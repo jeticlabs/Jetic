@@ -1,0 +1,18 @@
+{
+  "name": "@jetic/cli",
+  "version": "0.1.0",
+  "main": "dist/index.js",
+  "bin": {
+    "jetic": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "commander": "^12.0.0",
+    "@jetic/core": "workspace:*",
+    "@jetic/model": "workspace:*",
+    "@jetic/scanner": "workspace:*"
+  }
+}

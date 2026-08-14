@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+import { Command } from 'commander';
+import { initCommand } from './commands/init';
+import { scanCommand } from './commands/scan';
+import { inspectCommand } from './commands/inspect';
+import { configCommand } from './commands/config';
+
+const program = new Command();
+
+program
+  .name('jetic')
+  .description('AI-Native API Behavior Testing')
+  .version('0.1.0');
+
+program.addCommand(initCommand);
+program.addCommand(scanCommand);
+program.addCommand(inspectCommand);
+program.addCommand(configCommand);
+
+program.parse(process.argv);
