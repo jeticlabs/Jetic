@@ -12,6 +12,7 @@
     "@ai-sdk/openai": "^4.0.41",
     "@jetic/core": "workspace:*",
     "@jetic/model": "workspace:*",
+    "@openrouter/ai-sdk-provider": "^3.0.0",
     "ai": "^7.0.65",
     "dotenv": "^17.4.2",
     "ts-morph": "^21.0.1",

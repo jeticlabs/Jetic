@@ -10,11 +10,15 @@ export function normalizeDiscoveries(rawDiscoveries: RawDiscovery[]): Endpoint[]
     id: crypto.randomUUID(),
     method: raw.method as HttpMethod,
     path: raw.path,
+    handlerName: raw.handlerName,
     source: {
       file: raw.sourceFile,
       line: raw.line,
     },
-    parameters: [],
-    middleware: [],
+    requestBody: [],
+    returnOutput: [],
+    middleware: raw.middlewareNames
+      ? raw.middlewareNames.map((name) => ({ name }))
+      : [],
   }));
 }

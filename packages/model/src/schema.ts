@@ -8,9 +8,9 @@ export interface SourceReference {
 
 export interface Parameter {
   name: string;
-  in: 'query' | 'path' | 'header' | 'body';
+  in?: 'query' | 'path' | 'header' | 'body';
   type: string;
-  required: boolean;
+  required?: boolean;
 }
 
 export interface MiddlewareReference {
@@ -22,8 +22,10 @@ export interface Endpoint {
   id: string;
   method: HttpMethod;
   path: string;
+  handlerName?: string;
   source: SourceReference;
-  parameters: Parameter[];
+  requestBody: Parameter[];
+  returnOutput: Parameter[];
   middleware: MiddlewareReference[];
 }
 

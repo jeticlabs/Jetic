@@ -1,3 +1,5 @@
+![alt text](image.png)
+
 # Jetic
 
 **AI-Native API Behavior Testing**
@@ -39,6 +41,10 @@ The fastest way to understand Jetic is to run it against the included `express-s
 
 ```bash
 cd examples/express-shop
+
+# Set Apikey for openrounter
+
+SET OPENROUTER_API_KEY="API_KEY"
 
 # Initialize the Jetic configuration
 node ../../apps/cli/dist/index.js init

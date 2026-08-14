@@ -5,7 +5,17 @@ export const configCommand = new Command('config')
   .description('Manage Jetic configuration')
   .action(() => {
     const config = loadConfig();
-    console.log(JSON.stringify(config, null, 2));
+    
+    console.log('\n\x1b[1mJetic Configuration\x1b[0m\n');
+    const tableData = [
+      { Key: 'Project Root', Value: config.projectRoot },
+      { Key: 'Jetic Directory', Value: config.jeticDir },
+      { Key: 'AI Provider', Value: config.ai?.provider || 'Not set' },
+      { Key: 'AI Model', Value: config.ai?.model || 'Not set' },
+      { Key: 'API Key Env Var', Value: config.ai?.apiKeyEnvVar || 'Not set' }
+    ];
+    
+    console.table(tableData, ['Key', 'Value']);
   });
 
 configCommand
