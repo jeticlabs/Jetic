@@ -1,7 +1,7 @@
 <!-- PROJECT LOGO OR ANIMATED BANNER GOES HERE -->
 <!-- 💡 TIP: Replace this placeholder image with a high-quality animated GIF or beautiful banner showcasing the Jetic CLI in action. A tool like 'vhs' or 'terminalizer' works great for CLI animations. -->
 <p align="center">
-  <img src="https://via.placeholder.com/800x300.png?text=Jetic+AI-Native+API+Testing+Platform" alt="Jetic Banner">
+  <img src="https://avatars.githubusercontent.com/u/275651463?s=200&v=4" alt="Jetic Banner">
 </p>
 
 <h1 align="center">Jetic 🚀</h1>
