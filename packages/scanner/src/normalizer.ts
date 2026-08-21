@@ -15,8 +15,6 @@ export function normalizeDiscoveries(rawDiscoveries: RawDiscovery[]): Endpoint[]
       file: raw.sourceFile,
       line: raw.line,
     },
-    requestBody: [],
-    returnOutput: [],
     middleware: raw.middlewareNames
       ? raw.middlewareNames.map((name) => ({ name }))
       : [],

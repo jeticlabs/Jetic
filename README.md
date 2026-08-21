@@ -57,7 +57,31 @@ node ../../apps/cli/dist/index.js inspect
 
 # Inspect a specific endpoint in detail to see source provenance
 node ../../apps/cli/dist/index.js inspect endpoint GET /api/orders/:id
+
+# Simulate all endpoints against the live server (ensure the server is running)
+node ../../apps/cli/dist/index.js simulate endpoint --all
+
+# Simulate a specific endpoint with verbose output
+node ../../apps/cli/dist/index.js simulate endpoint GET /api/orders/:id --verbose
+
+# Generate + execute (uses AI)
+node ../../apps/cli/dist/index.js simulate workflow
+# Custom goal
+node ../../apps/cli/dist/index.js simulate workflow --goal "Admin creates exam, student enrolls, completes, gets results"
+# Use specific environment
+node ../../apps/cli/dist/index.js simulate workflow --env staging
+# Only generate the workflow.json, don't execute
+node ../../apps/cli/dist/index.js simulate workflow --generate-only
+# Use an existing workflow.json (skip AI generation)
+node ../../apps/cli/dist/index.js simulate workflow --workflow .jetic/workflow.json
+# Clear memory before run
+node ../../apps/cli/dist/index.js simulate workflow --clear-memory
+
+
 ```
+
+
+
 
 ## How It Works
 

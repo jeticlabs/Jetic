@@ -1,10 +1,49 @@
 import { Project } from 'ts-morph';
-import { BehavioralModel, CURRENT_MODEL_VERSION } from '@jetic/model';
+import { BehavioralModel, CURRENT_MODEL_VERSION, Environment } from '@jetic/model';
 import { normalizeDiscoveries } from './normalizer';
 import { discoverRoutes } from './route-discovery';
 import { AiAnalyzer } from './ai-analyzer';
 import { resolveRouteContext } from './import-resolver';
 import { JeticConfig } from '@jetic/core';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// ─── Environment Detection ────────────────────────────────────────────
+
+/**
+ * Auto-detect environments from the project's .env file and existing model.json.
+ * Priority: existing model.json environments > .env derived values > defaults.
+ */
+function detectEnvironments(projectRoot: string, jeticDir: string): Environment[] {
+  // 1. Check if there is an existing model.json with user-defined environments
+  const existingModelPath = path.join(jeticDir, 'model.json');
+  if (fs.existsSync(existingModelPath)) {
+    try {
+      const existing = JSON.parse(fs.readFileSync(existingModelPath, 'utf-8')) as BehavioralModel;
+      if (existing.environments && existing.environments.length > 0) {
+        return existing.environments; // preserve what the user has set
+      }
+    } catch {}
+  }
+
+  // 2. Try to read port / host from .env file
+  let port = 3000;
+  const envFilePath = path.join(projectRoot, '.env');
+  if (fs.existsSync(envFilePath)) {
+    try {
+      const envContent = fs.readFileSync(envFilePath, 'utf-8');
+      const portMatch = envContent.match(/^PORT\s*=\s*(\d+)/m);
+      if (portMatch) port = parseInt(portMatch[1], 10);
+    } catch {}
+  }
+
+  // 3. Build default local environment
+  const environments: Environment[] = [
+    { name: 'local', baseUrl: `http://localhost:${port}` },
+  ];
+
+  return environments;
+}
 
 // ─── Progress Reporter ───────────────────────────────────────────────
 class ProgressReporter {
@@ -18,8 +57,8 @@ class ProgressReporter {
   start() {
     this.startTime = Date.now();
     this.writeLine('');
-    this.writeLine('  \x1b[1m\x1b[36m⚡ Jetic AI Scanner\x1b[0m');
-    this.writeLine('  \x1b[2m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
+    this.writeLine('  \x1b[46m\x1b[30m\x1b[1m JETIC \x1b[0m  \x1b[36m\x1b[1mAI Scanner\x1b[0m');
+    //this.writeLine('  \x1b[2m──────────────────────────────────────────────────\x1b[0m');
     this.writeLine('');
   }
 
@@ -82,7 +121,7 @@ class ProgressReporter {
     const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(1);
 
     this.writeLine('');
-    this.writeLine('  \x1b[2m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
+    this.writeLine('  \x1b[2m──────────────────────────────────────────────────\x1b[0m');
     this.writeLine(`  \x1b[1m\x1b[32m✅ Analysis complete!\x1b[0m \x1b[2m(${elapsed}s)\x1b[0m`);
     this.writeLine('');
     this.writeLine(`  \x1b[36m├─\x1b[0m \x1b[1m${stats.endpoints}\x1b[0m endpoints discovered`);
@@ -197,16 +236,51 @@ export class ExpressScanner {
             staticMiddleware: ep.middleware.map((m) => m.name),
           });
 
-          ep.requestBody = aiData.requestBody;
-          ep.returnOutput = aiData.returnOutput;
+          // Convert AI-returned parameters into new schema format
+          if (aiData.requestBody.length > 0) {
+            const fields: Record<string, any> = {};
+            for (const param of aiData.requestBody) {
+              fields[param.name] = {
+                type: param.type,
+                required: param.required,
+                ...(param.in && param.in !== 'body' ? {} : {}),
+              };
+            }
+            ep.requestBody = {
+              contentType: 'application/json',
+              fields,
+              constraints: [],
+            };
+            // Store query/path/header params separately
+            const nonBodyParams = aiData.requestBody.filter((p) => p.in && p.in !== 'body');
+            if (nonBodyParams.length > 0) {
+              ep.parameters = nonBodyParams.map((p) => ({
+                name: p.name,
+                in: p.in as 'query' | 'path' | 'header',
+                type: p.type,
+                required: p.required,
+              }));
+            }
+          }
+
+          if (aiData.returnOutput.length > 0) {
+            const schema: Record<string, string> = {};
+            for (const field of aiData.returnOutput) {
+              schema[field.name] = field.type;
+            }
+            ep.responses = {
+              '200': { contentType: 'application/json', schema },
+            };
+          }
+
           // Merge: prefer AI middleware but keep static middleware as fallback
           if (aiData.middleware.length > 0) {
             ep.middleware = aiData.middleware;
           }
           // else keep the statically discovered middleware from normalizer
 
-          requestParamCount += ep.requestBody.length;
-          responseFieldCount += ep.returnOutput.length;
+          requestParamCount += aiData.requestBody.length;
+          responseFieldCount += aiData.returnOutput.length;
           middlewareRefCount += ep.middleware.length;
 
           progress.endpointDone(i, endpoints.length, ep.method, ep.path);
@@ -229,8 +303,18 @@ export class ExpressScanner {
     return {
       version: CURRENT_MODEL_VERSION,
       generatedAt: new Date().toISOString(),
-      project: { name: this.config.projectRoot.split('/').pop()?.split('\\').pop() || 'express-project' },
+      project: {
+        name: this.config.projectRoot.split('/').pop()?.split('\\').pop() || 'express-project',
+        language: 'typescript',
+        framework: 'express',
+      },
+      environments: detectEnvironments(this.config.projectRoot, this.config.jeticDir),
+      securitySchemes: {},
+      resources: [],
       endpoints,
+      dependencies: [],
+      workflows: [],
+      stateMachines: [],
     };
   }
 }

@@ -4,6 +4,8 @@ import { initCommand } from './commands/init';
 import { scanCommand } from './commands/scan';
 import { inspectCommand } from './commands/inspect';
 import { configCommand } from './commands/config';
+import { memoryCommand } from './commands/memory';
+import { simulateCommand } from './commands/simulate';
 
 const program = new Command();
 
@@ -16,5 +18,7 @@ program.addCommand(initCommand);
 program.addCommand(scanCommand);
 program.addCommand(inspectCommand);
 program.addCommand(configCommand);
+program.addCommand(memoryCommand);
+program.addCommand(simulateCommand);
 
 program.parse(process.argv);
