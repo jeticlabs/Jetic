@@ -20,6 +20,11 @@
     "@jetic/model": "workspace:*",
     "@jetic/scanner": "workspace:*",
     "@jetic/memory": "workspace:*",
-    "@jetic/simulator": "workspace:*"
+    "@jetic/simulator": "workspace:*",
+    "@jetic/dashboard": "workspace:*",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0"
   }
 }

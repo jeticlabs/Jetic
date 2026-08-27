@@ -6,6 +6,7 @@ import { inspectCommand } from './commands/inspect';
 import { configCommand } from './commands/config';
 import { memoryCommand } from './commands/memory';
 import { simulateCommand } from './commands/simulate';
+import { devCommand } from './commands/dev';
 
 const program = new Command();
 
@@ -20,5 +21,6 @@ program.addCommand(inspectCommand);
 program.addCommand(configCommand);
 program.addCommand(memoryCommand);
 program.addCommand(simulateCommand);
+program.addCommand(devCommand);
 
 program.parse(process.argv);
