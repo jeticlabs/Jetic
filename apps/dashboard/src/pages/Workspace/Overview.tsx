@@ -6,7 +6,7 @@ import {
   ChevronRight,
   Clock,
   Database,
-  GitBranch,
+
   Globe,
   Layers,
   Network,
@@ -16,7 +16,7 @@ import {
   Shield,
   Sparkles,
   Terminal,
-  TrendingUp,
+
   Workflow,
   Zap,
 } from 'lucide-react';

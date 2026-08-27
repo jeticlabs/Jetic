@@ -64,6 +64,30 @@ function shortKey(fullKey: string): string {
   return idx !== -1 ? fullKey.slice(idx + 1) : fullKey;
 }
 
+function MaskedValue({ value }: { value: string }) {
+  const [isHovered, setIsHovered] = useState(false);
+  const displayVal = value.length > 200 ? value.slice(0, 200) + '…' : value;
+
+  return (
+    <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className="cursor-pointer min-w-[200px]"
+    >
+      {isHovered ? (
+        <p className="text-zinc-300 text-wrap break-all transition-colors">
+          {displayVal}
+        </p>
+      ) : (
+        <p className="text-zinc-500 font-mono tracking-widest select-none">
+          ******
+        </p>
+      )}
+    </div>
+  );
+}
+
+
 // ─── ScopeGroup ──────────────────────────────────────────────────────────────
 
 
@@ -393,9 +417,7 @@ export function Memory() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <p className="text-zinc-400 text-wrap break-all min-w-[200px]">
-                          {val.length > 200 ? val.slice(0, 200) + '…' : val}
-                        </p>
+                        <MaskedValue value={val} />
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button

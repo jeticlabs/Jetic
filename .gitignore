@@ -3,6 +3,19 @@ dist/
 build/
 coverage/
 example/Backend
+apps/dashboard/node_modules
+apps/dashboard/dist
+apps/dashboard/build
+apps/dashboard/coverage
+apps/cli/node_modules
+apps/cli/dist
+apps/cli/build
+apps/cli/coverage
+apps/web/node_modules
+apps/web/dist
+apps/web/build
+apps/web/coverage
+
 # Jetic directories
 .jetic/
 
