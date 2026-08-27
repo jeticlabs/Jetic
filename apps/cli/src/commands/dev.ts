@@ -407,11 +407,18 @@ export const devCommand = new Command('dev')
       res.json({ ok: true });
     });
 
-    // We use the dashboard dist folder from the workspace node_modules
-    // since we've added @jetic/dashboard as a dependency.
+    // Locate the dashboard static files (bundled in dist/dashboard or resolved via workspace)
     try {
-      const dashboardPackagePath = require.resolve('@jetic/dashboard/package.json');
-      const dashboardDistPath = path.join(path.dirname(dashboardPackagePath), 'dist');
+      let dashboardDistPath = path.join(__dirname, 'dashboard');
+      if (!fs.existsSync(dashboardDistPath)) {
+        dashboardDistPath = path.join(__dirname, '..', 'dashboard');
+      }
+      if (!fs.existsSync(dashboardDistPath)) {
+        try {
+          const dashboardPackagePath = require.resolve('@jetic/dashboard/package.json');
+          dashboardDistPath = path.join(path.dirname(dashboardPackagePath), 'dist');
+        } catch {}
+      }
       
       if (!fs.existsSync(dashboardDistPath)) {
         console.warn(`Dashboard build not found at ${dashboardDistPath}. Please build the dashboard first.`);
@@ -421,7 +428,7 @@ export const devCommand = new Command('dev')
       app.use(express.static(dashboardDistPath));
 
       // SPA fallback
-      app.get('*', (req, res) => {
+      app.get('*', (_req, res) => {
         const indexPath = path.join(dashboardDistPath, 'index.html');
         if (fs.existsSync(indexPath)) {
           res.sendFile(indexPath);
@@ -430,7 +437,7 @@ export const devCommand = new Command('dev')
         }
       });
     } catch (e) {
-      console.error('Could not find @jetic/dashboard. Ensure it is installed and built.', e);
+      console.error('Could not find dashboard static files. Ensure it is built.', e);
     }
 
     app.listen(port, () => {

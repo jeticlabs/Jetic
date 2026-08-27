@@ -1,0 +1,57 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Jetic",
+  "logo": {
+    "light": "https://avatars.githubusercontent.com/u/275651463?s=200&v=4",
+    "dark": "https://avatars.githubusercontent.com/u/275651463?s=200&v=4"
+  },
+  "favicon": "https://avatars.githubusercontent.com/u/275651463?s=200&v=4",
+  "colors": {
+    "primary": "#7c3aed",
+    "light": "#a78bfa",
+    "dark": "#6d28d9"
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/jeticlabs"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Community Discord",
+    "url": "https://discord.gg/jeticlabs"
+  },
+  "navigation": [
+    {
+      "group": "Get Started",
+      "pages": [
+        "docs/introduction",
+        "docs/quickstart"
+      ]
+    },
+    {
+      "group": "Core Concepts",
+      "pages": [
+        "docs/architecture",
+        "docs/how-it-works"
+      ]
+    },
+    {
+      "group": "CLI Reference",
+      "pages": [
+        "docs/cli-commands"
+      ]
+    },
+    {
+      "group": "Jetic Studio Dashboard",
+      "pages": [
+        "docs/dashboard-overview"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/jeticlabs",
+    "discord": "https://discord.gg/jeticlabs",
+    "twitter": "https://twitter.com/jetic_ai"
+  }
+}

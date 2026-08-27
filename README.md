@@ -99,10 +99,10 @@ cd examples/express-shop
 export OPENROUTER_API_KEY="your_api_key_here"
 
 # Initialize Jetic configuration
-jetic init
+jetic-cli init
 
 # Scan the project and build the Behavioral Model
-jetic scan
+jetic-cli scan
 ```
 
 ---
@@ -115,19 +115,19 @@ jetic scan
 ### Inspect Discovered APIs
 ```bash
 # View all discovered endpoints
-jetic inspect
+jetic-cli inspect
 
 # Inspect a specific endpoint in detail (shows exact source provenance)
-jetic inspect endpoint GET /api/orders/:id
+jetic-cli inspect endpoint GET /api/orders/:id
 ```
 
 ### Simulate and Test Endpoints
 ```bash
 # Simulate all endpoints against the live server
-jetic simulate endpoint --all
+jetic-cli simulate endpoint --all
 
 # Simulate a specific endpoint with verbose output
-jetic simulate endpoint GET /api/orders/:id --verbose
+jetic-cli simulate endpoint GET /api/orders/:id --verbose
 ```
 
 ### AI-Powered Workflow Simulation 🧠
@@ -135,19 +135,19 @@ Jetic automatically deduces and executes entire API workflows (e.g., *Register �
 
 ```bash
 # Generate and execute an AI-driven workflow
-jetic simulate workflow
+jetic-cli simulate workflow
 
 # Test a custom natural-language goal
-jetic simulate workflow --goal "Admin creates exam, student enrolls, completes, gets results"
+jetic-cli simulate workflow --goal "Admin creates exam, student enrolls, completes, gets results"
 
 # Generate a workflow.json graph without executing it
-jetic simulate workflow --generate-only
+jetic-cli simulate workflow --generate-only
 
 # Execute an existing generated workflow
-jetic simulate workflow --workflow .jetic/workflow.json
+jetic-cli simulate workflow --workflow .jetic/workflow.json
 
 # Clear state/memory before running
-jetic simulate workflow --clear-memory
+jetic-cli simulate workflow --clear-memory
 ```
 
 ---
@@ -163,7 +163,7 @@ Jetic includes a premium, local developer dashboard (**Jetic Studio**) designed 
 pnpm --filter @jetic/dashboard dev
 
 # Or launch it directly via CLI (when linked)
-jetic dev
+jetic-cli dev
 ```
 
 ---
@@ -233,7 +233,7 @@ Real-time API request monitoring and event log viewer.
 
 ---
 
-#### ⚡ Jetic AI Assistant (Copilot Drawer) (comming soon)
+#### ⚡ Jetic AI Assistant (Copilot Drawer) (coming soon)
 Interactive AI assistant accessible anywhere in Jetic Studio via the sidebar or `Sparkles` trigger.
 - **Key Features**: Ask questions about your API structure, generate simulation goals, diagnose failing endpoints, and get instant recommendations directly within your workflow.
 

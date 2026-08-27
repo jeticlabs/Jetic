@@ -1,13 +1,39 @@
 {
-  "name": "@jetic/cli",
-  "version": "0.1.0",
+  "name": "jetic-cli",
+  "version": "0.1.1",
+  "description": "AI-Native API Behavior Testing & Discovery Platform — CLI and Local Studio Dashboard",
   "main": "dist/index.js",
   "bin": {
     "jetic": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"try { require('fs').cpSync('../dashboard/dist', './dist/dashboard', {recursive: true, force: true}); console.log('Bundled dashboard into dist/dashboard'); } catch (e) { console.warn('Could not bundle dashboard dist:', e.message); }\"",
     "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "jetic",
+    "api-testing",
+    "api-discovery",
+    "ast-parser",
+    "behavior-testing",
+    "workflow-simulation",
+    "express",
+    "nodejs",
+    "typescript",
+    "testing-framework",
+    "api-inspector",
+    "ai-testing"
+  ],
+  "author": "Jetic Labs <hello@jetic.online>",
+  "license": "ISC",
+  "homepage": "https://jetic.online",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jeticlabs/jetic.git",
+    "directory": "apps/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/jeticlabs/jetic/issues"
   },
   "dependencies": {
     "@faker-js/faker": "^9.0.0",
