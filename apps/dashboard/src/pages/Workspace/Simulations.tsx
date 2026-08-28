@@ -24,9 +24,12 @@ import {
   Loader2,
   LogsIcon,
   Play,
+  Plus,
   RefreshCw,
   RotateCcw,
   Square,
+  Trash2,
+  X,
   Zap,
 } from 'lucide-react';
 
@@ -46,6 +49,7 @@ interface WorkflowStep {
 
 interface Workflow {
   _file: string;
+  _legacy?: boolean;
   name: string;
   generatedAt?: string;
   steps: WorkflowStep[];
@@ -104,6 +108,17 @@ async function fetchWorkflows(): Promise<Workflow[]> {
   const r = await fetch('/api/workflows');
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
+}
+
+
+async function deleteWorkflow(file: string): Promise<void> {
+  // Extract slug from 'workflows/<slug>.json'
+  const slug = file.replace(/^workflows\//, '').replace(/\.json$/, '');
+  const r = await fetch(`/api/workflows/${encodeURIComponent(slug)}`, { method: 'DELETE' });
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}));
+    throw new Error(data.error ?? `HTTP ${r.status}`);
+  }
 }
 
 // ─── React Flow node types ─────────────────────────────────────────────────────
@@ -481,13 +496,26 @@ function makeInitialRunState(count: number): RunState {
   };
 }
 
-function WorkflowCard({ workflow }: { workflow: Workflow }) {
+function WorkflowCard({ workflow, onDelete }: { workflow: Workflow; onDelete: () => void }) {
   const [view, setView] = useState<'list' | 'graph'>('list');
   const [showLog, setShowLog] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [runState, setRunState] = useState<RunState>(() => makeInitialRunState(workflow.steps.length));
   const abortRef = useRef(false);
   const esRef = useRef<EventSource | null>(null);
+
+  const handleDelete = async () => {
+    if (!confirm(`Delete workflow "${workflow.name}"? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      await deleteWorkflow(workflow._file);
+      onDelete();
+    } catch (e: any) {
+      alert(`Failed to delete: ${e.message}`);
+      setDeleting(false);
+    }
+  };
 
   const stopRun = () => {
     abortRef.current = true;
@@ -796,6 +824,18 @@ function WorkflowCard({ workflow }: { workflow: Workflow }) {
               {hasResult ? 'Re-run' : 'Run'}
             </button>
           )}
+
+          {/* Delete (legacy workflows can't be deleted via API) */}
+          {!workflow._legacy && !isRunning && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              title="Delete workflow"
+              className="flex items-center gap-1 rounded border border-red-500/20 bg-red-500/[0.06] px-2 py-1 text-[10px] text-red-500/70 hover:bg-red-500/20 hover:text-red-400 transition-colors shrink-0 disabled:opacity-40"
+            >
+              {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+            </button>
+          )}
         </div>
 
         {/* ── Card body ── */}
@@ -847,10 +887,14 @@ function EmptyState() {
         </div>
       </div>
       <div>
-        <p className="font-medium text-zinc-300">No simulations found</p>
+        <p className="font-medium text-zinc-300">No workflows yet</p>
         <p className="mt-1 text-[11px] text-zinc-600">
-          Generate a workflow with <code className="text-zinc-500">jetic simulate-workflow</code> or create a{' '}
-          <code className="text-zinc-500">.jetic/workflow.json</code> file.
+          Create one with the{' '}
+          <span className="text-zinc-500">+ New Workflow</span> button, or run{' '}
+          <code className="text-zinc-500">jetic simulate workflow --goal "..."</code>
+        </p>
+        <p className="mt-1 text-[11px] text-zinc-700">
+          Workflows are stored in <code className="text-zinc-600">.jetic/workflows/</code>
         </p>
       </div>
     </div>
@@ -864,6 +908,12 @@ export function Simulations() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [newGoal, setNewGoal] = useState('');
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createLoading, setCreateLoading] = useState(false);
+
+  const resetCreate = () => { setCreating(false); setNewGoal(''); setCreateError(null); };
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
@@ -874,6 +924,32 @@ export function Simulations() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async () => {
+    if (!newGoal.trim()) return;
+    setCreateLoading(true);
+    setCreateError(null);
+    try {
+      // Try AI generation first
+      const r = await fetch('/api/workflows/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal: newGoal.trim() }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? `HTTP ${r.status}`);
+      resetCreate();
+      await load(true);
+    } catch (e: any) {
+      setCreateError(e.message);
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  const handleDelete = (file: string) => {
+    setWorkflows(prev => prev.filter(w => w._file !== file));
+  };
 
   return (
     <div className="flex min-h-full w-full flex-col">
@@ -890,13 +966,60 @@ export function Simulations() {
           </div>
         </div>
 
-        <button
-          onClick={() => load(true)}
-          disabled={refreshing || loading}
-          className="flex h-6 w-6 items-center justify-center rounded border border-white/[0.06] bg-white/[0.02] text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-300 disabled:opacity-40 transition-all"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* New Workflow button / inline form */}
+          {creating ? (
+            <div className="flex flex-col gap-2 rounded border border-violet-500/20 bg-violet-500/[0.04] p-3 w-80">
+              <div className="flex items-center gap-1.5 text-[10px] text-violet-400 font-medium">
+                <Zap className="h-3 w-3" /> AI Workflow Generator
+              </div>
+              <input
+                autoFocus
+                value={newGoal}
+                onChange={e => { setNewGoal(e.target.value); setCreateError(null); }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) handleCreate();
+                  if (e.key === 'Escape') resetCreate();
+                }}
+                placeholder="Describe the workflow goal, e.g. Admin creates workspace, invites teacher and logs out"
+                className="h-7 w-full rounded border border-violet-500/30 bg-white/[0.04] px-2 text-[11px] text-zinc-200 placeholder-zinc-600 outline-none focus:border-violet-500/60"
+              />
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={handleCreate}
+                  disabled={createLoading || !newGoal.trim()}
+                  className="flex h-6 flex-1 items-center justify-center gap-1.5 rounded border border-violet-500/40 bg-violet-500/20 px-2 text-[10px] text-violet-300 hover:bg-violet-500/30 transition-colors disabled:opacity-40"
+                >
+                  {createLoading
+                    ? <><Loader2 className="h-3 w-3 animate-spin" /> AI generating…</>
+                    : <><Zap className="h-3 w-3" /> Generate with AI</>}
+                </button>
+                <button
+                  onClick={resetCreate}
+                  className="flex h-6 w-6 items-center justify-center rounded border border-white/[0.06] bg-white/[0.02] text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+              {createError && <span className="text-[10px] text-red-400 leading-tight">{createError}</span>}
+            </div>
+          ) : (
+            <button
+              onClick={() => setCreating(true)}
+              className="flex h-6 items-center gap-1.5 rounded border border-violet-500/30 bg-violet-500/10 px-2.5 text-[10px] text-violet-400 hover:bg-violet-500/20 transition-colors"
+            >
+              <Plus className="h-3 w-3" /> New Workflow
+            </button>
+          )}
+
+          <button
+            onClick={() => load(true)}
+            disabled={refreshing || loading}
+            className="flex h-6 w-6 items-center justify-center rounded border border-white/[0.06] bg-white/[0.02] text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-300 disabled:opacity-40 transition-all"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {/* ── Body ── */}
@@ -925,14 +1048,13 @@ export function Simulations() {
 
         {!loading && !error && workflows.length > 0 && (
           <div className="space-y-5">
-            {workflows.map((wf, i) => <WorkflowCard key={`${wf._file}-${i}`} workflow={wf} />)}
+            {workflows.map((wf, i) => <WorkflowCard key={`${wf._file}-${i}`} workflow={wf} onDelete={() => handleDelete(wf._file)} />)}
           </div>
         )}
 
         {!loading && !error && workflows.length > 0 && (
           <div className="flex items-center gap-1.5 border-t border-white/[0.04] pt-3 text-[10px] text-zinc-700">
-            Workflow from <code className="text-zinc-600">.jetic/workflow.json</code>
-
+            Workflows from <code className="text-zinc-600">.jetic/workflows/</code>
           </div>
         )}
       </div>

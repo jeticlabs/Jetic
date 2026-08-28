@@ -120,44 +120,171 @@ async function generateWorkflow(
     throw new Error(`Unsupported AI provider: ${provider}`);
   }
 
-  // Build a concise endpoint summary for the prompt
-  const endpointSummary = model.endpoints
-    .map((ep) => {
-      const mw = ep.middleware.map((m) => m.name).join(', ');
-      const auth = mw ? ` [auth: ${mw}]` : '';
-      const resp = ep.responses?.['200']?.schema
-        ? ' → ' + Object.keys(ep.responses['200'].schema).slice(0, 5).join(', ')
-        : '';
-      const body = ep.requestBody?.fields
-        ? ' body:' + Object.keys(ep.requestBody.fields).slice(0, 5).join(',')
-        : '';
-      return `${ep.method} ${ep.path}${auth}${body}${resp}`;
-    })
-    .join('\n');
+  // ── Rich endpoint catalogue ──────────────────────────────────────────────
+  const endpointSummary = model.endpoints.map((ep) => {
+    const mw   = ep.middleware.map((m) => m.name).join(', ');
+    const auth = mw ? ` [requiresAuth: ${mw}]` : ' [public]';
 
-  const prompt = `You are an expert API test workflow designer.
-Given this API's endpoints, design a realistic end-to-end workflow that tests the most important user journey.
+    // Full body field list with types
+    const bodyFields = ep.requestBody?.fields
+      ? Object.entries(ep.requestBody.fields)
+          .map(([k, v]: [string, any]) => `${k}:${(v as any).type ?? 'string'}`)
+          .join(', ')
+      : '';
+    const bodyStr = bodyFields ? ` body={${bodyFields}}` : '';
 
-Project: ${model.project.name} (${model.project.framework})
+    // All response schemas (every status code)
+    const respParts: string[] = [];
+    for (const [status, def] of Object.entries(ep.responses ?? {})) {
+      const schema = (def as any).schema;
+      if (schema) {
+        const keys = Object.keys(schema).slice(0, 10).join(', ');
+        respParts.push(`${status}:{${keys}}`);
+      }
+    }
+    const respStr = respParts.length ? ` response=[${respParts.join(' | ')}]` : '';
+
+    return `${ep.method} ${ep.path}${auth}${bodyStr}${respStr}`;
+  }).join('\n');
+
+  const canonicalExample = `
+CANONICAL WORKFLOW FORMAT — follow this EXACTLY:
+{
+  "name": "Admin creates workspace, invites teacher, creates class and logs out",
+  "steps": [
+    {
+      "name": "Admin creates a workspace",
+      "method": "POST",
+      "path": "/api/workspaces/setup",
+      "description": "Register a new workspace with an admin account",
+      "body": {
+        "workspace_name": "{{faker.company.name}}",
+        "admin_name": "{{faker.internet.username}}",
+        "admin_email": "{{faker.internet.email}}",
+        "admin_password": "{{faker.internet.password}}"
+      },
+      "captureInput": {
+        "workflow:adminEmail": "admin_email",
+        "workflow:adminPassword": "admin_password",
+        "workflow:adminName": "admin_name",
+        "workflow:workspaceName": "workspace_name"
+      },
+      "capture": {
+        "workflow:workspaceID": "data.workspace.id",
+        "workflow:adminID": "data.admin.id"
+      },
+      "expectStatus": 201
+    },
+    {
+      "name": "Admin logs in",
+      "method": "POST",
+      "path": "/api/auth/login",
+      "description": "Authenticate with the created admin credentials",
+      "body": {
+        "user_email": "{{workflow:adminEmail}}",
+        "user_password": "{{workflow:adminPassword}}",
+        "deviceId": "{{faker.string.uuid}}",
+        "deviceName": "{{faker.commerce.productName}}"
+      },
+      "capture": {
+        "workflow:accessToken": "data.accessToken",
+        "workflow:refreshToken": "data.refreshToken"
+      },
+      "expectStatus": 200
+    },
+    {
+      "name": "Admin creates a class",
+      "method": "POST",
+      "path": "/api/classes",
+      "description": "Create a class inside the workspace using the access token",
+      "inject": {
+        "header:Authorization": "Bearer {{workflow:accessToken}}"
+      },
+      "body": {
+        "name": "{{faker.word.noun}} Class",
+        "workspaceId": "{{workflow:workspaceID}}"
+      },
+      "capture": {
+        "workflow:classID": "data.id"
+      },
+      "expectStatus": 201
+    },
+    {
+      "name": "Admin logs out",
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "description": "Invalidate the admin session",
+      "inject": {
+        "header:Authorization": "Bearer {{workflow:accessToken}}"
+      },
+      "body": {},
+      "expectStatus": 200
+    }
+  ]
+}`;
+
+  const prompt = `You are an expert API integration test designer.
+Output a workflow JSON that exercises a real end-to-end user journey for the API below.
+
+━━━ PROJECT ━━━
+Name: ${model.project.name}
+Framework: ${model.project.framework}
 Workflow goal: "${workflowName}"
 
-Endpoints:
+━━━ API ENDPOINTS ━━━
 ${endpointSummary}
 
-Rules:
-1. Order steps logically (auth first, then CRUD operations, then cleanup/logout).
-2. For each step, specify which response fields to "capture" into memory (e.g., accessToken, refreshToken, userId, workspaceId, examId etc.)
-3. For each step, specify which memory keys to "inject" — headers or body fields needed by this request.
-   - Use prefix "header:" for HTTP headers (e.g., "header:Authorization" → "Bearer {token}") 
-   - Use prefix "body:" for body fields injection
-   - Memory keys are in format "scope:key" e.g. "workflow:accessToken"
-4. The memory key format for capture is "scope:key" → "response.field.path" (dot-notation).
-   Bearer tokens should be stored with the full "Bearer " prefix if needed.
-5. For body fields that must be generated (email, password, name), use realistic placeholder values.
-6. Mark "expectStatus": 201 for creation routes, 200 for others, 204 for deletes.
-7. Include between 5-12 steps covering the full lifecycle.
+━━━ TEMPLATE SYNTAX ━━━
+Use EXACTLY these placeholders in body/inject values:
+  {{faker.internet.email}}         random email
+  {{faker.internet.password}}      random password
+  {{faker.internet.username}}      random username
+  {{faker.company.name}}           random company name
+  {{faker.person.fullName}}        random full name
+  {{faker.word.noun}}              random noun
+  {{faker.word.adjective}}         random adjective
+  {{faker.string.uuid}}            UUID v4
+  {{faker.commerce.productName}}   product name
+  {{faker.phone.number}}           phone number
+  {{workflow:KEY}}                 value captured from a previous step
 
-Return a JSON object matching this schema exactly.`;
+━━━ FIELD RULES ━━━
+"body"         — request body. Use {{faker.*}} for generated fields, {{workflow:KEY}} for previously captured values.
+
+"captureInput" — save RESOLVED body field values to memory BEFORE the HTTP call.
+               Only for faker-generated fields you need to re-use in later steps.
+               Format: { "workflow:KEY": "bodyFieldName" }
+               Example: { "workflow:adminEmail": "admin_email" }
+               ⚠ Only capture fields present in THIS step's body.
+
+"capture"      — save RESPONSE body field values to memory AFTER success.
+               Format: { "workflow:KEY": "dot.notation.path" }
+               Example: { "workflow:accessToken": "data.accessToken" }
+               ⚠ Use exact dot-notation paths from the response schema shown above.
+               ⚠ Only capture values that subsequent steps actually need.
+
+"inject"       — inject memory values into headers/body before this step runs.
+               Bearer auth: { "header:Authorization": "Bearer {{workflow:accessToken}}" }
+               Body inject: { "body:fieldName": "{{workflow:KEY}}" }
+               ⚠ EVERY endpoint marked [requiresAuth] MUST inject the Authorization header.
+
+"expectStatus" — 201 for resource creation, 200 for login/logout/GET, 204 for DELETE.
+
+━━━ ORDERING ━━━
+1. Registration / setup  (public, faker body, captureInput for credentials)
+2. Authentication        (login with captured creds, capture tokens)
+3. CRUD operations       (inject auth, reference captured IDs in body)
+4. Cleanup / logout      (inject auth)
+
+━━━ EXAMPLE ━━━
+${canonicalExample}
+
+━━━ GENERATE ━━━
+Using ONLY the endpoints listed above (exact methods and paths), generate a complete
+workflow JSON for: "${workflowName}".
+Requirements: 5-12 steps, every step has name/method/path/description/body/expectStatus,
+all [requiresAuth] endpoints inject Authorization, captures wired correctly between steps.
+`;
 
   const importDynamic = new Function('modulePath', 'return import(modulePath)');
   const { generateObject } = await importDynamic('ai');
@@ -171,36 +298,41 @@ Return a JSON object matching this schema exactly.`;
     aiModelObj = createOpenRouter({ apiKey })(aiModel);
   }
 
+  // ── Strict Zod schema — matches canonical format exactly ──────────────────
   const StepSchema = z.object({
-    name: z.string(),
-    method: z.string(),
-    path: z.string(),
-    description: z.string().optional(),
-    inject: z.record(z.string(), z.string()).optional(),
-    capture: z.record(z.string(), z.string()).optional(),
-    expectStatus: z.number().optional(),
-    body: z.record(z.string(), z.any()).optional(),
+    name:         z.string().describe('Short label for this step, e.g. "Admin logs in"'),
+    method:       z.string().describe('HTTP method in uppercase: GET, POST, PUT, PATCH, DELETE'),
+    path:         z.string().describe('Exact endpoint path, e.g. /api/auth/login'),
+    description:  z.string().optional().describe('One sentence describing what this step does'),
+    body:         z.record(z.string(), z.any()).optional()
+                    .describe('Request body. Use {{faker.X}} for generated values, {{workflow:KEY}} for captured values'),
+    captureInput: z.record(z.string(), z.string()).optional()
+                    .describe('Save resolved request body fields to memory BEFORE the HTTP call. Format: { "workflow:KEY": "bodyFieldName" }'),
+    capture:      z.record(z.string(), z.string()).optional()
+                    .describe('Save response body fields to memory AFTER success. Format: { "workflow:KEY": "dot.path" }'),
+    inject:       z.record(z.string(), z.string()).optional()
+                    .describe('Inject memory values into headers/body. Use "header:Authorization" for Bearer auth'),
+    expectStatus: z.number().int().min(100).max(599)
+                    .describe('Expected HTTP status: 201 for creates, 200 for others, 204 for deletes'),
   });
 
   const WorkflowSchema = z.object({
-    name: z.string(),
-    description: z.string().optional(),
-    steps: z.array(StepSchema),
+    name:  z.string().describe('Descriptive workflow name summarising the journey tested'),
+    steps: z.array(StepSchema).min(3).max(15),
   });
 
   const { object } = await generateObject({
-    model: aiModelObj,
-    mode: 'json',
-    maxTokens: 2000,
-    schema: WorkflowSchema,
+    model:     aiModelObj,
+    mode:      'json',
+    maxTokens: 4000,
+    schema:    WorkflowSchema,
     prompt,
   });
 
   return {
-    name: object.name as string,
-    description: object.description as string | undefined,
+    name:        object.name as string,
     generatedAt: new Date().toISOString(),
-    steps: object.steps as WorkflowStepDef[],
+    steps:       object.steps as WorkflowStepDef[],
   };
 }
 
@@ -624,24 +756,74 @@ export const simulateWorkflowCommand = new Command('workflow')
   .description('Generate and execute a full end-to-end workflow test from model.json')
   .option('--goal <text>', 'Describe the workflow goal', 'Full user journey')
   .option('--env <name>', 'Environment name to use from model.json')
-  .option('--workflow <file>', 'Use an existing workflow.json instead of generating')
-  .option('--generate-only', 'Only generate workflow.json without executing')
+  .option('--workflow <value>', 'Workflow name/slug or file path to use instead of generating')
+  .option('--generate-only', 'Only generate the workflow file without executing')
   .option('--clear-memory', 'Clear Jetic memory before running', false)
+  .option('--list', 'List all available workflows in .jetic/workflows/')
   .action(async (options: {
     goal: string;
     env?: string;
     workflow?: string;
     generateOnly?: boolean;
     clearMemory?: boolean;
+    list?: boolean;
   }) => {
+    const config = loadConfig();
+    const jeticDir = config.jeticDir;
+    const workflowsDir = path.join(jeticDir, 'workflows');
+
+    // ── --list mode ──────────────────────────────────────────────────────────
+    if (options.list) {
+      console.log('');
+      console.log(`  ${c.bgCyan}${c.black}${c.bold} JETIC ${c.reset}  ${c.cyan}${c.bold}Available Workflows${c.reset}`);
+      console.log('');
+
+      const slugs: string[] = [];
+      if (fs.existsSync(workflowsDir)) {
+        fs.readdirSync(workflowsDir)
+          .filter(f => f.endsWith('.json'))
+          .forEach(f => slugs.push(f.replace(/\.json$/, '')));
+      }
+
+      const legacyPath = path.join(jeticDir, 'workflow.json');
+      const hasLegacy = fs.existsSync(legacyPath);
+
+      if (slugs.length === 0 && !hasLegacy) {
+        console.log(`  ${c.yellow}No workflows found.${c.reset}`);
+        console.log(`  ${c.dim}Run \`jetic simulate workflow --goal "<description>"\` to generate one.${c.reset}\n`);
+        process.exit(0);
+      }
+
+      for (const slug of slugs) {
+        const wfPath = path.join(workflowsDir, `${slug}.json`);
+        try {
+          const data = JSON.parse(fs.readFileSync(wfPath, 'utf-8'));
+          console.log(`  ${c.cyan}◆${c.reset} ${c.bold}${slug}${c.reset}  ${c.dim}${data.name ?? ''}  •  ${data.steps?.length ?? 0} steps${c.reset}`);
+        } catch {
+          console.log(`  ${c.dim}◆ ${slug}${c.reset}`);
+        }
+      }
+
+      if (hasLegacy) {
+        try {
+          const data = JSON.parse(fs.readFileSync(legacyPath, 'utf-8'));
+          console.log(`  ${c.dim}◇ workflow  (legacy .jetic/workflow.json  •  ${data.name ?? ''}  •  ${data.steps?.length ?? 0} steps)${c.reset}`);
+        } catch {
+          console.log(`  ${c.dim}◇ workflow (legacy)${c.reset}`);
+        }
+      }
+
+      console.log('');
+      process.exit(0);
+    }
+
+    // ── Banner ────────────────────────────────────────────────────────────────
     console.log('');
     console.log(`  ${c.bgCyan}${c.black}${c.bold} JETIC ${c.reset}  ${c.cyan}${c.bold}Workflow Runner${c.reset}`);
-   // console.log(`  ${SEP}`);
     console.log('');
 
-    // ── Load config & model ────────────────────────────────────────────
-    const config = loadConfig();
-    const modelPath = path.join(config.jeticDir, 'model.json');
+    // ── Load model ────────────────────────────────────────────────────────────
+    const modelPath = path.join(jeticDir, 'model.json');
     const model = readJsonSync<BehavioralModel>(modelPath);
 
     if (!model) {
@@ -651,20 +833,42 @@ export const simulateWorkflowCommand = new Command('workflow')
 
     console.log(`  ${c.dim}Model: ${model.project.name} • ${model.endpoints.length} endpoints${c.reset}\n`);
 
-    // ── Optionally clear memory ────────────────────────────────────────
+    // ── Optionally clear memory ───────────────────────────────────────────────
     if (options.clearMemory) {
       JeticMemory.clearAllMemory();
       console.log(`  ${c.yellow}🧹${c.reset} Jetic memory cleared\n`);
     }
 
-    // ── Load or generate workflow ──────────────────────────────────────
+    // ── Resolve workflow path ─────────────────────────────────────────────────
     let workflow: WorkflowDef;
-    const workflowPath = options.workflow
-      ? path.resolve(options.workflow)
-      : path.join(config.jeticDir, 'workflow.json');
+    let workflowPath: string;
 
-    if (options.workflow && fs.existsSync(workflowPath)) {
-      // Use provided workflow file
+    if (options.workflow) {
+      const val = options.workflow;
+      // Plain slug (no path separators or .json extension) → look in .jetic/workflows/
+      const isSlug = !val.includes('/') && !val.includes('\\') && !val.endsWith('.json');
+      if (isSlug) {
+        workflowPath = path.join(workflowsDir, `${val}.json`);
+        if (!fs.existsSync(workflowPath)) {
+          // Legacy convenience: slug "workflow" → .jetic/workflow.json
+          const legacyPath = path.join(jeticDir, 'workflow.json');
+          if (val === 'workflow' && fs.existsSync(legacyPath)) {
+            workflowPath = legacyPath;
+          } else {
+            console.error(`  ${c.red}✗${c.reset} Workflow "${val}" not found in ${workflowsDir}\n`);
+            console.error(`  ${c.dim}Run \`jetic simulate workflow --list\` to see available workflows.${c.reset}\n`);
+            process.exit(1);
+          }
+        }
+      } else {
+        workflowPath = path.resolve(val);
+      }
+
+      if (!fs.existsSync(workflowPath)) {
+        console.error(`  ${c.red}✗${c.reset} Workflow file not found: ${workflowPath}\n`);
+        process.exit(1);
+      }
+
       try {
         workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf-8'));
         console.log(`  ${TICK} Loaded workflow: ${c.bold}${workflow.name}${c.reset}  ${c.dim}(${workflowPath})${c.reset}\n`);
@@ -673,7 +877,10 @@ export const simulateWorkflowCommand = new Command('workflow')
         process.exit(1);
       }
     } else {
-      // Generate with AI
+      // Generate with AI — save to .jetic/workflows/<slug>.json
+      const slug = options.goal.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workflow';
+      workflowPath = path.join(workflowsDir, `${slug}.json`);
+
       const spinner = new Spinner();
       spinner.start(`${c.magenta}🤖 AI generating workflow for: "${options.goal}"...${c.reset}`);
 
@@ -681,8 +888,7 @@ export const simulateWorkflowCommand = new Command('workflow')
         workflow = await generateWorkflow(model, config, options.goal);
         spinner.stop(`  ${TICK} Workflow generated: ${c.bold}${workflow.name}${c.reset}  ${c.dim}(${workflow.steps.length} steps)${c.reset}`);
 
-        // Save workflow.json
-        fs.mkdirSync(path.dirname(workflowPath), { recursive: true });
+        fs.mkdirSync(workflowsDir, { recursive: true });
         fs.writeFileSync(workflowPath, JSON.stringify(workflow, null, 2), 'utf-8');
         console.log(`  ${c.dim}   Saved to ${workflowPath}${c.reset}\n`);
       } catch (err: any) {
@@ -693,14 +899,14 @@ export const simulateWorkflowCommand = new Command('workflow')
       }
     }
 
-    // ── Generate-only mode ─────────────────────────────────────────────
+    // ── Generate-only mode ────────────────────────────────────────────────────
     if (options.generateOnly) {
       renderWorkflowHeader(workflow);
       console.log(`  ${c.green}✓${c.reset} Workflow saved. Run without ${c.bold}--generate-only${c.reset} to execute.\n`);
       process.exit(0);
     }
 
-    // ── Pick environment ───────────────────────────────────────────────
+    // ── Pick environment ──────────────────────────────────────────────────────
     let baseUrl: string;
     const envs = model.environments || [];
 
@@ -717,7 +923,7 @@ export const simulateWorkflowCommand = new Command('workflow')
       baseUrl = await pickEnvironment(model);
     }
 
-    // ── Check Backend Health ───────────────────────────────────────────
+    // ── Check Backend Health ──────────────────────────────────────────────────
     const checkSpinner = new Spinner();
     checkSpinner.start(`Checking if backend is active at ${baseUrl}...`);
     try {
@@ -731,11 +937,11 @@ export const simulateWorkflowCommand = new Command('workflow')
       process.exit(1);
     }
 
-    // ── Render workflow graph ──────────────────────────────────────────
+    // ── Render workflow graph ──────────────────────────────────────────────────
     renderWorkflowHeader(workflow);
     console.log(`  ${c.magenta}🚀${c.reset} Executing workflow steps...\n`);
 
-    // ── Execute steps ──────────────────────────────────────────────────
+    // ── Execute steps ─────────────────────────────────────────────────────────
     const results: StepResult[] = [];
     const totalStart = Date.now();
     let stopOnFailure = false;

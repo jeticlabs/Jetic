@@ -99,10 +99,10 @@ cd examples/express-shop
 export OPENROUTER_API_KEY="your_api_key_here"
 
 # Initialize Jetic configuration
-jetic-cli init
+jetic init
 
 # Scan the project and build the Behavioral Model
-jetic-cli scan
+jetic scan
 ```
 
 ---
@@ -115,19 +115,19 @@ jetic-cli scan
 ### Inspect Discovered APIs
 ```bash
 # View all discovered endpoints
-jetic-cli inspect
+jetic inspect
 
 # Inspect a specific endpoint in detail (shows exact source provenance)
-jetic-cli inspect endpoint GET /api/orders/:id
+jetic inspect endpoint GET /api/orders/:id
 ```
 
 ### Simulate and Test Endpoints
 ```bash
 # Simulate all endpoints against the live server
-jetic-cli simulate endpoint --all
+jetic simulate endpoint --all
 
 # Simulate a specific endpoint with verbose output
-jetic-cli simulate endpoint GET /api/orders/:id --verbose
+jetic simulate endpoint GET /api/orders/:id --verbose
 ```
 
 ### AI-Powered Workflow Simulation ðŸ§ 
@@ -135,19 +135,19 @@ Jetic automatically deduces and executes entire API workflows (e.g., *Register â
 
 ```bash
 # Generate and execute an AI-driven workflow
-jetic-cli simulate workflow
+jetic simulate workflow
 
 # Test a custom natural-language goal
-jetic-cli simulate workflow --goal "Admin creates exam, student enrolls, completes, gets results"
+jetic simulate workflow --goal "Admin creates exam, student enrolls, completes, gets results"
 
 # Generate a workflow.json graph without executing it
-jetic-cli simulate workflow --generate-only
+jetic simulate workflow --generate-only
 
 # Execute an existing generated workflow
-jetic-cli simulate workflow --workflow .jetic/workflow.json
+jetic simulate workflow --workflow .jetic/workflow.json
 
 # Clear state/memory before running
-jetic-cli simulate workflow --clear-memory
+jetic simulate workflow --clear-memory
 ```
 
 ---
@@ -163,7 +163,7 @@ Jetic includes a premium, local developer dashboard (**Jetic Studio**) designed 
 pnpm --filter @jetic/dashboard dev
 
 # Or launch it directly via CLI (when linked)
-jetic-cli dev
+jetic dev
 ```
 
 ---

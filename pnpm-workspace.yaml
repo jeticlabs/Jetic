@@ -1,4 +1,7 @@
 packages:
   - 'apps/*'
   - 'packages/*'
- 
+allowBuilds:
+  '@swc/core': true
+  '@tailwindcss/oxide': true
+  esbuild: true

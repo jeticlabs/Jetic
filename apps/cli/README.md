@@ -1,11 +1,7 @@
-<p align="center">
-  <img src="https://avatars.githubusercontent.com/u/275651463?s=200&v=4" alt="Jetic Banner" width="120">
-</p>
-
-<h1 align="center">jetic-cli 🚀</h1>
+<h1 align="center">Jetic 🚀</h1>
 
 <p align="center">
-  <strong>AI-Native API Behavior Testing & Discovery Platform</strong>
+  <strong>AI-Native API Behavior Testing & Discovery Tool</strong>
 </p>
 
 <p align="center">
@@ -18,7 +14,7 @@
 
 ## ⚡ What is Jetic?
 
-**Jetic** is a programmable developer platform that **automatically understands, models, and tests an application's API behavior directly from its source code.**
+**Jetic** is a programmable developer tool that **automatically understands, models, and tests an application's API behavior directly from its source code.**
 
 It connects to your Node.js/Express backend, statically analyzes the codebase using AST parsing (`ts-morph`), discovers endpoint structures and business logic constraints (e.g. `quantity > 0` or `role === "admin"`), builds a live behavioral graph, and uses AI to generate and execute end-to-end multi-step workflow tests.
 
