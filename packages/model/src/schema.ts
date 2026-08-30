@@ -66,6 +66,7 @@ export interface FieldDefinition {
   default?: any;
   enum?: string[];
   description?: string;
+  example?: any;
 }
 
 // ─── Constraints ────────────────────────────────────────────────────────────
@@ -97,25 +98,31 @@ export interface Constraint {
 
 export interface RequestBody {
   contentType: string | null;
+  required?: boolean;
   fields: Record<string, FieldDefinition>;
   constraints?: Constraint[];
 }
 
 export interface ResponseDefinition {
   contentType?: string;
+  description?: string;
   schema?: Record<string, string>;
+  example?: any;
   condition?: string;
   ownershipCheck?: boolean;
 }
 
-// ─── Parameters (query, path, header) ───────────────────────────────────────
+// ─── Parameters (query, path, header, cookie) ───────────────────────────────
 
 export interface Parameter {
   name: string;
-  in?: 'query' | 'path' | 'header' | 'body';
+  /** Where the parameter lives in the HTTP request */
+  in?: 'query' | 'path' | 'header' | 'cookie' | 'body';
   type: string;
+  format?: string;
   required?: boolean;
   default?: any;
+  example?: any;
   min?: number;
   max?: number;
   description?: string;
@@ -188,22 +195,37 @@ export interface Endpoint {
   id: string;
   method: HttpMethod;
   path: string;
+
+  /** Human-readable name, e.g. "Create User" */
+  name?: string;
+
+  /** Short description of what this endpoint does */
+  description?: string;
+
+  /** Grouping tags, e.g. ["auth", "users"] */
+  tags?: string[];
+
+  /** Whether this endpoint is deprecated */
+  deprecated?: boolean;
+
+  /** Request timeout in milliseconds */
+  timeout?: number;
+
   resource?: string;
   handlerName?: string;
   source: SourceReference;
   summary?: string;
-  tags?: string[];
 
   /** Security requirements for this endpoint */
   security?: EndpointSecurity[];
 
-  /** Query/path/header parameters */
+  /** Query / path / header / cookie parameters */
   parameters?: Parameter[];
 
   /** Request body definition */
   requestBody?: RequestBody;
 
-  /** Response definitions keyed by status code */
+  /** Response definitions keyed by HTTP status code string */
   responses?: Record<string, ResponseDefinition>;
 
   /** Middleware chain */
@@ -310,4 +332,4 @@ export interface BehavioralModel {
   stateMachines?: StateMachine[];
 }
 
-export const CURRENT_MODEL_VERSION = '0.2';
+export const CURRENT_MODEL_VERSION = '0.3';

@@ -7,13 +7,14 @@ import { configCommand } from './commands/config';
 import { memoryCommand } from './commands/memory';
 import { simulateCommand } from './commands/simulate';
 import { devCommand } from './commands/dev';
+import { upgradeCommand } from './commands/upgrade';
 
 const program = new Command();
 
 program
   .name('jetic')
   .description('AI-Native API Behavior Testing')
-  .version('0.1.0');
+  .version('0.1.3');
 
 program.addCommand(initCommand);
 program.addCommand(scanCommand);
@@ -22,5 +23,6 @@ program.addCommand(configCommand);
 program.addCommand(memoryCommand);
 program.addCommand(simulateCommand);
 program.addCommand(devCommand);
+program.addCommand(upgradeCommand);
 
 program.parse(process.argv);

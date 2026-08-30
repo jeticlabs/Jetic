@@ -3,6 +3,7 @@ import { Sidebar } from "./components/layout/Sidebar";
 //import { Topbar } from "./components/layout/Topbar";
 import { AssistantPanel } from "./components/layout/AssistantPanel";
 import { type PageId } from "./types";
+import { ThemeProvider } from "./context/ThemeContext";
 
 // Workspace
 import { Overview } from "./pages/Workspace/Overview";
@@ -51,7 +52,7 @@ const VALID_PAGES: PageId[] = [
   "traces", "events", "settings", "docs"
 ];
 
-export const App = () => {
+function AppInner() {
   const [currentPage, setCurrentPage] = useState<PageId>(() => {
     const saved = localStorage.getItem("active_sidebar_item") as PageId;
     return VALID_PAGES.includes(saved) ? saved : "overview";
@@ -65,6 +66,9 @@ export const App = () => {
       return null;
     }
   });
+
+  // Trace filter context: when navigating to Traces from Simulations/Model
+  const [traceFilter, setTraceFilter] = useState<{ workflowName?: string; endpointPath?: string; traceId?: string } | undefined>(undefined);
 
   useEffect(() => {
     localStorage.setItem("active_sidebar_item", currentPage);
@@ -80,6 +84,7 @@ export const App = () => {
 
   const navigateTo = (page: PageId) => {
     if (page !== "inspect") setInspectedEndpoint(null);
+    if (page !== "traces") setTraceFilter(undefined);
     setCurrentPage(page);
   };
 
@@ -88,12 +93,18 @@ export const App = () => {
     setCurrentPage("inspect");
   };
 
+  /** Navigate to Traces page with an optional filter (workflow name or endpoint path) */
+  const navigateToTraces = (filter?: { workflowName?: string; endpointPath?: string; traceId?: string }) => {
+    setTraceFilter(filter);
+    setCurrentPage('traces');
+  };
+
   const renderPage = () => {
     switch (currentPage) {
       // Workspace
       case "overview": return <Overview onNavigate={navigateTo as any} />;
-      case "simulations": return <Simulations />;
-      case "model": return <Model onInspect={handleInspect} />;
+      case "simulations": return <Simulations onViewTraces={navigateToTraces} />;
+      case "model": return <Model onInspect={handleInspect} onViewTraces={navigateToTraces} />;
       case "inspect": return <Inspect endpoint={inspectedEndpoint} onBack={() => navigateTo("model")} />;
 
       // Agent
@@ -109,7 +120,7 @@ export const App = () => {
       case "webhooks": return <Webhooks />;
 
       // Observability
-      case "traces": return <Traces />;
+      case "traces": return <Traces initialFilter={traceFilter} onNavigate={navigateTo} />;
       case "events": return <Events />;
 
       // Misc
@@ -121,7 +132,10 @@ export const App = () => {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#0a0a0a] text-zinc-300 antialiased [font-feature-settings:'ss01'] font-sans text-xs">
+    <div
+      className="flex h-screen w-full overflow-hidden antialiased [font-feature-settings:'ss01'] font-sans text-xs transition-colors duration-300"
+      style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-secondary)' }}
+    >
       <Sidebar
         currentPage={currentPage}
         onNavigate={navigateTo}
@@ -131,7 +145,10 @@ export const App = () => {
 
       <div className="flex min-w-0 flex-1 flex-col relative">
 
-        <div className="flex min-h-0 flex-1 overflow-auto bg-[#0a0a0a]">
+        <div
+          className="flex min-h-0 flex-1 overflow-auto transition-colors duration-300"
+          style={{ backgroundColor: 'var(--bg-base)' }}
+        >
           {renderPage()}
         </div>
 
@@ -142,4 +159,10 @@ export const App = () => {
       </div>
     </div>
   );
-};
+}
+
+export const App = () => (
+  <ThemeProvider>
+    <AppInner />
+  </ThemeProvider>
+);

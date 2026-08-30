@@ -3,3 +3,53 @@
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* ─── Dark mode (default) ─────────────────────────────────────────── */
+:root {
+  --bg-base:       #0a0a0a;
+  --bg-surface:    #111111;
+  --bg-elevated:   #161616;
+  --bg-overlay:    rgba(255,255,255,0.03);
+  --bg-overlay-md: rgba(255,255,255,0.06);
+  --border:        rgba(255,255,255,0.08);
+  --border-md:     rgba(255,255,255,0.12);
+  --text-primary:  #ffffff;
+  --text-secondary:#d4d4d8;  /* zinc-300 */
+  --text-muted:    #71717a;  /* zinc-500 */
+  --text-faint:    #3f3f46;  /* zinc-700 */
+  --sidebar-bg:    rgba(0,0,0,0.30);
+}
+
+/* ─── Light mode ──────────────────────────────────────────────────── */
+html.light {
+  --bg-base:       #f4f4f5;
+  --bg-surface:    #ffffff;
+  --bg-elevated:   #fafafa;
+  --bg-overlay:    rgba(0,0,0,0.03);
+  --bg-overlay-md: rgba(0,0,0,0.06);
+  --border:        rgba(0,0,0,0.10);
+  --border-md:     rgba(0,0,0,0.16);
+  --text-primary:  #09090b;
+  --text-secondary:#27272a;  /* zinc-800 */
+  --text-muted:    #71717a;  /* zinc-500 */
+  --text-faint:    #a1a1aa;  /* zinc-400 */
+  --sidebar-bg:    #ffffff;
+}
+
+/* Apply base background to body */
+body {
+  background-color: var(--bg-base);
+  color: var(--text-secondary);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* ─── Theme-aware utility shims ───────────────────────────────────── */
+.theme-bg-base     { background-color: var(--bg-base); }
+.theme-bg-surface  { background-color: var(--bg-surface); }
+.theme-bg-elevated { background-color: var(--bg-elevated); }
+.theme-border      { border-color: var(--border); }
+.theme-text        { color: var(--text-secondary); }
+.theme-text-muted  { color: var(--text-muted); }
+.theme-text-primary{ color: var(--text-primary); }
+.theme-sidebar     { background-color: var(--sidebar-bg); }
+

@@ -49,6 +49,52 @@ export const devCommand = new Command('dev')
       }
     });
 
+    // Create a brand-new endpoint
+    app.post('/api/model/endpoint', (req, res) => {
+      const jeticDir = path.join(process.cwd(), '.jetic');
+      const modelPath = path.join(jeticDir, 'model.json');
+      try {
+        const ep = req.body;
+        if (!ep.method || !ep.path) {
+          return res.status(400).json({ error: 'method and path are required' });
+        }
+
+        // Ensure .jetic dir exists
+        if (!fs.existsSync(jeticDir)) fs.mkdirSync(jeticDir, { recursive: true });
+
+        // Load or create model.json
+        let model: any;
+        if (fs.existsSync(modelPath)) {
+          model = JSON.parse(fs.readFileSync(modelPath, 'utf8'));
+        } else {
+          model = {
+            version: '1',
+            generatedAt: new Date().toISOString(),
+            project: { name: path.basename(process.cwd()) },
+            endpoints: [],
+          };
+        }
+
+        // Auto-generate id if not provided
+        if (!ep.id) {
+          const base = `${ep.method.toLowerCase()}-${ep.path.replace(/^\//, '').replace(/[/:{}]/g, '-').replace(/-+/g, '-').replace(/-$/, '')}`;
+          let id = base;
+          let counter = 2;
+          while (model.endpoints.some((e: any) => e.id === id)) {
+            id = `${base}-${counter++}`;
+          }
+          ep.id = id;
+        }
+
+        model.endpoints.push(ep);
+        model.generatedAt = new Date().toISOString();
+        fs.writeFileSync(modelPath, JSON.stringify(model, null, 2), 'utf8');
+        res.json({ ok: true, endpoint: ep, model });
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
     app.post('/api/model/scan', async (_req, res) => {
       try {
         const { loadConfig, writeJsonSync, ensureDirSync } = await import('@jetic/core');
@@ -63,6 +109,82 @@ export const devCommand = new Command('dev')
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }
+    });
+
+    // ─── Environments API ────────────────────────────────────────────────
+
+    function readModel(modelPath: string): any | null {
+      if (!fs.existsSync(modelPath)) return null;
+      return JSON.parse(fs.readFileSync(modelPath, 'utf8'));
+    }
+    function writeModel(modelPath: string, model: any) {
+      fs.writeFileSync(modelPath, JSON.stringify(model, null, 2), 'utf8');
+    }
+
+    app.get('/api/model/environments', (req, res) => {
+      const modelPath = path.join(process.cwd(), '.jetic', 'model.json');
+      const model = readModel(modelPath);
+      if (!model) return res.json({ environments: [], defaultEnvironment: null });
+      const envs = model.environments ?? [];
+      const defaultEnv = model.defaultEnvironment || envs.find((e: any) => e.default)?.name || envs[0]?.name || null;
+      res.json({
+        environments: envs,
+        defaultEnvironment: defaultEnv,
+      });
+    });
+
+    app.post('/api/model/environments', (req, res) => {
+      const modelPath = path.join(process.cwd(), '.jetic', 'model.json');
+      const { name, baseUrl } = req.body ?? {};
+      if (!name || !baseUrl) return res.status(400).json({ error: 'name and baseUrl are required' });
+      const model = readModel(modelPath);
+      if (!model) return res.status(404).json({ error: 'model.json not found' });
+      if (!model.environments) model.environments = [];
+      if (model.environments.find((e: any) => e.name === name))
+        return res.status(409).json({ error: `Environment "${name}" already exists` });
+      model.environments.push({ name, baseUrl });
+      writeModel(modelPath, model);
+      const defaultEnv = model.defaultEnvironment || model.environments?.find((e: any) => e.default)?.name || model.environments?.[0]?.name || null;
+      res.json({ ok: true, environments: model.environments, defaultEnvironment: defaultEnv });
+    });
+
+    app.put('/api/model/environments/:name', (req, res) => {
+      const modelPath = path.join(process.cwd(), '.jetic', 'model.json');
+      const model = readModel(modelPath);
+      if (!model) return res.status(404).json({ error: 'model.json not found' });
+      const idx = (model.environments ?? []).findIndex((e: any) => e.name === req.params.name);
+      if (idx === -1) return res.status(404).json({ error: 'Environment not found' });
+      model.environments[idx] = { ...model.environments[idx], ...req.body };
+      writeModel(modelPath, model);
+      const defaultEnv = model.defaultEnvironment || model.environments?.find((e: any) => e.default)?.name || model.environments?.[0]?.name || null;
+      res.json({ ok: true, environments: model.environments, defaultEnvironment: defaultEnv });
+    });
+
+    app.delete('/api/model/environments/:name', (req, res) => {
+      const modelPath = path.join(process.cwd(), '.jetic', 'model.json');
+      const model = readModel(modelPath);
+      if (!model) return res.status(404).json({ error: 'model.json not found' });
+      model.environments = (model.environments ?? []).filter((e: any) => e.name !== req.params.name);
+      if (model.defaultEnvironment === req.params.name) delete model.defaultEnvironment;
+      writeModel(modelPath, model);
+      const defaultEnv = model.defaultEnvironment || model.environments?.find((e: any) => e.default)?.name || model.environments?.[0]?.name || null;
+      res.json({ ok: true, environments: model.environments, defaultEnvironment: defaultEnv });
+    });
+
+    app.put('/api/model/environments/:name/default', (req, res) => {
+      const modelPath = path.join(process.cwd(), '.jetic', 'model.json');
+      const model = readModel(modelPath);
+      if (!model) return res.status(404).json({ error: 'model.json not found' });
+      const exists = (model.environments ?? []).some((e: any) => e.name === req.params.name);
+      if (!exists) return res.status(404).json({ error: 'Environment not found' });
+      model.defaultEnvironment = req.params.name;
+      if (Array.isArray(model.environments)) {
+        model.environments.forEach((e: any) => {
+          e.default = (e.name === req.params.name);
+        });
+      }
+      writeModel(modelPath, model);
+      res.json({ ok: true, defaultEnvironment: model.defaultEnvironment });
     });
 
     // ─── Source viewer ────────────────────────────────────────────────────
@@ -431,16 +553,21 @@ Output valid JSON only.
         res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
       };
 
-      // Resolve base URL from model
-      let baseUrl = 'http://localhost:4000';
-      const modelPath = path.join(jeticDir, 'model.json');
-      if (fs.existsSync(modelPath)) {
-        try {
-          const model = JSON.parse(fs.readFileSync(modelPath, 'utf8'));
-          const localEnv = (model.environments || []).find((e: any) => e.name === 'local');
-          if (localEnv) baseUrl = localEnv.baseUrl;
-        } catch {}
+      // Resolve base URL from request body or model
+      let baseUrl = req.body?.baseUrl;
+      if (!baseUrl) {
+        const modelPath = path.join(jeticDir, 'model.json');
+        if (fs.existsSync(modelPath)) {
+          try {
+            const model = JSON.parse(fs.readFileSync(modelPath, 'utf8'));
+            const envs = model.environments || [];
+            const defName = model.defaultEnvironment || envs.find((e: any) => e.default)?.name;
+            const defEnv = envs.find((e: any) => e.name === defName) || envs.find((e: any) => e.name === 'local') || envs[0];
+            if (defEnv?.baseUrl) baseUrl = defEnv.baseUrl;
+          } catch {}
+        }
       }
+      if (!baseUrl) baseUrl = 'http://localhost:4000';
 
       send('start', { name: workflow.name, totalSteps: workflow.steps.length, baseUrl });
 
