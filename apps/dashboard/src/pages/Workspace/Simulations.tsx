@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Clock,
   Diamond,
+  Edit2,
   GitBranch,
   Globe,
   Key,
@@ -38,6 +39,35 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// Condition system (matches conditions.md spec)
+export type ConditionOperator =
+  | 'equals' | 'not_equals'
+  | 'greater_than' | 'greater_than_or_equal'
+  | 'less_than' | 'less_than_or_equal'
+  | 'exists' | 'not_exists'
+  | 'is_empty' | 'is_not_empty'
+  | 'contains' | 'not_contains'
+  | 'starts_with' | 'ends_with';
+
+export interface ConditionRule {
+  left: string;       // e.g. "{{workflow:accessToken}}" or literal
+  operator: ConditionOperator;
+  right?: string;     // omitted for unary operators (exists, not_exists, is_empty, is_not_empty)
+}
+
+export interface ConditionGroup {
+  all?: ConditionRule[];  // AND
+  any?: ConditionRule[];  // OR
+}
+
+export type ConditionOnFail = 'abort' | 'continue' | 'switch';
+
+export interface StepCondition {
+  rules: ConditionGroup;
+  onFail: ConditionOnFail;
+  switchToWorkflow?: string; // slug, only when onFail === 'switch'
+}
+
 interface WorkflowStep {
   name: string;
   method: string;
@@ -48,6 +78,7 @@ interface WorkflowStep {
   capture?: Record<string, string>;
   captureInput?: Record<string, string>;
   expectStatus?: number;
+  condition?: StepCondition;
 }
 
 interface Workflow {
@@ -70,6 +101,7 @@ interface StepRunResult {
   injected: Record<string, string>;
   responseBody: any;
   error: string | null;
+  conditionResult?: { passed: boolean; reason: string };
 }
 
 interface RunState {
@@ -95,6 +127,85 @@ const METHOD_COLORS: Record<string, { bg: string; text: string; dot: string }> =
   OPTIONS: { bg: 'bg-purple-500/10', text: 'text-purple-400', dot: '#c084fc' },
 };
 function mc(m: string) { return METHOD_COLORS[m.toUpperCase()] ?? METHOD_COLORS['GET']; }
+
+// ─── Condition evaluator (client-side, operates on captured string values) ─────
+
+const UNARY_OPS: ConditionOperator[] = ['exists', 'not_exists', 'is_empty', 'is_not_empty'];
+
+function resolveRef(ref: string, memory: Record<string, string>): string {
+  return ref.replace(/\{\{([^}]+)\}\}/g, (_, expr) => {
+    const e = expr.trim();
+    if (e.includes(':')) {
+      const colonIdx = e.indexOf(':');
+      const scope = e.slice(0, colonIdx);
+      const key = e.slice(colonIdx + 1);
+      return memory[`${scope}:${key}`] ?? memory[key] ?? '';
+    }
+    return memory[e] ?? '';
+  });
+}
+
+function evalRule(rule: ConditionRule, memory: Record<string, string>): boolean {
+  const left = resolveRef(rule.left, memory);
+  const right = rule.right !== undefined ? resolveRef(rule.right, memory) : undefined;
+  const op = rule.operator;
+
+  switch (op) {
+    case 'equals': return left === right;
+    case 'not_equals': return left !== right;
+    case 'greater_than': return Number(left) > Number(right);
+    case 'greater_than_or_equal': return Number(left) >= Number(right);
+    case 'less_than': return Number(left) < Number(right);
+    case 'less_than_or_equal': return Number(left) <= Number(right);
+    case 'exists': return left !== '' && left !== undefined;
+    case 'not_exists': return left === '' || left === undefined;
+    case 'is_empty': return left === '' || left === null;
+    case 'is_not_empty': return left !== '' && left !== null;
+    case 'contains': return right !== undefined && left.includes(right);
+    case 'not_contains': return right !== undefined && !left.includes(right);
+    case 'starts_with': return right !== undefined && left.startsWith(right);
+    case 'ends_with': return right !== undefined && left.endsWith(right);
+    default: return false;
+  }
+}
+
+function evaluateCondition(
+  condition: StepCondition,
+  memory: Record<string, string>,
+): { passed: boolean; reason: string } {
+  const { rules } = condition;
+  const ruleList = rules.all ?? rules.any ?? [];
+  const isAnd = !!rules.all;
+
+  if (ruleList.length === 0) return { passed: true, reason: 'No rules' };
+
+  const results = ruleList.map(r => ({ rule: r, ok: evalRule(r, memory) }));
+  const passed = isAnd ? results.every(r => r.ok) : results.some(r => r.ok);
+
+  const failing = results.filter(r => !r.ok);
+  const reason = passed
+    ? `All conditions met (${isAnd ? 'AND' : 'OR'})`
+    : `Failed: ${failing.map(r => `${r.rule.left} ${r.rule.operator}${r.rule.right !== undefined ? ' ' + r.rule.right : ''}`).join(', ')}`;
+
+  return { passed, reason };
+}
+
+// ─── API: save conditions back to workflow file ────────────────────────────────
+
+async function saveWorkflowStepCondition(
+  file: string,
+  steps: WorkflowStep[],
+): Promise<void> {
+  // file is e.g. 'workflows/my-workflow.json' → slug is 'my-workflow'
+  const slug = file
+    .replace(/^workflows\//, '')
+    .replace(/\.json$/, '');
+  await fetch(`/api/workflows/${encodeURIComponent(slug)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ steps }),
+  });
+}
 
 function MethodChip({ method }: { method: string }) {
   const s = mc(method);
@@ -186,7 +297,31 @@ function StepNode({ data }: { data: any }) {
   );
 }
 
-const nodeTypes = { step: StepNode };
+// ─── Condition Node (diamond) ─────────────────────────────────────────────────
+
+function ConditionNode({ data }: { data: any }) {
+  const passed = data.passed;
+  const color = passed === undefined
+    ? 'rgba(96,165,250,0.5)'
+    : passed ? 'rgba(52,211,153,0.7)' : 'rgba(248,113,113,0.7)';
+  return (
+    <div style={{ width: 40, height: 40, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Handle type="target" position={Position.Top} style={{ background: 'transparent', border: 'none' }} />
+      <svg width="40" height="40" viewBox="0 0 40 40">
+        <polygon points="20,2 38,20 20,38 2,20" fill="none" stroke={color} strokeWidth="1.5" />
+        <polygon points="20,8 32,20 20,32 8,20" fill={color} fillOpacity={0.12} stroke="none" />
+      </svg>
+      <span style={{
+        position: 'absolute', fontSize: 8, fontFamily: 'monospace',
+        color, top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        whiteSpace: 'nowrap',
+      }}>◇</span>
+      <Handle type="source" position={Position.Bottom} style={{ background: 'transparent', border: 'none' }} />
+    </div>
+  );
+}
+
+const nodeTypes = { step: StepNode, condition: ConditionNode };
 
 // ─── React Flow Graph ─────────────────────────────────────────────────────────
 
@@ -194,49 +329,112 @@ function SimFlowGraph({ steps, runState }: { steps: WorkflowStep[]; runState: Ru
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
-  // Build nodes / edges from steps + run state
+  // Build nodes / edges from steps + run state (including condition diamonds)
   useEffect(() => {
-    const newNodes = steps.map((step, i) => ({
-      id: `step-${i}`,
-      type: 'step',
-      position: { x: 0, y: i * (NODE_H + 36) + 40 },
-      data: {
-        index: i,
-        name: step.name,
-        method: step.method,
-        path: step.path,
-        status: runState.stepStatuses[i] ?? 'idle',
-        result: runState.stepResults[i] ?? null,
-      },
-    }));
+    const COND_H = 44;
+    const STEP_GAP = 36;
+    const COND_GAP = 20;
+    const newNodes: any[] = [];
+    const newEdges: any[] = [];
+    let yOffset = 40;
 
-    const newEdges = steps.slice(0, -1).map((step, i) => {
-      const captured = Object.keys(step.capture ?? {});
-      const label = captured.length > 0 ? captured.map(k => k.split(':').pop()).join(', ') : undefined;
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
       const fromStatus = runState.stepStatuses[i] ?? 'idle';
-      return {
-        id: `e-${i}`,
-        source: `step-${i}`,
-        target: `step-${i + 1}`,
-        label,
-        labelStyle: { fill: 'rgba(96,165,250,0.7)', fontSize: 9, fontFamily: 'monospace' },
-        labelBgStyle: { fill: 'transparent' },
-        style: {
-          stroke: fromStatus === 'passed' ? 'rgba(52,211,153,0.3)' : fromStatus === 'failed' ? 'rgba(248,113,113,0.3)' : 'rgba(96,165,250,0.18)',
-          strokeWidth: 1.5,
-          strokeDasharray: fromStatus === 'idle' || fromStatus === 'running' ? '5 5' : undefined,
+      const result = runState.stepResults[i] ?? null;
+
+      newNodes.push({
+        id: `step-${i}`,
+        type: 'step',
+        position: { x: 0, y: yOffset },
+        data: {
+          index: i,
+          name: step.name,
+          method: step.method,
+          path: step.path,
+          status: fromStatus,
+          result,
         },
-        markerEnd: { type: MarkerType.ArrowClosed, color: fromStatus === 'passed' ? 'rgba(52,211,153,0.4)' : 'rgba(96,165,250,0.3)' },
-        animated: fromStatus === 'running',
-      };
-    });
+      });
+      yOffset += NODE_H + STEP_GAP;
+
+      if (step.condition) {
+        const condId = `cond-${i}`;
+        const condResult = result?.conditionResult;
+        newNodes.push({
+          id: condId,
+          type: 'condition',
+          position: { x: NODE_W / 2 - 20, y: yOffset },
+          data: { passed: condResult?.passed },
+        });
+
+        // Step → condition
+        const stepEdgeColor = fromStatus === 'passed' ? 'rgba(52,211,153,0.3)' : fromStatus === 'failed' ? 'rgba(248,113,113,0.3)' : 'rgba(96,165,250,0.18)';
+        newEdges.push({
+          id: `e-${i}-cond`,
+          source: `step-${i}`,
+          target: condId,
+          style: { stroke: stepEdgeColor, strokeWidth: 1.5 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: stepEdgeColor },
+          animated: fromStatus === 'running',
+        });
+
+        yOffset += COND_H + COND_GAP;
+
+        // Condition → next step
+        if (i < steps.length - 1) {
+          const passColor = condResult?.passed === true ? 'rgba(52,211,153,0.5)' : 'rgba(96,165,250,0.18)';
+          const failColor = condResult?.passed === false ? 'rgba(248,113,113,0.5)' : 'rgba(96,165,250,0.1)';
+          newEdges.push({
+            id: `e-${i}-cond-pass`,
+            source: condId,
+            target: `step-${i + 1}`,
+            label: 'PASS',
+            labelStyle: { fill: 'rgba(52,211,153,0.8)', fontSize: 8, fontFamily: 'monospace' },
+            labelBgStyle: { fill: 'transparent' },
+            style: { stroke: passColor, strokeWidth: 1.2 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: passColor },
+          });
+          newEdges.push({
+            id: `e-${i}-cond-fail`,
+            source: condId,
+            target: `step-${i + 1}`,
+            label: `FAIL→${step.condition.onFail.toUpperCase()}`,
+            labelStyle: { fill: 'rgba(248,113,113,0.8)', fontSize: 8, fontFamily: 'monospace' },
+            labelBgStyle: { fill: 'transparent' },
+            style: { stroke: failColor, strokeWidth: 1.2, strokeDasharray: '4 3' },
+          });
+        }
+      } else if (i < steps.length - 1) {
+        // Normal edge
+        const captured = Object.keys(step.capture ?? {});
+        const label = captured.length > 0 ? captured.map(k => k.split(':').pop()).join(', ') : undefined;
+        const fromStatus2 = runState.stepStatuses[i] ?? 'idle';
+        const edgeColor = fromStatus2 === 'passed' ? 'rgba(52,211,153,0.3)' : fromStatus2 === 'failed' ? 'rgba(248,113,113,0.3)' : 'rgba(96,165,250,0.18)';
+        newEdges.push({
+          id: `e-${i}`,
+          source: `step-${i}`,
+          target: `step-${i + 1}`,
+          label,
+          labelStyle: { fill: 'rgba(96,165,250,0.7)', fontSize: 9, fontFamily: 'monospace' },
+          labelBgStyle: { fill: 'transparent' },
+          style: { stroke: edgeColor, strokeWidth: 1.5, strokeDasharray: fromStatus2 === 'idle' || fromStatus2 === 'running' ? '5 5' : undefined },
+          markerEnd: { type: MarkerType.ArrowClosed, color: fromStatus2 === 'passed' ? 'rgba(52,211,153,0.4)' : 'rgba(96,165,250,0.3)' },
+          animated: fromStatus2 === 'running',
+        });
+      }
+    }
 
     setNodes(newNodes);
     setEdges(newEdges);
   }, [steps, runState.stepStatuses, runState.stepResults]);
 
+  const totalHeight = steps.reduce((h, step) =>
+    h + NODE_H + 36 + (step.condition ? 44 + 20 : 0), 40
+  );
+
   return (
-    <div style={{ height: Math.max(400, steps.length * (NODE_H + 36) + 120) }} className="w-full rounded-lg overflow-hidden">
+    <div style={{ height: Math.max(400, totalHeight) }} className="w-full rounded-lg overflow-hidden">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -339,6 +537,16 @@ function RunLog({ runState, steps }: { runState: RunState; steps: WorkflowStep[]
                 <p key={ci} className="pl-5 text-emerald-400">↳ captured {cap}</p>
               ))}
 
+              {/* Condition evaluation result */}
+              {result.conditionResult && (
+                <p className={`pl-5 ${result.conditionResult.passed ? 'text-purple-400' : 'text-orange-400'}`}>
+                  ◇ condition {result.conditionResult.passed ? 'passed' : 'failed'} — {result.conditionResult.reason}
+                  {!result.conditionResult.passed && step.condition && (
+                    <span className="text-orange-300/70"> → {step.condition.onFail}{step.condition.onFail === 'switch' && step.condition.switchToWorkflow ? `: ${step.condition.switchToWorkflow}` : ''}</span>
+                  )}
+                </p>
+              )}
+
               {/* Error */}
               {result.error && <p className="pl-5 text-red-400">Error: {result.error}</p>}
 
@@ -371,19 +579,261 @@ function RunLog({ runState, steps }: { runState: RunState; steps: WorkflowStep[]
   );
 }
 
+// ─── Condition Editor ─────────────────────────────────────────────────────────
+
+const OPERATOR_GROUPS: { label: string; ops: { value: ConditionOperator; label: string }[] }[] = [
+  {
+    label: 'Equality',
+    ops: [
+      { value: 'equals', label: 'equals' },
+      { value: 'not_equals', label: 'not equals' },
+    ],
+  },
+  {
+    label: 'Comparison',
+    ops: [
+      { value: 'greater_than', label: 'greater than' },
+      { value: 'greater_than_or_equal', label: 'greater than or equal' },
+      { value: 'less_than', label: 'less than' },
+      { value: 'less_than_or_equal', label: 'less than or equal' },
+    ],
+  },
+  {
+    label: 'Existence',
+    ops: [
+      { value: 'exists', label: 'exists' },
+      { value: 'not_exists', label: 'does not exist' },
+      { value: 'is_empty', label: 'is empty' },
+      { value: 'is_not_empty', label: 'is not empty' },
+    ],
+  },
+  {
+    label: 'Text / Collection',
+    ops: [
+      { value: 'contains', label: 'contains' },
+      { value: 'not_contains', label: 'does not contain' },
+      { value: 'starts_with', label: 'starts with' },
+      { value: 'ends_with', label: 'ends with' },
+    ],
+  },
+];
+
+function makeEmptyRule(): ConditionRule {
+  return { left: '', operator: 'equals', right: '' };
+}
+
+function ConditionEditor({
+  stepIndex,
+  existingCondition,
+  capturedKeys,
+  onSave,
+  onRemove,
+  onCancel,
+}: {
+  stepIndex: number;
+  existingCondition?: StepCondition;
+  capturedKeys: string[];
+  onSave: (condition: StepCondition) => void;
+  onRemove: () => void;
+  onCancel: () => void;
+}) {
+  const [logic, setLogic] = useState<'all' | 'any'>(existingCondition?.rules.all ? 'all' : (existingCondition?.rules.any ? 'any' : 'all'));
+  const existing = existingCondition?.rules.all ?? existingCondition?.rules.any ?? [];
+  const [rules, setRules] = useState<ConditionRule[]>(existing.length > 0 ? existing : [makeEmptyRule()]);
+  const [onFail, setOnFail] = useState<ConditionOnFail>(existingCondition?.onFail ?? 'abort');
+  const [switchSlug, setSwitchSlug] = useState(existingCondition?.switchToWorkflow ?? '');
+
+  const updateRule = (idx: number, patch: Partial<ConditionRule>) => {
+    setRules(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r));
+  };
+
+  const addRule = () => setRules(prev => [...prev, makeEmptyRule()]);
+  const removeRule = (idx: number) => setRules(prev => prev.filter((_, i) => i !== idx));
+
+  const handleSave = () => {
+    const filtered = rules.filter(r => r.left.trim() !== '');
+    if (filtered.length === 0) return;
+    const condition: StepCondition = {
+      rules: logic === 'all' ? { all: filtered } : { any: filtered },
+      onFail,
+      ...(onFail === 'switch' && switchSlug.trim() ? { switchToWorkflow: switchSlug.trim() } : {}),
+    };
+    onSave(condition);
+  };
+
+  const inputCls = 'h-7 rounded-lg border border-[var(--border)] bg-[var(--bg-overlay-md)] px-2 text-[11px] text-[var(--text-primary)] placeholder-[var(--text-faint)] outline-none focus:border-purple-500/60 transition-colors';
+  const selectCls = `${inputCls} cursor-pointer`;
+
+  return (
+    <div className="mt-2 rounded-lg border border-purple-500/20 bg-purple-500/[0.04] p-3 space-y-3">
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <Diamond className="h-3 w-3 text-purple-400" strokeWidth={2} />
+        <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">Step Condition</span>
+        <span className="text-[10px] text-[var(--text-faint)] ml-1">— evaluated after this step runs</span>
+        <div className="ml-auto flex items-center gap-1">
+          {/* Logic toggle: AND / OR */}
+          {(['all', 'any'] as const).map(l => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => setLogic(l)}
+              className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors hover:cursor-pointer ${logic === l
+                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40'
+                : 'bg-[var(--bg-overlay-md)] text-[var(--text-faint)] border border-[var(--border)] hover:text-[var(--text-muted)]'
+                }`}
+            >
+              {l === 'all' ? 'AND' : 'OR'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Rules */}
+      <div className="space-y-2">
+        {rules.map((rule, idx) => (
+          <div key={idx} className="flex items-center gap-1.5">
+            {/* Left value */}
+            <input
+              list={`cond-left-${stepIndex}-${idx}`}
+              value={rule.left}
+              onChange={e => updateRule(idx, { left: e.target.value })}
+              placeholder="{{workflow:key}} or value"
+              className={`flex-1 min-w-0 ${inputCls}`}
+            />
+            <datalist id={`cond-left-${stepIndex}-${idx}`}>
+              {capturedKeys.map(k => <option key={k} value={`{{${k}}}`} />)}
+            </datalist>
+
+            {/* Operator */}
+            <select
+              value={rule.operator}
+              onChange={e => updateRule(idx, { operator: e.target.value as ConditionOperator, right: UNARY_OPS.includes(e.target.value as ConditionOperator) ? undefined : rule.right })}
+              className={`w-44 shrink-0 ${selectCls}`}
+            >
+              {OPERATOR_GROUPS.map(g => (
+                <optgroup key={g.label} label={g.label}>
+                  {g.ops.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </optgroup>
+              ))}
+            </select>
+
+            {/* Right value (hidden for unary) */}
+            {!UNARY_OPS.includes(rule.operator) ? (
+              <input
+                value={rule.right ?? ''}
+                onChange={e => updateRule(idx, { right: e.target.value })}
+                placeholder="value or {{workflow:key}}"
+                className={`flex-1 min-w-0 ${inputCls}`}
+              />
+            ) : (
+              <div className="flex-1" />
+            )}
+
+            {/* Remove rule */}
+            {rules.length > 1 && (
+              <button type="button" onClick={() => removeRule(idx)} className="shrink-0 text-[var(--text-faint)] hover:text-red-400 transition-colors hover:cursor-pointer">
+                <X className="h-3 w-3" strokeWidth={2} />
+              </button>
+            )}
+          </div>
+        ))}
+
+        <button
+          type="button"
+          onClick={addRule}
+          className="flex items-center gap-1 text-[10px] text-purple-400/70 hover:text-purple-400 transition-colors hover:cursor-pointer"
+        >
+          <Plus className="h-3 w-3" strokeWidth={2} /> Add rule
+        </button>
+      </div>
+
+      {/* onFail action */}
+      <div className="flex items-center gap-2 pt-1 border-t border-purple-500/10">
+        <span className="text-[10px] text-[var(--text-faint)] shrink-0">If condition fails →</span>
+        {(['abort', 'continue', 'switch'] as const).map(action => (
+          <button
+            key={action}
+            type="button"
+            onClick={() => setOnFail(action)}
+            className={`px-2 py-0.5 rounded text-[9px] font-medium capitalize transition-colors border hover:cursor-pointer ${onFail === action
+              ? action === 'abort'
+                ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                : action === 'continue'
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                  : 'bg-blue-500/20 text-blue-400 border-blue-500/40'
+              : 'bg-[var(--bg-overlay-md)] text-[var(--text-faint)] border-[var(--border)] hover:text-[var(--text-muted)]'
+              }`}
+          >
+            {action}
+          </button>
+        ))}
+        {onFail === 'switch' && (
+          <input
+            value={switchSlug}
+            onChange={e => setSwitchSlug(e.target.value)}
+            placeholder="workflow-slug"
+            className={`flex-1 ${inputCls}`}
+          />
+        )}
+      </div>
+
+      {/* Footer actions */}
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={rules.every(r => !r.left.trim())}
+          className="flex items-center gap-1 rounded-lg bg-purple-500/20 border border-purple-500/40 px-3 py-1 text-[10px] text-purple-400 hover:bg-purple-500/30 transition-colors disabled:opacity-40 hover:cursor-pointer"
+        >
+          <Check className="h-3 w-3" strokeWidth={2} /> Save Condition
+        </button>
+        {existingCondition && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="flex items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/[0.06] px-3 py-1 text-[10px] text-red-400/80 hover:bg-red-500/15 transition-colors hover:cursor-pointer"
+          >
+            <Trash2 className="h-3 w-3" strokeWidth={2} /> Remove
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onCancel}
+          className="ml-auto flex items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors hover:cursor-pointer"
+        >
+          <X className="h-3 w-3" strokeWidth={2} /> Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Step list row ────────────────────────────────────────────────────────────
 
-function StepRow({ step, index, total, status, result }: {
+function StepRow({ step, index, total, status, result, allSteps, onConditionChange }: {
   step: WorkflowStep;
   index: number;
   total: number;
   status: StepStatus;
   result: StepRunResult | null;
+  allSteps: WorkflowStep[];
+  onConditionChange: (stepIdx: number, condition: StepCondition | undefined) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [editingCondition, setEditingCondition] = useState(false);
   const hasCapture = step.capture && Object.keys(step.capture).length > 0;
   const hasInject = step.inject && Object.keys(step.inject).length > 0;
   const hasBody = step.body && Object.keys(step.body).length > 0;
+  const hasCondition = !!step.condition;
+
+  // Build list of captured keys available up to this step
+  const capturedKeys: string[] = [];
+  for (let si = 0; si <= index; si++) {
+    const s = allSteps[si];
+    Object.keys(s.capture ?? {}).forEach(k => capturedKeys.push(k));
+    Object.keys(s.captureInput ?? {}).forEach(k => capturedKeys.push(k));
+  }
 
   const statusIcon = {
     idle: <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border)] text-[9px] text-[var(--text-faint)]">{index + 1}</span>,
@@ -392,6 +842,15 @@ function StepRow({ step, index, total, status, result }: {
     failed: <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500/10 text-red-400"><AlertCircle className="h-3 w-3" strokeWidth={2} /></span>,
     skipped: <span className="h-5 w-5 rounded-full border border-[var(--border)] bg-[var(--bg-overlay-md)]" />,
   }[status];
+
+  // Condition summary badge label
+  const condSummary = hasCondition && step.condition
+    ? (() => {
+      const rules = step.condition.rules.all ?? step.condition.rules.any ?? [];
+      const logic = step.condition.rules.all ? 'AND' : 'OR';
+      return `${rules.length} rule${rules.length !== 1 ? 's' : ''} ${logic} → ${step.condition.onFail}`;
+    })()
+    : null;
 
   return (
     <div className="relative">
@@ -415,6 +874,16 @@ function StepRow({ step, index, total, status, result }: {
           <span className="flex items-center gap-1">
             {hasInject && <span className="rounded bg-amber-500/10 px-1 py-0.5 text-[9px] text-amber-400">auth</span>}
             {hasCapture && <span className="rounded bg-blue-500/10 px-1 py-0.5 text-[9px] text-blue-400">capture</span>}
+            {hasCondition && (
+              <span className="rounded bg-purple-500/10 px-1 py-0.5 text-[9px] text-purple-400 flex items-center gap-0.5">
+                <Diamond className="h-2.5 w-2.5" strokeWidth={2} /> condition
+              </span>
+            )}
+            {result?.conditionResult && (
+              <span className={`rounded px-1 py-0.5 text-[9px] ${result.conditionResult.passed ? 'bg-purple-500/10 text-purple-400' : 'bg-orange-500/10 text-orange-400'}`}>
+                ◇ {result.conditionResult.passed ? 'passed' : 'failed'}
+              </span>
+            )}
           </span>
           <span className="text-[var(--text-faint)] shrink-0">{open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</span>
         </button>
@@ -480,6 +949,51 @@ function StepRow({ step, index, total, status, result }: {
                 </div>
               </div>
             )}
+
+            {/* Condition section */}
+            <div className="pt-1">
+              {hasCondition && condSummary && !editingCondition && (
+                <div className="flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-500/[0.04] px-3 py-2 mb-2">
+                  <Diamond className="h-3 w-3 text-purple-400 shrink-0" strokeWidth={2} />
+                  <span className="text-[10px] text-purple-400 flex-1">{condSummary}</span>
+                  {result?.conditionResult && (
+                    <span className={`text-[9px] font-medium ${result.conditionResult.passed ? 'text-purple-400' : 'text-orange-400'}`}>
+                      {result.conditionResult.passed ? '✓ passed' : '✗ failed'}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setEditingCondition(true)}
+                    className="shrink-0 text-[var(--text-faint)] hover:text-purple-400 transition-colors hover:cursor-pointer"
+                  >
+                    <Edit2 className="h-3 w-3" strokeWidth={2} />
+                  </button>
+                </div>
+              )}
+
+              {editingCondition ? (
+                <ConditionEditor
+                  stepIndex={index}
+                  existingCondition={step.condition}
+                  capturedKeys={capturedKeys}
+                  onSave={cond => { onConditionChange(index, cond); setEditingCondition(false); }}
+                  onRemove={() => { onConditionChange(index, undefined); setEditingCondition(false); }}
+                  onCancel={() => setEditingCondition(false)}
+                />
+              ) : (
+                !hasCondition && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingCondition(true)}
+                    className="flex items-center gap-1.5 text-[10px] text-[var(--text-faint)] hover:text-purple-400 transition-colors hover:cursor-pointer"
+                  >
+                    <Plus className="h-3 w-3" strokeWidth={2} />
+                    <Diamond className="h-3 w-3" strokeWidth={2} />
+                    Add Condition
+                  </button>
+                )
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -500,7 +1014,8 @@ function makeInitialRunState(count: number): RunState {
   };
 }
 
-function WorkflowCard({ workflow, onDelete, onViewTraces }: { workflow: Workflow; onDelete: () => void; onViewTraces?: (name: string, traceId?: string) => void }) {
+function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { workflow: Workflow; onDelete: () => void; onViewTraces?: (name: string, traceId?: string) => void }) {
+  const [workflow, setWorkflow] = useState<Workflow>(initialWorkflow);
   const [view, setView] = useState<'list' | 'graph'>('list');
   const [showLog, setShowLog] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -515,6 +1030,29 @@ function WorkflowCard({ workflow, onDelete, onViewTraces }: { workflow: Workflow
   const startedAtRef = useRef<string>('');
   const sourceRef = useRef<'local-sim' | 'api'>('local-sim');
 
+  // Accumulated in-memory captured values for condition evaluation
+  const capturedMemory = useRef<Record<string, string>>({});
+
+  // Handle condition change from StepRow
+  const handleConditionChange = async (stepIdx: number, condition: StepCondition | undefined) => {
+    const newSteps = workflow.steps.map((s, i) => {
+      if (i !== stepIdx) return s;
+      if (condition === undefined) {
+        const { condition: _removed, ...rest } = s as any;
+        return rest as WorkflowStep;
+      }
+      return { ...s, condition };
+    });
+    const updatedWorkflow = { ...workflow, steps: newSteps };
+    setWorkflow(updatedWorkflow);
+    // Persist to file via PUT API
+    try {
+      await saveWorkflowStepCondition(workflow._file, newSteps);
+    } catch {
+      // Non-critical — condition is updated in-memory regardless
+    }
+  };
+
   // Load environments from model
   useEffect(() => {
     fetch('/api/model/environments')
@@ -528,7 +1066,7 @@ function WorkflowCard({ workflow, onDelete, onViewTraces }: { workflow: Workflow
         const defEnv = envs.find((e: any) => e.name === def);
         if (defEnv) setBaseUrl(defEnv.baseUrl);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const handleDelete = async () => {
@@ -616,12 +1154,15 @@ function WorkflowCard({ workflow, onDelete, onViewTraces }: { workflow: Workflow
     const runSimulation = async () => {
       // Mark overall phase as running
       setRunState(prev => ({ ...prev, phase: 'running', baseUrl: baseUrl || prev.baseUrl }));
+      capturedMemory.current = {};
 
       let passed = 0;
       let failed = 0;
+      let conditionAborted = false;
+      let conditionAbortReason = '';
 
       for (let i = 0; i < count; i++) {
-        if (abortRef.current) break;
+        if (abortRef.current || conditionAborted) break;
 
         // Mark current step as running
         setRunState(prev => {
@@ -634,7 +1175,6 @@ function WorkflowCard({ workflow, onDelete, onViewTraces }: { workflow: Workflow
         const delay = 600 + Math.random() * 800;
         await new Promise<void>(resolve => {
           const t = setTimeout(resolve, delay);
-          // Allow abort to cancel the timer
           const check = setInterval(() => {
             if (abortRef.current) { clearTimeout(t); clearInterval(check); resolve(); }
           }, 50);
@@ -643,24 +1183,54 @@ function WorkflowCard({ workflow, onDelete, onViewTraces }: { workflow: Workflow
 
         if (abortRef.current) break;
 
-        // Simulate a result — all steps "pass" in simulation
+        const stepDef = workflow.steps[i];
+
+        // Accumulate captured keys into memory (simulated)
+        Object.keys(stepDef.capture ?? {}).forEach(k => {
+          capturedMemory.current[k] = '[simulated]';
+        });
+        Object.keys(stepDef.captureInput ?? {}).forEach(k => {
+          capturedMemory.current[k] = '[simulated]';
+        });
+
+        // Evaluate condition (if any)
+        let conditionResult: { passed: boolean; reason: string } | undefined;
+        if (stepDef.condition) {
+          conditionResult = evaluateCondition(stepDef.condition, capturedMemory.current);
+          if (!conditionResult.passed) {
+            const { onFail } = stepDef.condition;
+            if (onFail === 'abort') {
+              conditionAborted = true;
+              conditionAbortReason = `Condition failed at step ${i + 1}: ${conditionResult.reason}`;
+            }
+            // 'continue' and 'switch' both stop the current chain (switch would load another workflow)
+            if (onFail === 'continue' || onFail === 'switch') {
+              conditionAborted = true;
+              conditionAbortReason = onFail === 'switch'
+                ? `Condition failed → switching to: ${stepDef.condition.switchToWorkflow ?? 'unknown'}`
+                : `Condition failed → continuing without remaining steps`;
+            }
+          }
+        }
+
         const stepPassed = true;
         const durationMs = Math.round(delay);
         const result: StepRunResult = {
           index: i,
           step: {
-            name: workflow.steps[i].name,
-            method: workflow.steps[i].method,
-            path: workflow.steps[i].path,
-            description: workflow.steps[i].description,
+            name: stepDef.name,
+            method: stepDef.method,
+            path: stepDef.path,
+            description: stepDef.description,
           },
           status: 200,
           passed: stepPassed,
           durationMs,
-          captured: Object.keys(workflow.steps[i].capture ?? {}).map(k => k.split(':').pop() ?? k),
+          captured: Object.keys(stepDef.capture ?? {}).map(k => k.split(':').pop() ?? k),
           injected: {},
           responseBody: { simulated: true },
           error: null,
+          conditionResult,
         };
 
         if (stepPassed) passed++; else failed++;
@@ -672,29 +1242,36 @@ function WorkflowCard({ workflow, onDelete, onViewTraces }: { workflow: Workflow
           results[i] = result;
           return { ...prev, stepStatuses: statuses, stepResults: results, passed, failed };
         });
+
+        // After updating state, break if condition aborted
+        if (conditionAborted) break;
       }
 
       if (!abortRef.current) {
-        const finalState: RunState = {
-          phase: 'done',
-          currentStep: count - 1,
-          stepStatuses: Array(count).fill('passed'),
-          stepResults: workflow.steps.map((step, i) => ({
-            index: i,
-            step: { name: step.name, method: step.method, path: step.path, description: step.description },
-            status: 200,
-            passed: true,
-            durationMs: Math.round(600 + Math.random() * 800),
-            captured: Object.keys(step.capture ?? {}).map(k => k.split(':').pop() ?? k),
-            injected: {},
-            responseBody: { simulated: true },
-            error: null,
-          })),
-          passed,
-          failed,
-        };
-        setRunState(prev => ({ ...prev, phase: 'done', passed, failed }));
-        persistTrace(finalState, 'local-sim', startedAtRef.current);
+        if (conditionAborted) {
+          setRunState(prev => ({ ...prev, phase: 'aborted', error: conditionAbortReason }));
+        } else {
+          const finalState: RunState = {
+            phase: 'done',
+            currentStep: count - 1,
+            stepStatuses: Array(count).fill('passed'),
+            stepResults: workflow.steps.map((step, i) => ({
+              index: i,
+              step: { name: step.name, method: step.method, path: step.path, description: step.description },
+              status: 200,
+              passed: true,
+              durationMs: Math.round(600 + Math.random() * 800),
+              captured: Object.keys(step.capture ?? {}).map(k => k.split(':').pop() ?? k),
+              injected: {},
+              responseBody: { simulated: true },
+              error: null,
+            })),
+            passed,
+            failed,
+          };
+          setRunState(prev => ({ ...prev, phase: 'done', passed, failed }));
+          persistTrace(finalState, 'local-sim', startedAtRef.current);
+        }
       }
     };
 
@@ -970,11 +1547,10 @@ function WorkflowCard({ workflow, onDelete, onViewTraces }: { workflow: Workflow
                       key={env.name}
                       type="button"
                       onClick={() => { setSelectedEnv(env.name); setBaseUrl(env.baseUrl); }}
-                      className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-all hover:cursor-pointer ${
-                        isSelected
-                          ? 'border-blue-500/40 bg-blue-500/10 text-blue-400'
-                          : 'border-[var(--border)] text-[var(--text-faint)] hover:border-blue-500/20 hover:text-[var(--text-muted)]'
-                      }`}
+                      className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-all hover:cursor-pointer ${isSelected
+                        ? 'border-blue-500/40 bg-blue-500/10 text-blue-400'
+                        : 'border-[var(--border)] text-[var(--text-faint)] hover:border-blue-500/20 hover:text-[var(--text-muted)]'
+                        }`}
                     >
                       <span
                         className="h-1.5 w-1.5 rounded-full shrink-0"
@@ -1007,6 +1583,8 @@ function WorkflowCard({ workflow, onDelete, onViewTraces }: { workflow: Workflow
                     total={workflow.steps.length}
                     status={runState.stepStatuses[i] ?? 'idle'}
                     result={runState.stepResults[i] ?? null}
+                    allSteps={workflow.steps}
+                    onConditionChange={handleConditionChange}
                   />
                 ))}
               </div>
@@ -1104,7 +1682,7 @@ export function Simulations({ onViewTraces }: { onViewTraces?: (filter: { workfl
     <div className="flex min-h-full w-full flex-col">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-5">
+      <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-5 sticky">
         <div className="flex items-center gap-3">
           <div>
             <h1 className="text-[15px] font-medium text-[var(--text-primary)] leading-none">Simulations</h1>
@@ -1175,7 +1753,7 @@ export function Simulations({ onViewTraces }: { onViewTraces?: (filter: { workfl
       </div>
 
       {/* ── Body ── */}
-      <div className="flex flex-1 flex-col gap-4 p-6">
+      <div className="flex flex-1 flex-col gap-4 p-6 overflow-y-auto max-h[(calc(100vh-60px))]">
 
         {loading && (
           <div className="space-y-3">

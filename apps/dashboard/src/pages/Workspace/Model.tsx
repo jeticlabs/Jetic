@@ -473,6 +473,10 @@ interface EndpointResponse {
   example: string;
 }
 
+interface MiddlewareEntry {
+  name: string;
+}
+
 const CONTENT_TYPES = [
   'application/json',
   'application/x-www-form-urlencoded',
@@ -485,7 +489,7 @@ const CONTENT_TYPES = [
 const PARAM_TYPES = ['string', 'integer', 'number', 'boolean', 'array', 'object'];
 
 function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (ep: Endpoint, model: Model) => void }) {
-  const [tab, setTab] = useState<'basic' | 'request' | 'responses'>('basic');
+  const [tab, setTab] = useState<'basic' | 'request' | 'responses' | 'middleware'>('basic');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -505,6 +509,9 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
 
   // ── Responses
   const [responses, setResponses] = useState<EndpointResponse[]>([]);
+
+  // ── Middleware
+  const [middlewareList, setMiddlewareList] = useState<MiddlewareEntry[]>([]);
 
   // Validation
   const [touched, setTouched] = useState(false);
@@ -527,6 +534,7 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
       setBodyExample('');
       setBodyRequired(false);
       setResponses([]);
+      setMiddlewareList([]);
       setTouched(false);
       setError('');
       setSaving(false);
@@ -549,6 +557,17 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
   const updateResponse = (i: number, patch: Partial<EndpointResponse>) => setResponses(r => r.map((x, idx) => idx === i ? { ...x, ...patch } : x));
   const removeResponse = (i: number) => setResponses(r => r.filter((_, idx) => idx !== i));
 
+  const addMiddleware = () => setMiddlewareList(m => [...m, { name: '' }]);
+  const updateMiddleware = (i: number, name: string) => setMiddlewareList(m => m.map((x, idx) => idx === i ? { name } : x));
+  const removeMiddleware = (i: number) => setMiddlewareList(m => m.filter((_, idx) => idx !== i));
+  const moveMiddleware = (i: number, dir: -1 | 1) => setMiddlewareList(m => {
+    const next = [...m];
+    const j = i + dir;
+    if (j < 0 || j >= next.length) return next;
+    [next[i], next[j]] = [next[j], next[i]];
+    return next;
+  });
+
   const handleSubmit = async () => {
     setTouched(true);
     if (!epPath.trim()) { setTab('basic'); return; }
@@ -564,6 +583,10 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
       if (name.trim()) ep.name = name.trim();
       if (description.trim()) ep.description = description.trim();
       if (tags.trim()) ep.tags = tags.split(',').map(t => t.trim()).filter(Boolean);
+
+      // Middleware
+      const validMiddleware = middlewareList.filter(m => m.name.trim());
+      ep.middleware = validMiddleware.map(m => ({ name: m.name.trim() }));
 
       // Parameters
       const validParams = params.filter(p => p.name.trim());
@@ -633,6 +656,7 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
     { key: 'basic', label: 'Basic' },
     { key: 'request', label: 'Request' },
     { key: 'responses', label: 'Responses' },
+    { key: 'middleware', label: `Middleware${middlewareList.length > 0 ? ` (${middlewareList.length})` : ''}` },
   ];
 
   const inputCls = 'w-full rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] px-3 py-2 text-xs text-[var(--text-secondary)] placeholder-[var(--text-faint)] outline-none focus:border-blue-500/50 focus:bg-[var(--bg-overlay-md)] transition-all';
@@ -894,6 +918,68 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
               </div>
             </>
           )}
+
+          {/* ════ MIDDLEWARE TAB ════ */}
+          {tab === 'middleware' && (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className={labelCls + ' mb-0'}>Middleware Chain</p>
+                  <p className="text-[10px] text-[var(--text-faint)] mt-0.5">Executed in order, top → bottom</p>
+                </div>
+                <button type="button" onClick={addMiddleware} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-blue-400 hover:bg-blue-500/10 transition-colors hover:cursor-pointer">
+                  <Plus className="h-3 w-3" /> Add Middleware
+                </button>
+              </div>
+              {middlewareList.length === 0 && (
+                <div className="flex flex-col items-center gap-2 py-8 rounded-lg border border-dashed border-[var(--border)] text-center">
+                  <Shield className="h-6 w-6 text-[var(--text-faint)]" strokeWidth={1.5} />
+                  <p className="text-[10px] text-[var(--text-faint)] italic">No middleware added yet.<br />Click "Add Middleware" to get started.</p>
+                </div>
+              )}
+              <div className="space-y-2">
+                {middlewareList.map((mw, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] px-3 py-2">
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => moveMiddleware(i, -1)}
+                        disabled={i === 0}
+                        className="text-[var(--text-faint)] hover:text-[var(--text-secondary)] disabled:opacity-25 hover:cursor-pointer transition-colors leading-none"
+                        title="Move up"
+                      >
+                        <ChevronDown className="h-3 w-3 rotate-180" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveMiddleware(i, 1)}
+                        disabled={i === middlewareList.length - 1}
+                        className="text-[var(--text-faint)] hover:text-[var(--text-secondary)] disabled:opacity-25 hover:cursor-pointer transition-colors leading-none"
+                        title="Move down"
+                      >
+                        <ChevronDown className="h-3 w-3" />
+                      </button>
+                    </div>
+                    <span className="text-[10px] text-[var(--text-faint)] w-4 text-center shrink-0">{i + 1}</span>
+                    <input
+                      value={mw.name}
+                      onChange={e => updateMiddleware(i, e.target.value)}
+                      placeholder="e.g. authenticateToken"
+                      className={`${inputCls} flex-1 font-mono`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeMiddleware(i)}
+                      className="text-[var(--text-faint)] hover:text-red-400 transition-colors hover:cursor-pointer shrink-0"
+                      title="Remove"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Footer ── */}
@@ -936,7 +1022,7 @@ function EditEndpointDialog({ endpoint, onClose, onSaved }: {
   onClose: () => void;
   onSaved: (updated: Endpoint) => void;
 }) {
-  const [tab, setTab] = useState<'basic' | 'request' | 'responses'>('basic');
+  const [tab, setTab] = useState<'basic' | 'request' | 'responses' | 'middleware'>('basic');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -990,6 +1076,11 @@ function EditEndpointDialog({ endpoint, onClose, onSaved }: {
     }))
   );
 
+  // ── Middleware ──
+  const [middlewareList, setMiddlewareList] = useState<MiddlewareEntry[]>(
+    (endpoint.middleware ?? []).map(m => ({ name: m.name }))
+  );
+
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1005,6 +1096,17 @@ function EditEndpointDialog({ endpoint, onClose, onSaved }: {
   const addResponse = () => setResponses(r => [...r, { status: '200', description: '', contentType: 'application/json', schema: '', example: '' }]);
   const updateResponse = (i: number, patch: Partial<EndpointResponse>) => setResponses(r => r.map((x, idx) => idx === i ? { ...x, ...patch } : x));
   const removeResponse = (i: number) => setResponses(r => r.filter((_, idx) => idx !== i));
+
+  const addMiddlewareEdit = () => setMiddlewareList(m => [...m, { name: '' }]);
+  const updateMiddlewareEdit = (i: number, name: string) => setMiddlewareList(m => m.map((x, idx) => idx === i ? { name } : x));
+  const removeMiddlewareEdit = (i: number) => setMiddlewareList(m => m.filter((_, idx) => idx !== i));
+  const moveMiddlewareEdit = (i: number, dir: -1 | 1) => setMiddlewareList(m => {
+    const next = [...m];
+    const j = i + dir;
+    if (j < 0 || j >= next.length) return next;
+    [next[i], next[j]] = [next[j], next[i]];
+    return next;
+  });
 
   const handleSubmit = async () => {
     if (!epPath.trim()) { setTab('basic'); return; }
@@ -1022,8 +1124,10 @@ function EditEndpointDialog({ endpoint, onClose, onSaved }: {
       if (deprecated) updated.deprecated = true;
       if (endpoint.handlerName) updated.handlerName = endpoint.handlerName;
       if (endpoint.source) updated.source = endpoint.source;
-      if (endpoint.middleware) updated.middleware = endpoint.middleware;
       if (endpoint.security) updated.security = endpoint.security;
+
+      // Middleware — always write, even empty array, to allow clearing
+      updated.middleware = middlewareList.filter(m => m.name.trim()).map(m => ({ name: m.name.trim() }));
 
       const validParams = params.filter(p => p.name.trim());
       if (validParams.length > 0) {
@@ -1067,6 +1171,7 @@ function EditEndpointDialog({ endpoint, onClose, onSaved }: {
     { key: 'basic', label: 'Basic' },
     { key: 'request', label: 'Request' },
     { key: 'responses', label: 'Responses' },
+    { key: 'middleware', label: `Middleware${middlewareList.length > 0 ? ` (${middlewareList.length})` : ''}` },
   ];
 
   const inputCls = 'w-full rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] px-3 py-2 text-xs text-[var(--text-secondary)] placeholder-[var(--text-faint)] outline-none focus:border-blue-500/50 focus:bg-[var(--bg-overlay-md)] transition-all';
@@ -1260,6 +1365,68 @@ function EditEndpointDialog({ endpoint, onClose, onSaved }: {
                       <label className={labelCls}>Body Schema (JSON)</label>
                       <textarea value={r.schema} onChange={e => updateResponse(i, { schema: e.target.value })} rows={3} className={`${inputCls} resize-none font-mono text-[11px] leading-relaxed`} />
                     </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* ════ MIDDLEWARE TAB (Edit) ════ */}
+          {tab === 'middleware' && (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className={labelCls + ' mb-0'}>Middleware Chain</p>
+                  <p className="text-[10px] text-[var(--text-faint)] mt-0.5">Executed in order, top → bottom</p>
+                </div>
+                <button type="button" onClick={addMiddlewareEdit} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-amber-400 hover:bg-amber-500/10 transition-colors hover:cursor-pointer">
+                  <Plus className="h-3 w-3" /> Add Middleware
+                </button>
+              </div>
+              {middlewareList.length === 0 && (
+                <div className="flex flex-col items-center gap-2 py-8 rounded-lg border border-dashed border-[var(--border)] text-center">
+                  <Shield className="h-6 w-6 text-[var(--text-faint)]" strokeWidth={1.5} />
+                  <p className="text-[10px] text-[var(--text-faint)] italic">No middleware. Click "Add Middleware" to get started.</p>
+                </div>
+              )}
+              <div className="space-y-2">
+                {middlewareList.map((mw, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] px-3 py-2">
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => moveMiddlewareEdit(i, -1)}
+                        disabled={i === 0}
+                        className="text-[var(--text-faint)] hover:text-[var(--text-secondary)] disabled:opacity-25 hover:cursor-pointer transition-colors leading-none"
+                        title="Move up"
+                      >
+                        <ChevronDown className="h-3 w-3 rotate-180" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveMiddlewareEdit(i, 1)}
+                        disabled={i === middlewareList.length - 1}
+                        className="text-[var(--text-faint)] hover:text-[var(--text-secondary)] disabled:opacity-25 hover:cursor-pointer transition-colors leading-none"
+                        title="Move down"
+                      >
+                        <ChevronDown className="h-3 w-3" />
+                      </button>
+                    </div>
+                    <span className="text-[10px] text-[var(--text-faint)] w-4 text-center shrink-0">{i + 1}</span>
+                    <input
+                      value={mw.name}
+                      onChange={e => updateMiddlewareEdit(i, e.target.value)}
+                      placeholder="e.g. authenticateToken"
+                      className={`${inputCls} flex-1 font-mono`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeMiddlewareEdit(i)}
+                      className="text-[var(--text-faint)] hover:text-red-400 transition-colors hover:cursor-pointer shrink-0"
+                      title="Remove"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 ))}
               </div>
