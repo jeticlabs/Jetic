@@ -6,10 +6,12 @@ export default defineConfig({
   target: 'node18',
   outDir: 'dist',
   bundle: true,
-  // Inline all @jetic/* workspace packages into the bundle
-  noExternal: [/^@jetic\/.*/],
-  // Keep third-party deps external (they'll be installed from npm)
-  // Also externalize Node.js built-in subpath exports that esbuild can't resolve
+  // Inline all @jetic/* workspace packages and MCP SDK into the bundle
+  noExternal: [/^@jetic\/.*/, /^@modelcontextprotocol\/.*/],
+  // Keep third-party deps external (they'll be installed from npm).
+  // NOTE: @modelcontextprotocol/* must stay bundled (noExternal above wins):
+  // it is not in dependencies and @jetic/* is unpublished, so externalizing
+  // either would break `npm install -g jetic-cli`.
   external: [
     'commander',
     'express',
@@ -22,5 +24,5 @@ export default defineConfig({
     /^node:.*/,
   ],
   shims: true,
-  clean: true,
+  clean: false,
 });

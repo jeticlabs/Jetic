@@ -329,17 +329,23 @@ export const devCommand = new Command('dev')
       const slug = req.params.name;
       const jeticDir = path.join(process.cwd(), '.jetic');
       const workflowsDir = path.join(jeticDir, 'workflows');
-      const filePath = path.join(workflowsDir, `${slug}.json`);
+      let filePath = path.join(workflowsDir, `${slug}.json`);
 
       if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ error: `Workflow "${slug}" not found` });
+        const legacyPath = path.join(jeticDir, 'workflow.json');
+        if (slug === 'workflow' && fs.existsSync(legacyPath)) {
+          filePath = legacyPath;
+        } else {
+          return res.status(404).json({ error: `Workflow "${slug}" not found` });
+        }
       }
 
       try {
         const existing = JSON.parse(fs.readFileSync(filePath, 'utf8'));
         const updated = { ...existing, ...req.body };
         fs.writeFileSync(filePath, JSON.stringify(updated, null, 2), 'utf8');
-        res.json({ ok: true, _file: `workflows/${slug}.json`, ...updated });
+        const relFile = filePath.endsWith('workflow.json') && !filePath.includes('workflows') ? 'workflow.json' : `workflows/${slug}.json`;
+        res.json({ ok: true, _file: relFile, ...updated });
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }
@@ -708,6 +714,58 @@ Output valid JSON only.
 
       // ── Execute steps, emitting SSE events ──
       let passed = 0; let failed = 0;
+
+      // ── Inline condition evaluator (mirrors dashboard + CLI logic) ─────────
+      async function resolveCondRef(ref: string): Promise<string> {
+        const matches = [...ref.matchAll(/\{\{([^}]+)\}\}/g)];
+        let result = ref;
+        for (const [placeholder, expr] of matches.map(m => [m[0], m[1].trim()])) {
+          if (expr.includes(':') && !expr.startsWith('faker.')) {
+            const [scope, key] = expr.split(':', 2);
+            const mem = new Mem({ scope });
+            const val = await mem.get(key);
+            result = result.replace(placeholder, val != null ? String(val) : '');
+          }
+        }
+        return result;
+      }
+
+      async function evalCondRule(rule: { left: string; operator: string; right?: string }): Promise<boolean> {
+        const left = await resolveCondRef(rule.left);
+        const right = rule.right !== undefined ? await resolveCondRef(rule.right) : undefined;
+        switch (rule.operator) {
+          case 'equals':                return left === right;
+          case 'not_equals':            return left !== right;
+          case 'greater_than':          return Number(left) > Number(right);
+          case 'greater_than_or_equal': return Number(left) >= Number(right);
+          case 'less_than':             return Number(left) < Number(right);
+          case 'less_than_or_equal':    return Number(left) <= Number(right);
+          case 'exists':                return left !== '' && left !== undefined;
+          case 'not_exists':            return left === '' || left === undefined;
+          case 'is_empty':              return left === '';
+          case 'is_not_empty':          return left !== '';
+          case 'contains':              return right !== undefined && left.includes(right);
+          case 'not_contains':          return right !== undefined && !left.includes(right);
+          case 'starts_with':           return right !== undefined && left.startsWith(right);
+          case 'ends_with':             return right !== undefined && left.endsWith(right);
+          default:                      return false;
+        }
+      }
+
+      async function evalCondition(condition: any): Promise<{ passed: boolean; reason: string }> {
+        const rules: any[] = condition.rules?.all ?? condition.rules?.any ?? [];
+        const isAnd = !!(condition.rules?.all);
+        if (rules.length === 0) return { passed: true, reason: 'No rules' };
+        const results: { rule: any; ok: boolean }[] = [];
+        for (const rule of rules) results.push({ rule, ok: await evalCondRule(rule) });
+        const passed = isAnd ? results.every(r => r.ok) : results.some(r => r.ok);
+        const failing = results.filter(r => !r.ok);
+        const reason = passed
+          ? `All conditions met (${isAnd ? 'AND' : 'OR'})`
+          : `Failed: ${failing.map(r => `${r.rule.left} ${r.rule.operator}${r.rule.right !== undefined ? ' ' + r.rule.right : ''}`).join(', ')}`;
+        return { passed, reason };
+      }
+
       for (let i = 0; i < workflow.steps.length; i++) {
         if (aborted) break;
         const step = workflow.steps[i];
@@ -727,6 +785,46 @@ Output valid JSON only.
           responseBody: result.responseBody,
           error: result.error,
         });
+
+        // ── Evaluate step condition (if present) ──────────────────────────
+        if (step.condition && !aborted) {
+          const condResult = await evalCondition(step.condition);
+          send('condition_result', {
+            index: i,
+            passed: condResult.passed,
+            reason: condResult.reason,
+            onFail: step.condition.onFail,
+            switchToWorkflow: step.condition.switchToWorkflow,
+          });
+
+          if (!condResult.passed) {
+            const { onFail, returnOnComplete } = step.condition;
+            if (onFail === 'abort') {
+              send('aborted', { index: i, reason: `Condition failed at step ${i + 1}: ${condResult.reason}` });
+              res.end();
+              return;
+            } else if (onFail === 'continue') {
+              // Mark remaining steps as skipped and finish
+              send('done', { passed, failed, total: workflow.steps.length, conditionBranch: 'continue' });
+              res.end();
+              return;
+            } else if (onFail === 'switch') {
+              if (!returnOnComplete) {
+                // Transfer of control: end this workflow
+                send('done', {
+                  passed,
+                  failed,
+                  total: workflow.steps.length,
+                  conditionBranch: 'switch',
+                  switchToWorkflow: step.condition.switchToWorkflow,
+                });
+                res.end();
+                return;
+              }
+              // If returnOnComplete is true, continue loop in current workflow!
+            }
+          }
+        }
 
         // Only abort the chain if the step explicitly failed AND continueOnFailure is not set
         // AND the failure is a hard error (not just a bad status code)
@@ -781,6 +879,61 @@ Output valid JSON only.
       const memory = new JeticMemory({ scope });
       await memory.delete(key);
       res.json({ ok: true });
+    });
+
+    // ─── Traces API (.jetic/traces/*.json) ───────────────────────────────────
+    const getTracesDir = () => path.join(process.cwd(), '.jetic', 'traces');
+
+    app.get('/api/traces', (_req, res) => {
+      try {
+        const dir = getTracesDir();
+        if (!fs.existsSync(dir)) return res.json([]);
+        const records: any[] = [];
+        for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.json'))) {
+          try { records.push(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))); } catch {}
+        }
+        records.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+        res.json(records);
+      } catch (err: any) { res.status(500).json({ error: err.message }); }
+    });
+
+    app.get('/api/traces/:id', (req, res) => {
+      try {
+        const p = path.join(getTracesDir(), `${req.params.id}.json`);
+        if (!fs.existsSync(p)) return res.status(404).json({ error: 'Not found' });
+        res.json(JSON.parse(fs.readFileSync(p, 'utf8')));
+      } catch (err: any) { res.status(500).json({ error: err.message }); }
+    });
+
+    app.post('/api/traces', (req, res) => {
+      try {
+        const record = req.body;
+        if (!record?.id) return res.status(400).json({ error: 'id required' });
+        const dir = getTracesDir();
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, `trace_${record.id}.json`), JSON.stringify(record, null, 2), 'utf8');
+        res.json({ ok: true, id: record.id });
+      } catch (err: any) { res.status(500).json({ error: err.message }); }
+    });
+
+    app.delete('/api/traces/:id', (req, res) => {
+      try {
+        const p = path.join(getTracesDir(), `trace_${req.params.id}.json`);
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+        res.json({ ok: true });
+      } catch (err: any) { res.status(500).json({ error: err.message }); }
+    });
+
+    app.delete('/api/traces', (_req, res) => {
+      try {
+        const dir = getTracesDir();
+        if (fs.existsSync(dir)) {
+          for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.json'))) {
+            try { fs.unlinkSync(path.join(dir, f)); } catch {}
+          }
+        }
+        res.json({ ok: true });
+      } catch (err: any) { res.status(500).json({ error: err.message }); }
     });
 
     // Locate the dashboard static files (bundled in dist/dashboard or resolved via workspace)

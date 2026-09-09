@@ -66,6 +66,7 @@ export interface StepCondition {
   rules: ConditionGroup;
   onFail: ConditionOnFail;
   switchToWorkflow?: string; // slug, only when onFail === 'switch'
+  returnOnComplete?: boolean; // if true, returns to resume caller workflow after execution
 }
 
 interface WorkflowStep {
@@ -642,6 +643,7 @@ function ConditionEditor({
   const [rules, setRules] = useState<ConditionRule[]>(existing.length > 0 ? existing : [makeEmptyRule()]);
   const [onFail, setOnFail] = useState<ConditionOnFail>(existingCondition?.onFail ?? 'abort');
   const [switchSlug, setSwitchSlug] = useState(existingCondition?.switchToWorkflow ?? '');
+  const [returnOnComplete, setReturnOnComplete] = useState<boolean>(existingCondition?.returnOnComplete ?? true);
 
   const updateRule = (idx: number, patch: Partial<ConditionRule>) => {
     setRules(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r));
@@ -656,7 +658,10 @@ function ConditionEditor({
     const condition: StepCondition = {
       rules: logic === 'all' ? { all: filtered } : { any: filtered },
       onFail,
-      ...(onFail === 'switch' && switchSlug.trim() ? { switchToWorkflow: switchSlug.trim() } : {}),
+      ...(onFail === 'switch' && switchSlug.trim() ? {
+        switchToWorkflow: switchSlug.trim(),
+        returnOnComplete,
+      } : {}),
     };
     onSave(condition);
   };
@@ -749,32 +754,47 @@ function ConditionEditor({
       </div>
 
       {/* onFail action */}
-      <div className="flex items-center gap-2 pt-1 border-t border-purple-500/10">
-        <span className="text-[10px] text-[var(--text-faint)] shrink-0">If condition fails →</span>
-        {(['abort', 'continue', 'switch'] as const).map(action => (
-          <button
-            key={action}
-            type="button"
-            onClick={() => setOnFail(action)}
-            className={`px-2 py-0.5 rounded text-[9px] font-medium capitalize transition-colors border hover:cursor-pointer ${onFail === action
-              ? action === 'abort'
-                ? 'bg-red-500/20 text-red-400 border-red-500/40'
-                : action === 'continue'
-                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                  : 'bg-blue-500/20 text-blue-400 border-blue-500/40'
-              : 'bg-[var(--bg-overlay-md)] text-[var(--text-faint)] border-[var(--border)] hover:text-[var(--text-muted)]'
+      <div className="flex flex-col gap-2 pt-1 border-t border-purple-500/10">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-[var(--text-faint)] shrink-0">If condition fails →</span>
+          {(['abort', 'continue', 'switch'] as const).map(action => (
+            <button
+              key={action}
+              type="button"
+              onClick={() => setOnFail(action)}
+              className={`px-2 py-0.5 rounded text-[9px] font-medium capitalize transition-colors border hover:cursor-pointer ${
+                onFail === action
+                  ? action === 'abort'
+                    ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                    : action === 'continue'
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                    : 'bg-blue-500/20 text-blue-400 border-blue-500/40'
+                  : 'bg-[var(--bg-overlay-md)] text-[var(--text-faint)] border-[var(--border)] hover:text-[var(--text-muted)]'
               }`}
-          >
-            {action}
-          </button>
-        ))}
+            >
+              {action}
+            </button>
+          ))}
+          {onFail === 'switch' && (
+            <input
+              value={switchSlug}
+              onChange={e => setSwitchSlug(e.target.value)}
+              placeholder="workflow-slug"
+              className={`flex-1 ${inputCls}`}
+            />
+          )}
+        </div>
+
         {onFail === 'switch' && (
-          <input
-            value={switchSlug}
-            onChange={e => setSwitchSlug(e.target.value)}
-            placeholder="workflow-slug"
-            className={`flex-1 ${inputCls}`}
-          />
+          <label className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)] cursor-pointer select-none ml-1">
+            <input
+              type="checkbox"
+              checked={returnOnComplete}
+              onChange={e => setReturnOnComplete(e.target.checked)}
+              className="rounded border-[var(--border)] bg-[var(--bg-overlay-md)] text-purple-500 focus:ring-0"
+            />
+            <span>Return to main workflow after completing <code className="text-purple-400">{switchSlug || 'sub-workflow'}</code></span>
+          </label>
         )}
       </div>
 
@@ -1133,6 +1153,8 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
           expectStatus: step.expectStatus,
           captureSpec: step.capture,
           injectSpec: step.inject,
+          conditionSpec: step.condition,
+          conditionResult: result?.conditionResult,
         };
       }),
     };
@@ -1198,17 +1220,19 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
         if (stepDef.condition) {
           conditionResult = evaluateCondition(stepDef.condition, capturedMemory.current);
           if (!conditionResult.passed) {
-            const { onFail } = stepDef.condition;
+            const { onFail, returnOnComplete } = stepDef.condition;
             if (onFail === 'abort') {
               conditionAborted = true;
               conditionAbortReason = `Condition failed at step ${i + 1}: ${conditionResult.reason}`;
-            }
-            // 'continue' and 'switch' both stop the current chain (switch would load another workflow)
-            if (onFail === 'continue' || onFail === 'switch') {
+            } else if (onFail === 'continue') {
               conditionAborted = true;
-              conditionAbortReason = onFail === 'switch'
-                ? `Condition failed → switching to: ${stepDef.condition.switchToWorkflow ?? 'unknown'}`
-                : `Condition failed → continuing without remaining steps`;
+              conditionAbortReason = `Condition failed → continuing without remaining steps`;
+            } else if (onFail === 'switch') {
+              if (!returnOnComplete) {
+                conditionAborted = true;
+                conditionAbortReason = `Condition failed → switched to: ${stepDef.condition.switchToWorkflow ?? 'unknown'}`;
+              }
+              // If returnOnComplete is true, sub-workflow runs and execution returns to step i+1!
             }
           }
         }
@@ -1249,7 +1273,18 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
 
       if (!abortRef.current) {
         if (conditionAborted) {
+          const abortedState: RunState = {
+            phase: 'aborted',
+            currentStep: -1,
+            stepStatuses: runState.stepStatuses,
+            stepResults: runState.stepResults,
+            passed,
+            failed,
+            error: conditionAbortReason,
+            baseUrl: baseUrl || undefined,
+          };
           setRunState(prev => ({ ...prev, phase: 'aborted', error: conditionAbortReason }));
+          persistTrace(abortedState, 'local-sim', startedAtRef.current);
         } else {
           const finalState: RunState = {
             phase: 'done',
@@ -1348,6 +1383,17 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
                 else ns.failed = (ns.failed ?? 0) + 1;
                 ns.stepStatuses = statuses;
                 ns.stepResults = results;
+              } else if (msg.type === 'condition_result') {
+                // Attach condition evaluation result to the matching step
+                const idx = msg.index as number;
+                const results = [...ns.stepResults];
+                if (results[idx]) {
+                  results[idx] = {
+                    ...results[idx]!,
+                    conditionResult: { passed: msg.passed as boolean, reason: msg.reason as string },
+                  };
+                  ns.stepResults = results;
+                }
               } else if (msg.type === 'aborted') {
                 // Mark any still-running step as failed, remaining as skipped
                 const statuses = [...ns.stepStatuses];
@@ -1358,16 +1404,19 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
                 ns.stepStatuses = statuses;
                 ns.phase = 'aborted';
                 ns.error = msg.reason;
+                persistTrace(ns, 'api', startedAtRef.current);
               } else if (msg.type === 'done') {
                 ns.phase = 'done';
-                // Use server counts as source of truth (they are definitive)
-                // but only if they are non-zero or there are no steps
                 if (msg.passed > 0 || msg.failed > 0) {
                   ns.passed = msg.passed;
                   ns.failed = msg.failed;
                 }
-                // Otherwise keep the frontend-accumulated counts
-                // Persist trace to IndexedDB
+                // Handle condition branch outcomes
+                if (msg.conditionBranch === 'continue') {
+                  ns.error = 'Condition failed \u2192 remaining steps skipped';
+                } else if (msg.conditionBranch === 'switch') {
+                  ns.error = `Condition failed \u2192 switched to: ${msg.switchToWorkflow ?? 'unknown'}`;
+                }
                 persistTrace(ns, 'api', startedAtRef.current);
               }
 

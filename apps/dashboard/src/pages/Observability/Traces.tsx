@@ -16,18 +16,16 @@ import {
   AlertCircle,
   ArrowRight,
   Check,
-
   Clock,
   Code2,
   Database,
   ExternalLink,
-
+  GitBranch,
   Layers2,
   RefreshCw,
   Search,
   Trash2,
   X,
-
   Diamond,
 } from 'lucide-react';
 import { listTraces, deleteTrace, clearAllTraces, type TraceRecord } from '../../lib/traceStore';
@@ -135,6 +133,23 @@ function StepNode({ data }: { data: any }) {
           </div>
         )}
 
+        {/* Condition badge */}
+        {(data.conditionSpec || data.conditionResult) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+            <span style={{
+              fontSize: 9, fontWeight: 600,
+              color: data.conditionResult ? (data.conditionResult.passed ? '#c084fc' : '#fb923c') : '#c084fc',
+              background: data.conditionResult?.passed === false ? 'rgba(251,146,60,0.1)' : 'rgba(192,132,252,0.1)',
+              border: `1px solid ${data.conditionResult?.passed === false ? 'rgba(251,146,60,0.3)' : 'rgba(192,132,252,0.3)'}`,
+              borderRadius: 4, padding: '1px 5px',
+              display: 'flex', alignItems: 'center', gap: 3
+            }}>
+              <Diamond style={{ width: 9, height: 9 }} />
+              {data.conditionResult ? (data.conditionResult.passed ? 'cond passed' : 'cond FAILED') : 'has condition'}
+            </span>
+          </div>
+        )}
+
         {/* Error */}
         {data.error && (
           <span style={{ fontSize: 9, color: '#f87171', marginTop: 2 }}>⚠ {data.error}</span>
@@ -214,7 +229,63 @@ function EndNode({ data }: { data: any }) {
   );
 }
 
-const nodeTypes = { step: StepNode, memory: MemoryNode, start: StartNode, end: EndNode };
+function ConditionNode({ data }: { data: any }) {
+  const passed = data.conditionResult?.passed;
+  const color = passed === undefined
+    ? '#c084fc'
+    : passed ? '#4ade80' : '#fb923c';
+  return (
+    <div style={{ width: 44, height: 44, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Handle type="target" position={Position.Top} style={{ background: 'transparent', border: 'none' }} />
+      <svg width="44" height="44" viewBox="0 0 44 44">
+        <polygon points="22,2 42,22 22,42 2,22" fill="none" stroke={color} strokeWidth="1.5" />
+        <polygon points="22,8 36,22 22,36 8,22" fill={color} fillOpacity={0.15} stroke="none" />
+      </svg>
+      <span style={{
+        position: 'absolute', fontSize: 9, fontFamily: 'monospace', fontWeight: 700,
+        color, top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        whiteSpace: 'nowrap',
+      }}>◇</span>
+      {/* Bottom = main spine (PASS), Right = branch (FAIL / switch) */}
+      <Handle type="source" position={Position.Bottom} id="pass" style={{ background: 'transparent', border: 'none' }} />
+      <Handle type="source" position={Position.Right} id="fail" style={{ background: 'transparent', border: 'none' }} />
+    </div>
+  );
+}
+
+/** Branch node — shown when a condition switches to another workflow (tree fork) */
+function BranchNode({ data }: { data: any }) {
+  return (
+    <div style={{
+      width: 210,
+      border: '1.5px dashed rgba(251,146,60,0.45)',
+      borderRadius: 12,
+      background: 'rgba(251,146,60,0.06)',
+      padding: '9px 13px',
+      backdropFilter: 'blur(4px)',
+    }}>
+      <Handle type="target" position={Position.Left} style={{ background: 'transparent', border: 'none' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <GitBranch style={{ width: 11, height: 11, color: '#fb923c' }} />
+        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', color: '#fb923c' }}>
+          SWITCHED WORKFLOW
+        </span>
+      </div>
+      <span style={{ fontSize: 11, color: '#fdba74', fontFamily: 'monospace' }}>
+        {data.workflowName || 'unknown'}
+      </span>
+      {data.returnsOnComplete && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
+          <RefreshCw style={{ width: 9, height: 9, color: '#71717a' }} />
+          <span style={{ fontSize: 9, color: '#71717a' }}>resumes main flow after</span>
+        </div>
+      )}
+      <Handle type="source" position={Position.Right} id="return" style={{ background: 'transparent', border: 'none' }} />
+    </div>
+  );
+}
+
+const nodeTypes = { step: StepNode, memory: MemoryNode, condition: ConditionNode, start: StartNode, end: EndNode, branch: BranchNode };
 
 // ─── Build ReactFlow graph from trace ─────────────────────────────────────────
 
@@ -222,8 +293,27 @@ const STEP_W = 260;
 const STEP_H = 130;
 const MEM_W = 200;
 const MEM_H = 90;
-//const X_STEP = 310;
+const BRANCH_X = STEP_W + 90; // fork column, to the right of the main spine
 const Y_GAP = 50;
+
+/** Shared edge styling so the whole graph reads as one coherent, routed tree */
+function edgeBase(color: string, opts: Partial<{ dashed: boolean; width: number; animated: boolean; labelBg: boolean }> = {}) {
+  return {
+    type: 'smoothstep' as const,
+    pathOptions: { borderRadius: 14 },
+    animated: !!opts.animated,
+    style: {
+      stroke: color,
+      strokeWidth: opts.width ?? 1.5,
+      strokeDasharray: opts.dashed ? '5 4' : undefined,
+    },
+    markerEnd: { type: MarkerType.ArrowClosed, color, width: 16, height: 16 },
+    labelStyle: { fill: color, fontSize: 9, fontWeight: 600, fontFamily: 'monospace' },
+    labelBgStyle: opts.labelBg === false ? { fill: 'transparent' } : { fill: 'var(--bg-base, #0a0a0a)', fillOpacity: 0.9 },
+    labelBgPadding: [4, 2] as [number, number],
+    labelBgBorderRadius: 4,
+  };
+}
 
 function buildGraph(trace: TraceRecord, selectedStep: number | null, onSelectStep: (i: number) => void) {
   const nodes: any[] = [];
@@ -244,7 +334,9 @@ function buildGraph(trace: TraceRecord, selectedStep: number | null, onSelectSte
     const step = trace.steps[i];
     const hasCapture = step.captureSpec && Object.keys(step.captureSpec).length > 0;
     const hasCaptured = step.captured && Object.keys(step.captured).length > 0;
-    const edgeColor = step.passed ? 'rgba(74,222,128,0.4)' : 'rgba(248,113,113,0.4)';
+    const hasCond = !!(step.conditionSpec || step.conditionResult);
+    const hasBranch = !!step.conditionSpec?.switchToWorkflow;
+    const edgeColor = step.passed ? '#4ade80' : '#f87171';
 
     // Step node
     nodes.push({
@@ -262,29 +354,34 @@ function buildGraph(trace: TraceRecord, selectedStep: number | null, onSelectSte
         error: step.error,
         injectSpec: step.injectSpec,
         captureSpec: step.captureSpec,
+        conditionSpec: step.conditionSpec,
+        conditionResult: step.conditionResult,
         selected: selectedStep === i,
         onSelect: () => onSelectStep(i),
       },
       draggable: false,
     });
 
-    // Edge from previous
-    const prevId = i === 0 ? 'start' : (hasPrevCapture(trace, i - 1) ? `mem-${i - 1}` : `step-${i - 1}`);
+    // Edge from previous node on the main spine
+    const prevId = i === 0 ? 'start' : (
+      hasPrevCond(trace, i - 1) ? `cond-${i - 1}` :
+        hasPrevCapture(trace, i - 1) ? `mem-${i - 1}` : `step-${i - 1}`
+    );
+    const prevSourceHandle = i > 0 && hasPrevCond(trace, i - 1) ? 'pass' : undefined;
     edges.push({
       id: `e-${i}`,
       source: prevId,
+      sourceHandle: prevSourceHandle,
       target: `step-${i}`,
-      style: { stroke: edgeColor, strokeWidth: 1.5 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor },
-      animated: false,
+      ...edgeBase(edgeColor, { width: 2 }),
       label: i > 0 && trace.steps[i - 1].injectSpec
         ? Object.keys(trace.steps[i - 1].injectSpec ?? {}).map(k => `{{${k}}}`).join(', ')
         : undefined,
-      labelStyle: { fill: 'rgba(167,139,250,0.7)', fontSize: 9 },
-      labelBgStyle: { fill: 'transparent' },
     });
 
     y += STEP_H + Y_GAP;
+
+    let lastStepId = `step-${i}`;
 
     // Memory node after step (if captures)
     if (hasCapture || hasCaptured) {
@@ -303,13 +400,72 @@ function buildGraph(trace: TraceRecord, selectedStep: number | null, onSelectSte
         id: `e-mem-${i}`,
         source: `step-${i}`,
         target: `mem-${i}`,
-        style: { stroke: 'rgba(167,139,250,0.3)', strokeWidth: 1, strokeDasharray: '4 3' },
-        markerEnd: { type: MarkerType.ArrowClosed, color: 'rgba(167,139,250,0.4)' },
+        ...edgeBase('#a78bfa', { dashed: true, width: 1.2 }),
         label: 'capture',
-        labelStyle: { fill: 'rgba(167,139,250,0.5)', fontSize: 9 },
-        labelBgStyle: { fill: 'transparent' },
       });
       y += MEM_H + Y_GAP;
+      lastStepId = `mem-${i}`;
+    }
+
+    // Condition diamond node after step — this is the fork point of the tree
+    if (hasCond) {
+      const condColor = step.conditionResult?.passed === false ? '#fb923c' : '#c084fc';
+      const condY = y;
+      nodes.push({
+        id: `cond-${i}`,
+        type: 'condition',
+        position: { x: (STEP_W - 44) / 2, y: condY },
+        data: {
+          conditionSpec: step.conditionSpec,
+          conditionResult: step.conditionResult,
+        },
+        draggable: false,
+      });
+      edges.push({
+        id: `e-cond-${i}`,
+        source: lastStepId,
+        target: `cond-${i}`,
+        ...edgeBase(condColor, { width: 1.4 }),
+        label: step.conditionResult ? (step.conditionResult.passed ? 'PASS' : 'FAIL') : 'eval',
+      });
+
+      // ── Tree fork: FAIL branch peels off to the right into a switched-workflow node ──
+      if (hasBranch) {
+        nodes.push({
+          id: `branch-${i}`,
+          type: 'branch',
+          position: { x: BRANCH_X, y: condY - 10 },
+          data: {
+            workflowName: step.conditionSpec?.switchToWorkflow,
+            returnsOnComplete: step.conditionSpec?.returnOnComplete,
+          },
+          draggable: false,
+        });
+        edges.push({
+          id: `e-branch-${i}`,
+          source: `cond-${i}`,
+          sourceHandle: 'fail',
+          target: `branch-${i}`,
+          ...edgeBase('#fb923c', { dashed: true, width: 1.6, labelBg: true }),
+          label: 'on FAIL → switch',
+        });
+
+        // If it resumes the main flow, draw a dashed return arrow merging back onto
+        // the spine at the next node (or the end sentinel if this was the last step).
+        if (step.conditionSpec?.returnOnComplete) {
+          const nextMainId = i < trace.steps.length - 1 ? `step-${i + 1}` : 'end';
+          edges.push({
+            id: `e-branch-return-${i}`,
+            source: `branch-${i}`,
+            sourceHandle: 'return',
+            target: nextMainId,
+            ...edgeBase('#60a5fa', { dashed: true, width: 1.2, labelBg: true }),
+            label: 'resume',
+          });
+        }
+      }
+
+      y += 44 + Y_GAP;
     }
   }
 
@@ -321,18 +477,47 @@ function buildGraph(trace: TraceRecord, selectedStep: number | null, onSelectSte
     data: { phase: trace.phase, passed: trace.passed, failed: trace.failed },
     draggable: false,
   });
+  const lastIndex = trace.steps.length - 1;
   const lastId = trace.steps.length > 0
-    ? (hasPrevCapture(trace, trace.steps.length - 1) ? `mem-${trace.steps.length - 1}` : `step-${trace.steps.length - 1}`)
+    ? (hasPrevCond(trace, lastIndex) ? `cond-${lastIndex}` : (hasPrevCapture(trace, lastIndex) ? `mem-${lastIndex}` : `step-${lastIndex}`))
     : 'start';
+  const lastSourceHandle = trace.steps.length > 0 && hasPrevCond(trace, lastIndex) ? 'pass' : undefined;
   edges.push({
     id: 'e-end',
     source: lastId,
+    sourceHandle: lastSourceHandle,
     target: 'end',
-    style: { stroke: trace.phase === 'done' && trace.failed === 0 ? 'rgba(74,222,128,0.4)' : 'rgba(248,113,113,0.3)', strokeWidth: 1.5 },
-    markerEnd: { type: MarkerType.ArrowClosed, color: 'rgba(74,222,128,0.4)' },
+    ...edgeBase(trace.phase === 'done' && trace.failed === 0 ? '#4ade80' : '#f87171', { width: 2 }),
+  });
+
+  // Decorative spine rail — a faint vertical guide behind the main column,
+  // purely visual, gives the graph a "designed pipeline" feel like Temporal/Linear.
+  nodes.push({
+    id: 'spine-rail',
+    type: 'default',
+    position: { x: STEP_W / 2 - 1, y: 0 },
+    data: { label: '' },
+    draggable: false,
+    selectable: false,
+    focusable: false,
+    style: {
+      width: 2,
+      height: y,
+      background: 'linear-gradient(to bottom, rgba(96,165,250,0.18), rgba(167,139,250,0.12), rgba(74,222,128,0.18))',
+      border: 'none',
+      borderRadius: 2,
+      pointerEvents: 'none',
+    },
+    zIndex: -1,
   });
 
   return { nodes, edges };
+}
+
+function hasPrevCond(trace: TraceRecord, i: number) {
+  const s = trace.steps[i];
+  if (!s) return false;
+  return !!(s.conditionSpec || s.conditionResult);
 }
 
 function hasPrevCapture(trace: TraceRecord, i: number) {
@@ -367,8 +552,9 @@ function TraceGraph({ trace, selectedStep, onSelectStep }: {
       fitView
       fitViewOptions={{ padding: 0.3 }}
       proOptions={{ hideAttribution: true }}
-      minZoom={0.2}
+      minZoom={0.15}
       maxZoom={2}
+      defaultEdgeOptions={{ type: 'smoothstep' }}
       style={{ background: 'transparent' }}
     >
       <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="rgba(255,255,255,0.04)" />
@@ -376,7 +562,9 @@ function TraceGraph({ trace, selectedStep, onSelectStep }: {
       <MiniMap
         nodeColor={n => {
           if (n.type === 'memory') return 'rgba(167,139,250,0.5)';
+          if (n.type === 'branch') return 'rgba(251,146,60,0.5)';
           if (n.type === 'start' || n.type === 'end') return 'rgba(96,165,250,0.5)';
+          if (n.id === 'spine-rail') return 'transparent';
           return (n.data?.passed ? 'rgba(74,222,128,0.5)' : 'rgba(248,113,113,0.5)');
         }}
         style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8 }}
@@ -447,10 +635,10 @@ function StepDetailDrawer({ step, onClose }: { step: TraceRecord['steps'][number
 
       {/* Tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
-        {(['overview', 'request', 'response', 'vars'] as const).map(t => (
+        {(['overview', 'request', 'response', 'vars', 'conditions'] as const).map(t => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => setTab(t as any)}
             style={{
               flex: 1, padding: '8px 4px', fontSize: 10, fontWeight: 600,
               letterSpacing: '0.05em', textTransform: 'capitalize',
@@ -562,6 +750,49 @@ function StepDetailDrawer({ step, onClose }: { step: TraceRecord['steps'][number
               </Section>
             ) : (
               <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>No variables captured in this step</span>
+            )}
+          </div>
+        )}
+
+        {tab === ('conditions' as any) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {step.conditionResult && (
+              <Section title="Condition Evaluation Result">
+                <div style={{
+                  padding: '8px 10px', borderRadius: 6,
+                  border: `1px solid ${step.conditionResult.passed ? 'rgba(74,222,128,0.2)' : 'rgba(251,146,60,0.2)'}`,
+                  background: step.conditionResult.passed ? 'rgba(74,222,128,0.06)' : 'rgba(251,146,60,0.06)',
+                }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: step.conditionResult.passed ? '#4ade80' : '#fb923c' }}>
+                    ◇ Condition {step.conditionResult.passed ? 'PASSED' : 'FAILED'}
+                  </span>
+                  <p style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4, fontFamily: 'monospace' }}>
+                    {step.conditionResult.reason}
+                  </p>
+                </div>
+              </Section>
+            )}
+            {step.conditionSpec ? (
+              <Section title="Condition Rules">
+                <KV k="Logic mode" v={step.conditionSpec.rules.all ? 'AND (all rules must pass)' : 'OR (any rule can pass)'} />
+                <KV k="Failure action" v={step.conditionSpec.onFail} accent="#fb923c" />
+                {step.conditionSpec.switchToWorkflow && (
+                  <KV k="Switch workflow" v={step.conditionSpec.switchToWorkflow} mono accent="#60a5fa" />
+                )}
+                {step.conditionSpec.returnOnComplete !== undefined && (
+                  <KV k="Return on complete" v={step.conditionSpec.returnOnComplete ? 'Yes (resumes main workflow)' : 'No (permanent switch)'} />
+                )}
+                <div style={{ marginTop: 6 }}>
+                  <p style={{ fontSize: 9, color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: 4 }}>Rules list</p>
+                  {(step.conditionSpec.rules.all ?? step.conditionSpec.rules.any ?? []).map((r, idx) => (
+                    <div key={idx} style={{ fontSize: 10, color: '#c4b5fd', fontFamily: 'monospace', background: 'var(--bg-overlay)', padding: '4px 8px', borderRadius: 4, marginBottom: 3 }}>
+                      {r.left} <span style={{ color: '#a78bfa' }}>{r.operator}</span> {r.right !== undefined ? r.right : ''}
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            ) : (
+              <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>No condition configured for this step</span>
             )}
           </div>
         )}
@@ -757,6 +988,11 @@ function TraceListItem({ trace, selected, onClick, onDelete }: {
             <span style={{ fontSize: 9, color: 'var(--text-faint)', background: 'var(--bg-overlay)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px' }}>
               {trace.source === 'local-sim' ? 'sim' : 'api'}
             </span>
+            {trace.steps.some(s => s.conditionSpec || s.conditionResult) && (
+              <span style={{ fontSize: 9, color: '#c084fc', background: 'rgba(192,132,252,0.08)', border: '1px solid rgba(192,132,252,0.2)', borderRadius: 4, padding: '1px 5px', display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Diamond style={{ width: 8, height: 8 }} /> cond
+              </span>
+            )}
           </div>
         </div>
         {/* Delete */}
@@ -826,6 +1062,7 @@ function EmptyViewer() {
         {[
           ['HTTP step nodes', 'Every request in the workflow shown as a graph node with method, path, status, and timing'],
           ['Memory nodes', 'Variables captured from responses (tokens, IDs, etc.) shown in between steps'],
+          ['Branch forks', 'Conditions that switch workflows peel off into a side branch, then merge back if they resume'],
           ['Execution flow', 'Arrows colored green/red showing the success/failure path through your workflow'],
           ['Step detail drawer', 'Click any node to see full request/response bodies, headers, and capture specs'],
         ].map(([title, desc]) => (
@@ -872,6 +1109,18 @@ export function Traces({ initialFilter, onNavigate }: TracesProps) {
   }, [initialFilter?.traceId, initialFilter?.workflowName]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Auto-poll every 5 s so new traces written by CLI or simulations appear
+  useEffect(() => {
+    const interval = setInterval(() => {
+      listTraces().then(all => {
+        if (all.length !== traces.length || all.some((t, i) => t.id !== traces[i]?.id)) {
+          setTraces(all);
+        }
+      }).catch(() => { });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [traces]);
 
   // Re-trigger when navigating here with a new traceId
   useEffect(() => {

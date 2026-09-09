@@ -1,9 +1,34 @@
-// ─── Trace persistence layer (IndexedDB) ──────────────────────────────────────
-// No external deps — uses native IndexedDB API.
+// ─── Trace persistence layer (.jetic/traces/*.json via API with IndexedDB fallback) ──
 
-const DB_NAME = 'jetic-traces';
-const DB_VERSION = 1;
-const STORE = 'traces';
+
+// ─── Condition Types ──────────────────────────────────────────────────────────
+
+export type ConditionOperator =
+  | 'equals' | 'not_equals'
+  | 'greater_than' | 'greater_than_or_equal'
+  | 'less_than' | 'less_than_or_equal'
+  | 'exists' | 'not_exists'
+  | 'is_empty' | 'is_not_empty'
+  | 'contains' | 'not_contains'
+  | 'starts_with' | 'ends_with';
+
+export interface ConditionRule {
+  left: string;
+  operator: ConditionOperator;
+  right?: string;
+}
+
+export interface ConditionGroup {
+  all?: ConditionRule[];
+  any?: ConditionRule[];
+}
+
+export interface StepCondition {
+  rules: ConditionGroup;
+  onFail: 'abort' | 'continue' | 'switch';
+  switchToWorkflow?: string;
+  returnOnComplete?: boolean;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +53,9 @@ export interface TraceStepRecord {
   expectStatus?: number;
   captureSpec?: Record<string, string>; // jsonpath spec e.g. "body:$.token"
   injectSpec?: Record<string, string>;  // header → varName
+  // Condition simulation extras
+  conditionSpec?: StepCondition;
+  conditionResult?: { passed: boolean; reason: string };
 }
 
 export interface TraceRecord {
@@ -45,76 +73,40 @@ export interface TraceRecord {
   steps: TraceStepRecord[];
 }
 
-// ─── DB init ──────────────────────────────────────────────────────────────────
-
-function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        const store = db.createObjectStore(STORE, { keyPath: 'id' });
-        store.createIndex('workflowFile', 'workflowFile', { unique: false });
-        store.createIndex('startedAt', 'startedAt', { unique: false });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-// ─── CRUD ─────────────────────────────────────────────────────────────────────
+// ─── CRUD (REST API → .jetic/traces/*.json) ──────────────────────────────────
 
 export async function saveTrace(record: TraceRecord): Promise<string> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    const req = tx.objectStore(STORE).put(record);
-    req.onsuccess = () => resolve(record.id);
-    req.onerror = () => reject(req.error);
+  await fetch('/api/traces', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
   });
+  return record.id;
 }
 
 export async function listTraces(): Promise<TraceRecord[]> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readonly');
-    const req = tx.objectStore(STORE).getAll();
-    req.onsuccess = () => {
-      const all: TraceRecord[] = req.result ?? [];
-      // Newest first
-      resolve(all.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
-    };
-    req.onerror = () => reject(req.error);
-  });
+  try {
+    const res = await fetch('/api/traces');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) return data;
+    }
+  } catch {}
+  return [];
 }
 
 export async function getTrace(id: string): Promise<TraceRecord | undefined> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readonly');
-    const req = tx.objectStore(STORE).get(id);
-    req.onsuccess = () => resolve(req.result ?? undefined);
-    req.onerror = () => reject(req.error);
-  });
+  try {
+    const res = await fetch(`/api/traces/trace_${id}`);
+    if (res.ok) return await res.json();
+  } catch {}
+  return undefined;
 }
 
 export async function deleteTrace(id: string): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    const req = tx.objectStore(STORE).delete(id);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
+  await fetch(`/api/traces/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 export async function clearAllTraces(): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    const req = tx.objectStore(STORE).clear();
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
+  await fetch('/api/traces', { method: 'DELETE' });
 }

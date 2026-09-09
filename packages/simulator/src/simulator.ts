@@ -43,6 +43,27 @@ export interface SimulationSummary {
 }
 
 /**
+ * Per-call overrides for {@link EndpointSimulator.simulateEndpoint}.
+ * Used by the MCP `jetic_test_endpoint` tool so AI editors can inject auth
+ * headers, custom payloads, query params, or a request timeout.
+ */
+export interface SimulateEndpointOverrides {
+  /** Merged over generated headers (e.g. `{ Authorization: 'Bearer …' }`). */
+  headers?: Record<string, string>;
+  /**
+   * Replaces the generated body. Pass an object to send it, or explicit
+   * `null` to send no body. `undefined` (default) keeps generated data.
+   */
+  body?: Record<string, any> | null;
+  /** Merged over generated query params. */
+  queryParams?: Record<string, any>;
+  /** Abort the request after this many milliseconds (default 15000). */
+  timeoutMs?: number;
+}
+
+const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
+
+/**
  * Core simulation engine. Takes a behavioral model and an environment,
  * then executes requests against the live server with generated data,
  * validating responses against the model's expected schemas.
@@ -68,8 +89,17 @@ export class EndpointSimulator {
 
   /**
    * Simulate a single endpoint.
+   *
+   * @param endpoint  Endpoint definition from the behavioral model.
+   * @param overrides Optional header/body/query/timeout overrides. Supplied
+   *                  headers and query params are merged over generated
+   *                  values; a supplied body (or explicit `null`) replaces
+   *                  the generated one.
    */
-  public async simulateEndpoint(endpoint: Endpoint): Promise<SimulationResult> {
+  public async simulateEndpoint(
+    endpoint: Endpoint,
+    overrides?: SimulateEndpointOverrides
+  ): Promise<SimulationResult> {
     // Check if we should skip (signature-based auth etc.)
     const skipReason = this.shouldSkip(endpoint);
     if (skipReason) {
@@ -77,12 +107,14 @@ export class EndpointSimulator {
     }
 
     try {
-      // Generate request data
-      const body = this.hasBody(endpoint) ? this.dataGenerator.generateBody(endpoint) : null;
-      const queryParams = this.dataGenerator.generateQueryParams(endpoint);
+      // Generate request data (caller overrides win over generated values)
+      const generatedBody = this.hasBody(endpoint) ? this.dataGenerator.generateBody(endpoint) : null;
+      const body = overrides?.body !== undefined ? overrides.body : generatedBody;
+      const generatedQuery = this.dataGenerator.generateQueryParams(endpoint);
+      const queryParams = { ...generatedQuery, ...overrides?.queryParams };
 
-      // Build headers
-      const headers = await this.buildHeaders(endpoint);
+      // Build headers (generated auth/content-type headers + overrides)
+      const headers = { ...(await this.buildHeaders(endpoint)), ...overrides?.headers };
 
       // Resolve path parameters
       const resolvedPath = this.dataGenerator.resolvePathParams(endpoint.path, endpoint);
@@ -98,15 +130,24 @@ export class EndpointSimulator {
         fullUrl += `?${queryString}`;
       }
 
-      // Execute request
+      // Execute request (with timeout so MCP/CLI callers never hang forever)
+      const timeoutMs = overrides?.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
       const startTime = Date.now();
       const fetchOptions: RequestInit = {
         method: endpoint.method,
         headers,
+        signal: AbortSignal.timeout(timeoutMs),
       };
 
       if (body && this.hasBody(endpoint)) {
         fetchOptions.body = JSON.stringify(body);
+      } else if (body && overrides?.body !== undefined && !this.hasBody(endpoint)) {
+        // Explicit caller-supplied body for methods without a modeled body
+        // (e.g. POST-like DELETE): send it so overrides are honored.
+        fetchOptions.body = JSON.stringify(body);
+        if (!headers['Content-Type']) {
+          headers['Content-Type'] = 'application/json';
+        }
       }
 
       const response = await fetch(fullUrl, fetchOptions);

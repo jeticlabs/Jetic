@@ -318,9 +318,42 @@ jetic memory set workflow:accessToken "eyJhbGciOi..."
 # Delete a key
 jetic memory delete workflow:accessToken
 
-# Clear all stored memory
+# Clear all entries in memory.json
 jetic memory clear
 ```
+
+---
+
+### `jetic mcp`
+Launches the **Jetic Model Context Protocol (MCP) Server** over stdio. This enables AI code IDE assistants (Claude Code, Cursor, Windsurf, Roo Code, Codex) to inspect, add, update, verify, and test endpoints in `.jetic/model.json` directly inside your editor.
+
+```bash
+# Launch MCP Server over stdio
+jetic mcp
+```
+
+#### Editor Configuration Example (e.g. `.cursor/mcp.json` or `claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "jetic": {
+      "command": "jetic",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+#### MCP Tools Provided to IDE Assistants:
+- `jetic_read_model`: Read full `.jetic/model.json` or metadata summary.
+- `jetic_list_endpoints`: Filter endpoints by method, path, tag, or resource.
+- `jetic_get_endpoint`: Fetch single endpoint structural definition.
+- `jetic_add_endpoint`: Strictly validate & append missing API endpoints to `.jetic/model.json`.
+- `jetic_update_endpoint`: Modify existing endpoint properties (parameters, responses, security).
+- `jetic_delete_endpoint`: Remove endpoints from model.
+- `jetic_verify_model`: Validate model integrity (unbound path parameters, duplicate routes, response shapes).
+- `jetic_test_endpoint`: Trigger live HTTP simulation test request on target endpoint directly from the editor.
+- `jetic_manage_environment`: Manage target base URLs & deployment environments.
 
 ---
 

@@ -10,6 +10,7 @@
   "dependencies": {
     "@faker-js/faker": "^9.0.0",
     "@jetic/core": "workspace:*",
+    "@jetic/memory": "workspace:*",
     "@jetic/model": "workspace:*"
   }
 }

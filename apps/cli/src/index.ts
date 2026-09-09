@@ -8,13 +8,14 @@ import { memoryCommand } from './commands/memory';
 import { simulateCommand } from './commands/simulate';
 import { devCommand } from './commands/dev';
 import { upgradeCommand } from './commands/upgrade';
+import { mcpCommand } from './commands/mcp';
 
 const program = new Command();
 
 program
   .name('jetic')
   .description('AI-Native API Behavior Testing')
-  .version('0.1.5');
+  .version('0.1.9');
 
 program.addCommand(initCommand);
 program.addCommand(scanCommand);
@@ -24,5 +25,6 @@ program.addCommand(memoryCommand);
 program.addCommand(simulateCommand);
 program.addCommand(devCommand);
 program.addCommand(upgradeCommand);
+program.addCommand(mcpCommand);
 
 program.parse(process.argv);
