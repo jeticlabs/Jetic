@@ -17,6 +17,7 @@
   <a href="#-how-jetic-works">How It Works</a> •
   <a href="#-monorepo-architecture">Monorepo Architecture</a> •
   <a href="#-getting-started">Getting Started</a> •
+  <a href="#-demo">Demo</a> •
   <a href="#-start-with-your-ai-ide-recommended-no-ai-key">AI IDE Setup</a> •
   <a href="#-cli-command-reference">CLI Reference</a> •
   <a href="#-jetic-studio-dashboard">Jetic Studio</a> •
@@ -31,6 +32,19 @@
   <img src="https://img.shields.io/badge/AST-ts--morph-blueviolet" alt="ts-morph">
   <img src="https://img.shields.io/badge/license-ISC-green.svg" alt="License">
 </p>
+
+---
+
+## 🎬 Demo
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=YOUR_VIDEO_ID">
+    <img src="screenshots/jetic_overview.JPG" alt="Watch the Jetic demo video" width="720">
+  </a>
+</p>
+
+<!-- TODO: paste the real demo video ID above (replace YOUR_VIDEO_ID).
+     Optionally swap the thumbnail for a dedicated screenshots/demo-thumbnail.png. -->
 
 ---
 
