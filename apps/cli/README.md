@@ -16,6 +16,7 @@
   <a href="#-key-features">Features</a> •
   <a href="#-how-jetic-works">How It Works</a> •
   <a href="#-getting-started">Getting Started</a> •
+  <a href="#-start-with-your-ai-ide-recommended-no-ai-key">AI IDE Setup</a> •
   <a href="#-cli-command-reference">CLI Reference</a> •
   <a href="#-jetic-studio-dashboard">Jetic Studio</a> •
   <a href="#-artifact--file-schemas">File Schemas</a>
@@ -52,6 +53,7 @@ Furthermore, conventional HTTP runners only check if an endpoint returns a `200 
 > [!NOTE]
 > **Framework & Language Support**: Automated AST source code scanning currently supports **Node.js & Express (TypeScript)** projects.
 > For backends built with other languages or frameworks (e.g., Python/FastAPI, Go, Rust, Java, NestJS), you can manually add and manage endpoints directly inside **Jetic Studio** on the **Behavioral Model** page (`/model`) using the **"Add Endpoint"** button.
+> **Easiest option for any stack**: use the [AI IDE setup below](#-start-with-your-ai-ide-recommended-no-ai-key) — your editor's AI reads the code and authors the model through Jetic MCP tools, no scanner or AI key required.
 
 ---
 
@@ -107,6 +109,9 @@ Furthermore, conventional HTTP runners only check if an endpoint returns a `200 
 4. **Run & Capture / Inject**: The simulator engine executes requests step-by-step. `captureInput` saves faker credentials pre-flight, `capture` reads response JSONPath fields post-flight, and `inject` dynamically constructs request headers/bodies for downstream steps.
 5. **Trace & Observe**: Results are persisted as execution trace records and rendered in **Jetic Studio** (`/traces`) as an interactive ReactFlow node graph.
 
+> [!TIP]
+> **No AI key? Any backend stack? Skip the terminal AI commands.** Connect [`jetic mcp`](#jetic-mcp) to your AI code editor and let the agent do the same flow conversationally — it reads your code, builds `model.json`, authors workflows, and runs them, using your editor's own model. See [Start with Your AI IDE](#-start-with-your-ai-ide-recommended-no-ai-key).
+
 ---
 
 ## 🚀 Getting Started
@@ -133,7 +138,66 @@ npx jetic-cli --help
 > [!NOTE]
 > **Package Name vs Executable Command**: The CLI package is published on NPM as **`jetic-cli`** (`npm install -g jetic-cli`). Once installed, npm registers the **`jetic`** binary executable command in your system `PATH` so you can directly run `jetic init`, `jetic scan`, `jetic dev`, etc.
 
-### Quickstart
+### Start with Your AI IDE (Recommended, No AI Key)
+
+The fastest way to use Jetic is **through the AI assistant already inside your code editor** — opencode, Antigravity, Cursor, Claude Code, Windsurf, or VS Code. Your editor's model drives Jetic's 16 MCP tools directly: **no OpenRouter/OpenAI key, no `jetic config ai`, and no `jetic scan` needed to begin**. This path also works for **any backend stack** (Express, FastAPI, Go, Java, NestJS…), because the AI reads your code and models it via MCP.
+
+#### Step 1 — Initialize your backend (10 seconds, once per project)
+
+```bash
+cd path/to/your-backend
+jetic init
+```
+
+#### Step 2 — Connect the MCP server to your editor (once per editor)
+
+opencode (`opencode.json` — global or project root):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "jetic": {
+      "type": "local",
+      "command": ["cmd", "/c", "jetic", "mcp"],
+      "cwd": "C:/path/to/your-backend",
+      "enabled": true
+    }
+  }
+}
+```
+
+> Windows needs `cmd /c` (npm shims are `.cmd` files); on macOS/Linux use `"command": ["jetic", "mcp"]`. Point `cwd` at your backend root so Jetic finds `.jetic/model.json`. Using Antigravity, Cursor, Claude Code/Desktop, Windsurf, or VS Code? Same `jetic mcp` server — per-editor snippets live in the [mcp-server guide](https://github.com/jeticlabs/Jetic/tree/main/packages/mcp-server).
+
+Restart the editor (or refresh its MCP panel) and confirm the `jetic_*` tools appear.
+
+#### Step 3 — Onboard with copy-paste prompts 💬
+
+Paste these into your editor's agent chat, in order:
+
+**1. Meet Jetic** — *first message in a fresh project:*
+> I've installed the Jetic MCP tools. Summarize what you can do with them, then read my project's model summary and tell me what's in it.
+
+**2. Re-analyse the whole project** — *builds your entire `model.json` from code:*
+> Help me re-analyse the whole project: find ALL API endpoints in this codebase — routes, controllers, middleware, auth guards, request/response shapes — and add every missing endpoint to my .jetic/model.json using the jetic tools. Include security, middleware chains, parameters, and response schemas. When done, run jetic_verify_model and fix all errors.
+
+**3. Zoom into one area** — *repeat per module until coverage is complete:*
+> Analyse ONLY src/modules/payments: add/update all of its endpoints in the model with full detail (middleware, auth, validation constraints), then verify.
+
+**4. Create a workflow** — *the agent validates before saving, then runs it:*
+> Help create a workflow called "Shopper checkout" with these steps: (1) register a user with a faker email and capture the credentials, (2) log in and capture the access token, (3) create an order with the Bearer token and expect 201. Validate it BEFORE saving, then save it and simulate it against http://localhost:3000.
+
+**5. Negative / conditional test** — *expect a specific status:*
+> Help create a workflow called "Forbidden admin action" where a normal non-admin user logs in and calls DELETE /api/admin/users/:id expecting 403. Validate, save, and simulate it.
+
+**6. Live-test & verify loop** — *anytime your API changes:*
+> Test POST /api/auth/login against my local server at http://localhost:4000 with a realistic payload and tell me whether the response matches the model. Then verify the whole model and fix any issues.
+
+Behind the scenes the agent uses `jetic_add_endpoint` (middleware, security, constraints), `jetic_verify_model`, `jetic_validate_workflow` → `jetic_create_workflow` → `jetic_simulate_workflow`. If a step fails, just paste the error back — the validation messages say exactly how to fix it.
+
+### Quickstart — Terminal Flow (Needs an AI Key)
+
+Prefer the terminal, or want Express auto-discovery? This flow uses `jetic scan` plus AI workflow generation, which requires your own AI provider key (`jetic config ai`). The [AI IDE path above](#-start-with-your-ai-ide-recommended-no-ai-key) needs no key.
 
 Navigate to your TypeScript/Express backend directory:
 
@@ -264,6 +328,27 @@ jetic memory delete workflow:accessToken
 # Clear all stored memory
 jetic memory clear
 ```
+
+---
+
+### `jetic mcp`
+Launches the **Jetic Model Context Protocol (MCP) Server** over stdio, giving the AI assistant inside your code editor 16 typed tools to inspect, author, validate, and live-test endpoints and workflows — no AI key needed (the editor's own model is used).
+
+```bash
+# Launch MCP Server over stdio (uses current directory as project root)
+jetic mcp
+
+# Pin to a project explicitly (same as JETIC_PROJECT_PATH env var)
+jetic mcp --project C:/path/to/your-backend
+```
+
+> **Start here instead:** [Start with Your AI IDE](#-start-with-your-ai-ide-recommended-no-ai-key) — install, one `jetic init`, one editor config snippet, and copy-paste chat prompts. Per-editor configs (opencode, Antigravity, Cursor, Claude Code/Desktop, Windsurf, VS Code): [mcp-server guide](https://github.com/jeticlabs/Jetic/tree/main/packages/mcp-server).
+
+#### MCP Tools Provided to IDE Assistants (16):
+- **Read**: `jetic_read_model` (full model or summary) · `jetic_list_endpoints` (filter by method/tag/resource/path) · `jetic_get_endpoint` (full structural detail) · `jetic_verify_model` (duplicates, unbound params, bad status codes, dangling sources) · `jetic_list_workflows`
+- **Author endpoints** (full fidelity: middleware chains, security, pagination, rate limits, ownership, produces/consumes, constraints): `jetic_add_endpoint` · `jetic_update_endpoint` · `jetic_delete_endpoint` · `jetic_manage_environment`
+- **Author workflows** (validate → create → simulate loop with memory data-flow checks): `jetic_validate_workflow` · `jetic_create_workflow` · `jetic_update_workflow` · `jetic_delete_workflow`
+- **Run live** (needs a running server): `jetic_test_endpoint` (custom headers/body/query supported) · `jetic_simulate_workflow` (+ `jetic_simulate` alias)
 
 ---
 
