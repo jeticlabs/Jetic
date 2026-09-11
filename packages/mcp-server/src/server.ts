@@ -39,6 +39,12 @@ import {
   deleteWorkflowSchema,
   handleDeleteWorkflow,
 } from './tools/workflow-authoring-tools';
+import {
+  initProjectSchema,
+  handleInitProject,
+  scanProjectSchema,
+  handleScanProject,
+} from './tools/project-tools';
 
 export const JETIC_MCP_SERVER_NAME = 'jetic-mcp-server';
 
@@ -65,14 +71,12 @@ export function getJeticMcpVersion(): string {
  * read first, mutate second, verify last.
  */
 export const JETIC_MCP_INSTRUCTIONS = [
-  'Jetic MCP manages API behavioral models stored in `.jetic/model.json`.',
-  'Suggested workflow for AI agents:',
-  '1. Start with `jetic_read_model` (summaryOnly=true) to learn the project layout.',
-  '2. Use `jetic_list_endpoints` / `jetic_get_endpoint` before changing anything.',
-  '3. Mutating tools (`jetic_add_endpoint`, `jetic_update_endpoint`, `jetic_delete_endpoint`, `jetic_manage_environment`) write to disk — confirm intent with the user first when the change is destructive (delete/overwrite).',
-  '4. After edits, run `jetic_verify_model` and fix reported errors.',
-  '5. Use `jetic_test_endpoint` / `jetic_simulate_workflow` only against a running server (local/staging); pass `baseUrl` to override the stored environment URL.',
-  'Authoring workflows: NEVER hand-write workflow files blind. Build the steps, then run `jetic_validate_workflow` with the inline definition (dry run), fix reported errors, save with `jetic_create_workflow`, and finally execute with `jetic_simulate_workflow`. Chain steps with capture/captureInput (producer) + inject or {{workflow:key}} templates (consumer).',
+  'Jetic MCP manages API behavioral models in `.jetic/`. Work in this structured order:',
+  '1. INITIALIZE: if there is no `.jetic/model.json` (read tools report modelExists:false), call `jetic_init` first. It scaffolds the folder + model and tells you whether auto-scan applies. Never invent a model file by hand.',
+  '2. MODEL: Express+TypeScript project with tsconfig.json → run `jetic_scan` (static, keyless) to fill model.json, then refine with `jetic_add_endpoint` / `jetic_update_endpoint`. Any other stack — or scan gaps — read the code and model each endpoint yourself with `jetic_add_endpoint` (full fidelity: middleware chains, security, constraints, pagination, produces/consumes). Run `jetic_verify_model` until clean.',
+  '3. SIMULATE (only when the user asks): author workflows with `jetic_validate_workflow` (dry run) → `jetic_create_workflow` → `jetic_simulate_workflow`. Chain steps with capture/captureInput (producer) + inject or {{workflow:key}} templates (consumer). Use {{human:key}} ONLY for values unknowable beforehand (OTP codes, real secrets) — runners pause for interactive input and the create response lists them under needsHuman so you can warn the user.',
+  'No AI-provider setup is needed for any of this: never ask for OpenRouter/OpenAI keys and never use `jetic config ai`.',
+  'Mutating tools (`jetic_add_endpoint`, `jetic_update_endpoint`, `jetic_delete_endpoint`, `jetic_manage_environment`, workflow create/update) write to disk — confirm intent with the user first when the change is destructive (delete/overwrite).',
   'Project resolution: every tool accepts an optional `projectPath`. If omitted, the server uses the `JETIC_PROJECT_PATH` environment variable, falling back to its own working directory. Set one of them to the project root so the server edits the right `.jetic/model.json`.',
 ].join('\n');
 
@@ -264,7 +268,7 @@ export function createJeticMcpServer(): McpServer {
   register(
     'jetic_validate_workflow',
     'Validate workflow',
-    'Deep-validates a workflow WITHOUT saving or running it: step structure, endpoint cross-checks against model.json, and memory data-flow analysis (every {{scope:key}} must be captured by an earlier step). Accepts a saved workflow reference or an inline definition for pre-save dry runs.',
+    'Deep-validates a workflow WITHOUT saving or running it: step structure, endpoint cross-checks against model.json, and memory data-flow analysis (every {{scope:key}} except {{human:key}} must be captured by an earlier step). Accepts a saved workflow reference or an inline definition for pre-save dry runs.',
     validateWorkflowSchema.shape,
     READ_ONLY,
     handleValidateWorkflow
@@ -295,6 +299,24 @@ export function createJeticMcpServer(): McpServer {
     deleteWorkflowSchema.shape,
     DESTRUCTIVE,
     handleDeleteWorkflow
+  );
+
+  register(
+    'jetic_init',
+    'Initialize Jetic project',
+    'Step 1 of the structured order: scaffolds .jetic/model.json (+ workflows/, config.json) for repos that have none. Refuses to clobber an existing model (pass overwrite:true to replace). Reports whether auto-scan applies (Express+TypeScript) and what to do next.',
+    initProjectSchema.shape,
+    WRITES_MODEL,
+    handleInitProject
+  );
+
+  register(
+    'jetic_scan',
+    'Scan Express project',
+    'Step 2a for Express+TypeScript projects (requires tsconfig.json): static AST scan that fills model.json with routes, middleware, and auth heuristics. Keyless — no AI provider involved. Default merge upserts scanned routes and keeps hand-added endpoints; overwrite replaces all endpoints. Fails with guidance for non-Express stacks (model those manually).',
+    scanProjectSchema.shape,
+    WRITES_MODEL,
+    handleScanProject
   );
 
   return server;

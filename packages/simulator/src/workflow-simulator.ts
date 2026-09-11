@@ -218,6 +218,16 @@ export class WorkflowSimulator {
         const colonIdx = expr.indexOf(':');
         const scope = expr.slice(0, colonIdx);
         const key = expr.slice(colonIdx + 1);
+        if (scope === 'human') {
+          // Interactive value: JETIC_HUMAN_<KEY> env or pre-seeded `human:key`
+          // memory (see `jetic memory set human:<key>`). Non-interactive
+          // runners (like this one) never prompt — unset resolves to ''.
+          const envVal = process.env[`JETIC_HUMAN_${key.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`];
+          if (envVal !== undefined && envVal !== '') {
+            replacements.push({ placeholder: match[0], resolved: envVal });
+            continue;
+          }
+        }
         const mem = new JeticMemory({ scope });
         const memVal = await mem.get(key);
         replacements.push({ placeholder: match[0], resolved: memVal != null ? String(memVal) : '' });

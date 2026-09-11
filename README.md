@@ -209,7 +209,7 @@ pnpm link --global
 
 ### 2. Start with Your AI IDE (Recommended, No AI Key)
 
-The fastest way to use Jetic is **through the AI assistant already inside your code editor** — opencode, Antigravity, Cursor, Claude Code, Windsurf, or VS Code. Your editor's model drives Jetic's 16 MCP tools directly: **no OpenRouter/OpenAI key, no `jetic config ai`, and no `jetic scan` needed to begin**. This path also works for **any backend stack** (Express, FastAPI, Go, Java, NestJS…), because the AI reads your code and models it via MCP.
+The fastest way to use Jetic is **through the AI assistant already inside your code editor** — opencode, Antigravity, Cursor, Claude Code, Windsurf, or VS Code. Your editor's model drives Jetic's 18 MCP tools directly: **no OpenRouter/OpenAI key, no `jetic config ai`, and no `jetic scan` needed to begin**. This path also works for **any backend stack** (Express, FastAPI, Go, Java, NestJS…), because the AI reads your code and models it via MCP.
 
 #### Step 1 — Initialize your backend (10 seconds, once per project)
 
@@ -262,7 +262,7 @@ Paste these into your editor's agent chat, in order:
 **6. Live-test & verify loop** — *anytime your API changes:*
 > Test POST /api/auth/login against my local server at http://localhost:4000 with a realistic payload and tell me whether the response matches the model. Then verify the whole model and fix any issues.
 
-Behind the scenes the agent uses `jetic_add_endpoint` (middleware, security, constraints), `jetic_verify_model`, `jetic_validate_workflow` → `jetic_create_workflow` → `jetic_simulate_workflow`. If a step fails, just paste the error back — the validation messages say exactly how to fix it.
+Behind the scenes the agent follows the structured order — `jetic_init` (first time in a repo), `jetic_scan` for Express or `jetic_add_endpoint` per endpoint otherwise (middleware, security, constraints), `jetic_verify_model`, then `jetic_validate_workflow` → `jetic_create_workflow` → `jetic_simulate_workflow`. If a step fails, just paste the error back — the validation messages say exactly how to fix it.
 
 ### 3. Quickstart with Included Example (Terminal Flow — Needs an AI Key)
 
@@ -403,7 +403,7 @@ jetic memory clear
 ---
 
 ### `jetic mcp`
-Launches the **Jetic Model Context Protocol (MCP) Server** over stdio, giving the AI assistant inside your code editor 16 typed tools to inspect, author, validate, and live-test endpoints and workflows — no AI key needed (the editor's own model is used).
+Launches the **Jetic Model Context Protocol (MCP) Server** over stdio, giving the AI assistant inside your code editor 18 typed tools to inspect, author, validate, and live-test endpoints and workflows — no AI key needed (the editor's own model is used).
 
 ```bash
 # Launch MCP Server over stdio (uses current directory as project root)
@@ -415,7 +415,8 @@ jetic mcp --project C:/path/to/your-backend
 
 > **Start here instead:** [Start with Your AI IDE](#-start-with-your-ai-ide-recommended-no-ai-key) — install, one `jetic init`, one editor config snippet, and copy-paste chat prompts. Per-editor configs (opencode, Antigravity, Cursor, Claude Code/Desktop, Windsurf, VS Code): [packages/mcp-server/README.md](packages/mcp-server/README.md).
 
-#### MCP Tools Provided to IDE Assistants (16):
+#### MCP Tools Provided to IDE Assistants (18 — structured order: init → model → simulate):
+- **Setup**: `jetic_init` (scaffold `.jetic/` for new repos, detects Express) · `jetic_scan` (keyless Express+TS auto-scan, merge keeps hand-added endpoints)
 - **Read**: `jetic_read_model` (full model or summary) · `jetic_list_endpoints` (filter by method/tag/resource/path) · `jetic_get_endpoint` (full structural detail) · `jetic_verify_model` (duplicates, unbound params, bad status codes, dangling sources) · `jetic_list_workflows`
 - **Author endpoints** (full fidelity: middleware chains, security, pagination, rate limits, ownership, produces/consumes, constraints): `jetic_add_endpoint` · `jetic_update_endpoint` · `jetic_delete_endpoint` · `jetic_manage_environment`
 - **Author workflows** (validate → create → simulate loop with memory data-flow checks): `jetic_validate_workflow` · `jetic_create_workflow` · `jetic_update_workflow` · `jetic_delete_workflow`

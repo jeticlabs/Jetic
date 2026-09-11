@@ -57,6 +57,9 @@ importers:
       '@jetic/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@jetic/dashboard':
+        specifier: workspace:*
+        version: link:../dashboard
       '@jetic/mcp-server':
         specifier: workspace:*
         version: link:../../packages/mcp-server
@@ -147,6 +150,9 @@ importers:
       '@jetic/model':
         specifier: workspace:*
         version: link:../model
+      '@jetic/scanner':
+        specifier: workspace:*
+        version: link:../scanner
       '@jetic/simulator':
         specifier: workspace:*
         version: link:../simulator

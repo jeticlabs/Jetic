@@ -39,6 +39,7 @@
     "@jetic/core": "workspace:*",
     "@jetic/memory": "workspace:*",
     "@jetic/model": "workspace:*",
+    "@jetic/scanner": "workspace:*",
     "@jetic/simulator": "workspace:*",
     "zod": "^3.23.8"
   },

@@ -16,8 +16,8 @@ export const workflowStepSchema = z.object({
   method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']).describe('HTTP method'),
   path: z.string().min(1).describe('Route path; :params resolve from body/memory (NOT from {{templates}} — those only work in body/inject)'),
   description: z.string().optional().describe('What this step does'),
-  body: z.record(z.any()).optional().describe('Request payload. Values support {{faker.*}}, {{scope:key}} and {{workflow:key}} templates'),
-  inject: z.record(z.string()).optional().describe('Memory/header injection: "header:Name" or "body:field" (or bare header name) -> "scope:key" or "{{template}}"'),
+  body: z.record(z.any()).optional().describe('Request payload. Values support {{faker.*}}, {{scope:key}}, {{workflow:key}} and {{human:key}} templates (human pauses for interactive input at runtime)'),
+  inject: z.record(z.string()).optional().describe('Memory/header injection: "header:Name" or "body:field" (or bare header name) -> "scope:key" or "{{template}}" ({{human:key}} supported)'),
   capture: z.record(z.string()).optional().describe('Save RESPONSE fields to memory: "scope:key" -> "dot.path.in.response"'),
   captureInput: z.record(z.string()).optional().describe('Save REQUEST body fields to memory BEFORE sending: "scope:key" -> "bodyField"'),
   expectStatus: z.number().int().positive().optional().describe('Expected HTTP status (default 200; any 2xx passes when expecting 2xx)'),
@@ -50,6 +50,8 @@ export interface WorkflowValidationReport {
   warningsCount: number;
   errors: WorkflowValidationIssue[];
   warnings: WorkflowValidationIssue[];
+  /** {{human:key}} keys used anywhere in the workflow (need interactive input at runtime). */
+  humanKeys: string[];
 }
 
 const TEMPLATE_RE = /\{\{\s*([^}]+?)\s*\}\}/g;
@@ -159,6 +161,7 @@ export function validateWorkflowDefinition(
 
   const seenNames = new Set<string>();
   const defined = new Set<string>(); // scope:key available from earlier steps
+  const humanKeys = new Set<string>(); // {{human:key}} refs (runtime interactive input)
 
   wf.steps.forEach((rawStep, i) => {
     const stepNo = i + 1;
@@ -299,6 +302,13 @@ export function validateWorkflowDefinition(
         err(errors, stepNo, sName, 'BAD_TEMPLATE', `"{{${ref}}}" has an empty key.`, 'Use {{scope:key}} with a real key.');
         continue;
       }
+      if (scope === 'human') {
+        // {{human:key}} is resolved interactively at runtime (CLI terminal
+        // prompt / dashboard dialog) or via JETIC_HUMAN_* env / human: memory —
+        // it is never an error for it to be "uncaptured".
+        if (key) humanKeys.add(key);
+        continue;
+      }
       const full = `${scope}:${key}`;
       if (!defined.has(full) && !persistedMemory.has(full)) {
         err(errors, stepNo, sName, 'UNDEFINED_MEMORY_REF',
@@ -355,16 +365,17 @@ export function validateWorkflowDefinition(
     }
   });
 
-  return toReport(errors, warnings);
+  return toReport(errors, warnings, humanKeys);
 }
 
-function toReport(errors: WorkflowValidationIssue[], warnings: WorkflowValidationIssue[]): WorkflowValidationReport {
+function toReport(errors: WorkflowValidationIssue[], warnings: WorkflowValidationIssue[], humanKeys?: Set<string>): WorkflowValidationReport {
   return {
     valid: errors.length === 0,
     errorsCount: errors.length,
     warningsCount: warnings.length,
     errors,
     warnings,
+    humanKeys: [...(humanKeys || [])].sort(),
   };
 }
 
@@ -560,6 +571,7 @@ export function handleCreateWorkflow(args: z.infer<typeof createWorkflowSchema>)
       slug,
       filePath,
       stepsCount: def.steps.length,
+      needsHuman: report.humanKeys,
       validation: { ...report, warnings },
     };
   }
@@ -579,6 +591,12 @@ export function handleCreateWorkflow(args: z.infer<typeof createWorkflowSchema>)
     slug,
     filePath,
     stepsCount: def.steps.length,
+    needsHuman: report.humanKeys,
+    ...(report.humanKeys.length > 0
+      ? {
+          humanNote: `Steps need interactive human input for: ${report.humanKeys.map((k) => `{{human:${k}}}`).join(', ')}. Runners pause for it (CLI terminal prompt / dashboard dialog); pre-seed with ${report.humanKeys.map((k) => `JETIC_HUMAN_${k.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`).join(', ')} env or human: memory. Tell the user.`,
+        }
+      : {}),
     validation: { ...report, warnings },
     next: `Run it with jetic_simulate_workflow { "workflow": "${slug}" }.`,
   };
@@ -623,7 +641,7 @@ export function handleUpdateWorkflow(args: z.infer<typeof updateWorkflowSchema>)
     );
   }
   if (args.validateOnly === true) {
-    return { success: true, action: 'validated', saved: false as const, slug: resolved.slug, filePath: resolved.filePath, stepsCount: def.steps.length, validation: report };
+    return { success: true, action: 'validated', saved: false as const, slug: resolved.slug, filePath: resolved.filePath, stepsCount: def.steps.length, needsHuman: report.humanKeys, validation: report };
   }
 
   writeWorkflowFile(resolved.filePath, def);
@@ -633,6 +651,7 @@ export function handleUpdateWorkflow(args: z.infer<typeof updateWorkflowSchema>)
     slug: resolved.slug,
     filePath: resolved.filePath,
     stepsCount: def.steps.length,
+    needsHuman: report.humanKeys,
     validation: report,
     next: `Run it with jetic_simulate_workflow { "workflow": "${resolved.slug}" }.`,
   };

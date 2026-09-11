@@ -4,10 +4,9 @@
 
 `@jetic/mcp-server` is a **stdio-based MCP server** for AI code editors and agents —
 **opencode**, **Antigravity**, **Cursor**, **Claude Code**, **Claude Desktop**,
-**Windsurf**, and **VS Code (Copilot)**. It gives the AI 16 typed tools to inspect,
-author, validate, and live-test the API endpoints and multi-step workflows stored
-in `.jetic/model.json` / `.jetic/workflows/` directly from the editor — no AI API
-keys, no external scanners.
+**Windsurf**, and **VS Code (Copilot)**. It gives the AI 18 typed tools that work
+in a structured order — **1. initialize → 2. model (scan or hand-author) →
+3. simulate on demand** — with no AI-provider keys anywhere in the flow.
 
 ---
 
@@ -74,7 +73,7 @@ instead of silently pretending an empty model is real — run `jetic init` /
 
 ## Editor setup
 
-All entries below are **local stdio** servers. After adding the config, restart the editor (or refresh its MCP panel) and look for the `jetic_*` tools (16 total: 6 read-only, 5 writers, 2 destructive, 3 live-HTTP).
+All entries below are **local stdio** servers. After adding the config, restart the editor (or refresh its MCP panel) and look for the `jetic_*` tools (18 total: 6 read-only, 7 writers, 2 destructive, 3 live-HTTP).
 
 > Windows note: prefer `"command": "node"` with **absolute forward-slash paths**
 > in `args` (e.g. `C:/Users/you/Jetic/packages/mcp-server/dist/index.js`).
@@ -154,7 +153,7 @@ Antigravity uses `mcpServers` (note the plural) with `command` + `args` + `env`:
 ```
 
 Steps: agent panel `…` → **MCP Servers** → **Manage MCP Servers** →
-**View raw config** → paste → save → **Refresh**. The 16 `jetic_*` tools then
+**View raw config** → paste → save → **Refresh**. The 18 `jetic_*` tools then
 appear for every project (global config).
 
 Tip: add an `AGENTS.md` in the project root so the agent reaches for Jetic first:
@@ -242,7 +241,7 @@ Windsurf (`~/.codeium/windsurf/mcp_config.json`) and VS Code
 | `jetic_test_endpoint` / `jetic_simulate*` fail with `fetch failed` | Target server isn't running. Start it, or pass `baseUrl` / `envName` pointing at a live environment (`jetic_manage_environment` → `list` to see options). Default timeout is 15 s (`timeoutMs`, max 120 s). |
 | `... sirv ... EPIPE` / exit on editor close | Normal: the editor closed the stdio pipe. Restart via the editor's MCP refresh. |
 | `jetic-mcp --help` hangs | You're on a stale build — rebuild; current builds exit immediately for `--help`/`--version`. |
-| Slow completions / context bloat (opencode) | Jetic adds 16 tools. Scope them per-agent (`jetic_*`) as shown above. |
+| Slow completions / context bloat (opencode) | Jetic adds 18 tools. Scope them per-agent (`jetic_*`) as shown above. |
 
 Still stuck? Capture stderr: editors log it to their MCP panel — the server
 prints its version and resolved project there on startup, and **never** writes
@@ -250,13 +249,21 @@ anything but protocol JSON to stdout.
 
 ---
 
-## Provided MCP tools (16)
+## Provided MCP tools (18)
 
 The server advertises machine-readable `annotations` (`readOnlyHint`,
-`destructiveHint`, `openWorldHint`) and startup `instructions`, so modern
-editors can badge tools and suggest the read → edit → verify flow automatically.
+`destructiveHint`, `openWorldHint`) and startup `instructions` encoding the
+structured order below, so modern editors nudge agents through
+initialize → model → simulate automatically.
 Tool calls execute strictly one-at-a-time in arrival order, so agents may fire
 parallel calls safely.
+
+**The structured order:** 1. `jetic_init` once per repo (creates `.jetic/`,
+detects Express, never clobbers) → 2. `jetic_scan` for Express+TypeScript
+(keyless static scan, merge keeps hand-added endpoints) *or* `jetic_add_endpoint`
+per endpoint for any other stack, `jetic_verify_model` until clean →
+3. workflows only when asked (`validate → create → simulate`). No AI-provider
+setup exists anywhere in this flow.
 
 | # | Tool | Kind | Purpose |
 |---|---|---|---|
@@ -273,14 +280,16 @@ parallel calls safely.
 | 11 | `jetic_simulate_workflow` | live HTTP | End-to-end multi-step simulation with memory capture + validation. Params: `workflow?`, `envName?`, `baseUrl?`, `clearMemory?`. |
 | 12 | `jetic_simulate` | live HTTP | Alias of `jetic_simulate_workflow` (kept for older prompts). |
 | 13 | `jetic_validate_workflow` | read-only | **Dry-run validation without saving or running.** Checks structure, endpoint cross-references against `model.json` (with did-you-mean suggestions), and full memory data-flow: every `{{scope:key}}` must be captured by an earlier step. Accepts a saved reference **or an inline definition for pre-save checks**. Flags dialect mix-ups (`call`/`auth`/`bind` belong to embedded model workflows, not files) and warns about ignored keys like `condition`. |
-| 14 | `jetic_create_workflow` | writes workflows | Saves `.jetic/workflows/<slug>.json` from ordered steps. **Refuses to save when validation errors exist** (each error names the step and the fix); `validateOnly` dry-runs; `overwrite: false` by default blocks accidental clobbering; `fromModelWorkflow` migrates an embedded `model.json` workflow to a file. |
+| 14 | `jetic_create_workflow` | writes workflows | Saves `.jetic/workflows/<slug>.json` from ordered steps. **Refuses to save when validation errors exist** (each error names the step and the fix); `validateOnly` dry-runs; `overwrite: false` by default blocks accidental clobbering; `fromModelWorkflow` migrates an embedded `model.json` workflow to a file. Reports `needsHuman: [...]` for `{{human:*}}` refs plus a note telling the user what will pause at runtime. |
 | 15 | `jetic_update_workflow` | writes workflows | Rename / description / environment / full `steps` replace / `appendSteps`. Validates before writing, refuses on errors. Cannot edit `model.json`-embedded workflows (migrate them first). |
 | 16 | `jetic_delete_workflow` | **destructive** | Deletes a workflow file by slug/name/path. Confirm with the user first. |
+| 17 | `jetic_init` | writes model | **Step 1:** scaffolds `.jetic/model.json` (+ `workflows/`, `config.json`) for repos without one. Refuses to clobber existing models; detects Express+TypeScript and reports `scanRecommended` with the next step spelled out. |
+| 18 | `jetic_scan` | writes model | **Step 2a (Express+TS, needs `tsconfig.json`):** keyless static AST scan. Default `merge` upserts scanned routes and preserves hand-added endpoints (counts reported); `overwrite` replaces all endpoints. Fails with manual-modeling guidance for other stacks. |
 
-### Suggested agent workflow
+### Suggested agent workflow (structured order)
 
-1. `jetic_read_model` with `{"summaryOnly": true}`
-2. `jetic_list_endpoints` (+ `jetic_get_endpoint` for details)
+1. `jetic_init` if there is no `.jetic/model.json` (`modelExists: false`)
+2. Express+TS → `jetic_scan` (merge), else model each endpoint with `jetic_add_endpoint`; `jetic_verify_model` until clean
 3. Edit via `jetic_add_endpoint` / `jetic_update_endpoint` (middleware in execution order; `jetic_verify_model` afterwards)
 4. `jetic_verify_model` → fix issues
 5. `jetic_test_endpoint` (needs a running server) or author a journey (next section) and `jetic_simulate_workflow`
@@ -293,6 +302,7 @@ Never hand-write workflow files blind — follow validate → create → simulat
 2. **Draft steps** with memory chaining:
    - *Producer*: `capture: { "workflow:accessToken": "data.accessToken" }` (response → memory) or `captureInput: { "workflow:email": "email" }` (request → memory, pre-flight).
    - *Consumer*: `inject: { "header:Authorization": "Bearer {{workflow:accessToken}}" }`, body templates `{{workflow:key}}`, faker data `{{faker.internet.email}}`, cross-scope `{{scope:key}}`.
+   - *Human*: `{{human:otp}}` pauses for interactive input at runtime (CLI prompt / dashboard dialog). Reserve for values unknowable beforehand (OTP/2FA codes, real secrets) — first answer is saved to `human:` memory, `JETIC_HUMAN_OTP` env skips the prompt.
    - Path params use `:id` + a body field or captured `workflow:id` key (`{{…}}` templates do **not** resolve in paths).
 3. **Dry-run**: `jetic_validate_workflow` with the inline `definition` — fix every error (undefined memory refs, unresolved `:params`, dialect mix-ups like `call`/`auth`/`bind`).
 4. **Save**: `jetic_create_workflow` (refuses to save while errors remain; `overwrite: false` default protects existing files).

@@ -33,6 +33,7 @@ import {
   RotateCcw,
   Square,
   Trash2,
+  User,
   X,
   Zap,
 } from 'lucide-react';
@@ -114,6 +115,12 @@ interface RunState {
   failed: number;
   error?: string;
   baseUrl?: string;
+  /** {{human:key}} needs announced by the server in the start event. */
+  humanKeys?: { key: string; source: string }[];
+  /** Ephemeral resolution notes (e.g. where each human value came from). */
+  notes?: string[];
+  /** True when the connected server predates human-input support. */
+  humanUnsupported?: boolean;
 }
 
 // ─── Method colours (semantic — stay consistent across light/dark) ───────────
@@ -234,6 +241,121 @@ async function deleteWorkflow(file: string): Promise<void> {
     const data = await r.json().catch(() => ({}));
     throw new Error(data.error ?? `HTTP ${r.status}`);
   }
+}
+
+// ─── Human input ({{human:key}}) helpers ─────────────────────────────────────
+
+const HUMAN_REF_RE = /\{\{\s*human:([^}]+?)\s*\}\}/g;
+
+/** All distinct `key`s referenced as {{human:key}} in one step (body/inject/path). */
+function findHumanKeys(step: WorkflowStep): string[] {
+  const found = new Set<string>();
+  for (const hay of [step.path, JSON.stringify(step.body ?? {}), JSON.stringify(step.inject ?? {}), JSON.stringify(step.condition ?? {})]) {
+    if (!hay) continue;
+    HUMAN_REF_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = HUMAN_REF_RE.exec(hay)) !== null) {
+      const k = m[1].trim();
+      if (k) found.add(k);
+    }
+  }
+  return [...found];
+}
+
+/** All distinct {{human:key}} keys across a workflow, in first-use order. */
+function collectHumanKeys(steps: WorkflowStep[]): string[] {
+  const all = new Set<string>();
+  steps.forEach(s => findHumanKeys(s).forEach(k => all.add(k)));
+  return [...all];
+}
+
+function looksSecretHumanKey(key: string): boolean {
+  return /pass|secret|token|pwd|private|credential/i.test(key);
+}
+
+/**
+ * Modal dialog that blocks the run until a human types the requested value(s).
+ * Used mid-run for live API executions (one key) and pre-run for local
+ * previews (all keys at once).
+ */
+function HumanInputDialog({
+  title,
+  subtitle,
+  fields,
+  values,
+  onChange,
+  onSubmit,
+  onCancel,
+  submitLabel,
+  error,
+  submitting,
+}: {
+  title: string;
+  subtitle?: string;
+  fields: { key: string; hint?: string }[];
+  values: Record<string, string>;
+  onChange: (key: string, value: string) => void;
+  onSubmit: () => void;
+  onCancel?: () => void;
+  submitLabel: string;
+  error?: string | null;
+  submitting?: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-sm rounded-xl border border-amber-500/25 bg-[var(--bg-overlay)] shadow-2xl">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)]">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
+            <User className="h-3.5 w-3.5" strokeWidth={2} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[12px] font-medium text-[var(--text-primary)]">{title}</p>
+            {subtitle && <p className="text-[10px] text-[var(--text-faint)] truncate">{subtitle}</p>}
+          </div>
+        </div>
+        <div className="space-y-2.5 p-4">
+          <p className="text-[11px] text-[var(--text-muted)]">
+            This workflow needs a value only you know. The run stays paused until you answer.
+          </p>
+          {fields.map(f => (
+            <div key={f.key}>
+              <label className="mb-1 block font-mono text-[10px] text-amber-400/90">{`{{human:${f.key}}}`}</label>
+              <input
+                autoFocus={fields.length === 1}
+                type={looksSecretHumanKey(f.key) ? 'password' : 'text'}
+                value={values[f.key] ?? ''}
+                onChange={e => onChange(f.key, e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') onSubmit(); }}
+                placeholder={f.hint ?? `Enter ${f.key}…`}
+                className="h-8 w-full rounded-lg border border-amber-500/30 bg-[var(--bg-overlay-md)] px-2.5 text-[12px] text-[var(--text-primary)] placeholder-[var(--text-faint)] outline-none focus:border-amber-500/70 transition-colors"
+              />
+            </div>
+          ))}
+          {error && <p className="text-[10px] text-red-400 leading-tight">{error}</p>}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={!!submitting}
+              className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-500/20 border border-amber-500/40 px-3 text-[11px] font-medium text-amber-300 hover:bg-amber-500/30 transition-colors disabled:opacity-40 hover:cursor-pointer"
+            >
+              {submitting ? <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} /> : <Check className="h-3 w-3" strokeWidth={2} />}
+              {submitLabel}
+            </button>
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex h-8 items-center gap-1 rounded-lg border border-[var(--border)] px-3 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors hover:cursor-pointer"
+              >
+                <X className="h-3 w-3" strokeWidth={2} /> Cancel run
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── React Flow node types ─────────────────────────────────────────────────────
@@ -457,7 +579,7 @@ function SimFlowGraph({ steps, runState }: { steps: WorkflowStep[]; runState: Ru
 
 // ─── Run Log Panel ────────────────────────────────────────────────────────────
 
-function RunLog({ runState, steps }: { runState: RunState; steps: WorkflowStep[] }) {
+function RunLog({ runState, steps, waitingStepIndex }: { runState: RunState; steps: WorkflowStep[]; waitingStepIndex?: number | null }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -485,6 +607,27 @@ function RunLog({ runState, steps }: { runState: RunState; steps: WorkflowStep[]
         {/* Start line */}
         <p className="text-[var(--text-faint)]">▶ Starting workflow execution…</p>
 
+        {/* Connected server predates {{human:*}} support — say so loudly */}
+        {runState.humanUnsupported && (
+          <p className="text-red-400">
+            ⚠ Connected server doesn't support {'{{human:*}}'} — restart `jetic dev` from the latest build.
+            Human values will resolve empty and the dialog will never appear.
+          </p>
+        )}
+
+        {/* Human input needs announced by the server */}
+        {(runState.humanKeys ?? []).filter(h => h.source === 'prompt').map(h => (
+          <p key={`need-${h.key}`} className="text-amber-400">◉ will ask for {`{{human:${h.key}}}`} when reached</p>
+        ))}
+        {(runState.humanKeys ?? []).filter(h => h.source !== 'prompt').map(h => (
+          <p key={`have-${h.key}`} className="text-[var(--text-faint)]">
+            ↳ human {`{{human:${h.key}}}`} ← {HUMAN_SOURCE_LABEL[h.source] ?? h.source} (ready)
+          </p>
+        ))}
+        {(runState.notes ?? []).map((n, ni) => (
+          <p key={`note-${ni}`} className="text-[var(--text-faint)]">{n}</p>
+        ))}
+
         {runState.stepResults.map((result, i) => {
           if (!result && runState.stepStatuses[i] !== 'running') return null;
 
@@ -494,12 +637,17 @@ function RunLog({ runState, steps }: { runState: RunState; steps: WorkflowStep[]
 
           if (isRunning) {
             return (
-              <div key={i} className="flex items-center gap-2 text-[var(--text-muted)]">
-                <Loader2 className="h-3 w-3 animate-spin text-blue-400" strokeWidth={2} />
-                <span className="text-[var(--text-faint)]">Step {i + 1}/{steps.length}</span>
-                <span className={s.text}>{step.method}</span>
-                <span className="text-[var(--text-secondary)]">{step.path}</span>
-                <span className="text-[var(--text-faint)]">…</span>
+              <div key={i}>
+                <div className="flex items-center gap-2 text-[var(--text-muted)]">
+                  <Loader2 className="h-3 w-3 animate-spin text-blue-400" strokeWidth={2} />
+                  <span className="text-[var(--text-faint)]">Step {i + 1}/{steps.length}</span>
+                  <span className={s.text}>{step.method}</span>
+                  <span className="text-[var(--text-secondary)]">{step.path}</span>
+                  <span className="text-[var(--text-faint)]">…</span>
+                </div>
+                {waitingStepIndex === i && (
+                  <p className="pl-5 text-amber-400">⏳ Waiting for your input — answer the dialog to resume the run.</p>
+                )}
               </div>
             );
           }
@@ -831,7 +979,7 @@ function ConditionEditor({
 
 // ─── Step list row ────────────────────────────────────────────────────────────
 
-function StepRow({ step, index, total, status, result, allSteps, onConditionChange }: {
+function StepRow({ step, index, total, status, result, allSteps, onConditionChange, waitingHuman }: {
   step: WorkflowStep;
   index: number;
   total: number;
@@ -839,6 +987,8 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
   result: StepRunResult | null;
   allSteps: WorkflowStep[];
   onConditionChange: (stepIdx: number, condition: StepCondition | undefined) => void;
+  /** True while the run is paused waiting for the human to answer this step's {{human:key}}. */
+  waitingHuman?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [editingCondition, setEditingCondition] = useState(false);
@@ -846,6 +996,7 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
   const hasInject = step.inject && Object.keys(step.inject).length > 0;
   const hasBody = step.body && Object.keys(step.body).length > 0;
   const hasCondition = !!step.condition;
+  const humanKeys = findHumanKeys(step);
 
   // Build list of captured keys available up to this step
   const capturedKeys: string[] = [];
@@ -855,7 +1006,9 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
     Object.keys(s.captureInput ?? {}).forEach(k => capturedKeys.push(k));
   }
 
-  const statusIcon = {
+  const statusIcon = waitingHuman
+    ? <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/15 text-amber-400" title="Waiting for your input — answer the dialog to resume"><User className="h-3 w-3 animate-pulse" strokeWidth={2} /></span>
+    : {
     idle: <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border)] text-[9px] text-[var(--text-faint)]">{index + 1}</span>,
     running: <Loader2 className="h-5 w-5 text-blue-400 animate-spin" strokeWidth={2} />,
     passed: <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400"><Check className="h-3 w-3" strokeWidth={2} /></span>,
@@ -894,6 +1047,14 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
           <span className="flex items-center gap-1">
             {hasInject && <span className="rounded bg-amber-500/10 px-1 py-0.5 text-[9px] text-amber-400">auth</span>}
             {hasCapture && <span className="rounded bg-blue-500/10 px-1 py-0.5 text-[9px] text-blue-400">capture</span>}
+            {humanKeys.length > 0 && (
+              <span
+                title={`Needs human input at runtime: ${humanKeys.map(k => `{{human:${k}}}`).join(', ')}`}
+                className="rounded bg-orange-500/10 px-1 py-0.5 text-[9px] text-orange-400 flex items-center gap-0.5"
+              >
+                <User className="h-2.5 w-2.5" strokeWidth={2} /> human
+              </span>
+            )}
             {hasCondition && (
               <span className="rounded bg-purple-500/10 px-1 py-0.5 text-[9px] text-purple-400 flex items-center gap-0.5">
                 <Diamond className="h-2.5 w-2.5" strokeWidth={2} /> condition
@@ -1031,8 +1192,17 @@ function makeInitialRunState(count: number): RunState {
     stepResults: Array(count).fill(null),
     passed: 0,
     failed: 0,
+    humanKeys: [],
+    notes: [],
   };
 }
+
+const HUMAN_SOURCE_LABEL: Record<string, string> = {
+  run: 'pre-seeded for this run',
+  env: 'environment variable',
+  memory: 'saved human memory',
+  prompt: 'your answer',
+};
 
 function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { workflow: Workflow; onDelete: () => void; onViewTraces?: (name: string, traceId?: string) => void }) {
   const [workflow, setWorkflow] = useState<Workflow>(initialWorkflow);
@@ -1052,6 +1222,20 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
 
   // Accumulated in-memory captured values for condition evaluation
   const capturedMemory = useRef<Record<string, string>>({});
+  // Already-logged human resolutions (server may emit one per reference).
+  const notedHuman = useRef<Set<string>>(new Set());
+
+  // ── Human input coordination ─────────────────────────────────────────
+  const runIdRef = useRef<string | null>(null);
+  // Dialog shown mid-run whenever a step needs a {{human:key}} value.
+  // Used by both the real API path (human_input_required SSE event) and
+  // the local simulation path (askHumanMidRun helper).
+  const [humanPrompt, setHumanPrompt] = useState<{ key: string; stepIndex: number; stepName: string } | null>(null);
+  const [humanValue, setHumanValue] = useState('');
+  const [humanError, setHumanError] = useState<string | null>(null);
+  const [humanSending, setHumanSending] = useState(false);
+  // Resolver for local-simulation mid-run pauses (one key at a time).
+  const humanLocalResolveRef = useRef<((v: string | null) => void) | null>(null);
 
   // Handle condition change from StepRow
   const handleConditionChange = async (stepIdx: number, condition: StepCondition | undefined) => {
@@ -1105,8 +1289,82 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
     abortRef.current = true;
     esRef.current?.close();
     esRef.current = null;
+    // If we're paused on a human prompt (API or local sim), close the dialog.
+    if (humanLocalResolveRef.current) {
+      const resolve = humanLocalResolveRef.current;
+      humanLocalResolveRef.current = null;
+      setHumanPrompt(null);
+      resolve(null); // unblocks the sim loop which will see abortRef.current = true
+    } else if (humanPrompt) {
+      void cancelHuman();
+    }
     setRunState(prev => ({ ...prev, phase: prev.phase === 'running' ? 'aborted' : prev.phase }));
   };
+
+  /** Answer the paused server run (null value = cancel the run). */
+  const postHumanAnswer = async (key: string, value: string | null): Promise<void> => {
+    if (!runIdRef.current) throw new Error('Run id lost — please re-run the workflow.');
+    const r = await fetch('/api/workflows/human-input', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ runId: runIdRef.current, key, value }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error ?? `HTTP ${r.status}`);
+  };
+
+  const submitHuman = async () => {
+    if (!humanPrompt) return;
+
+    // Local-sim path: resolve the in-process promise and close the dialog.
+    if (humanLocalResolveRef.current) {
+      const resolve = humanLocalResolveRef.current;
+      humanLocalResolveRef.current = null;
+      setHumanPrompt(null);
+      setHumanValue('');
+      resolve(humanValue);
+      return;
+    }
+
+    // Real API path: POST the answer to the server.
+    setHumanSending(true);
+    setHumanError(null);
+    try {
+      await postHumanAnswer(humanPrompt.key, humanValue);
+      setHumanPrompt(null);
+      setHumanValue('');
+    } catch (e: any) {
+      setHumanError(e.message);
+    } finally {
+      setHumanSending(false);
+    }
+  };
+
+  const cancelHuman = async () => {
+    if (!humanPrompt) return;
+
+    // Local-sim path: resolve with null (aborts the run).
+    if (humanLocalResolveRef.current) {
+      const resolve = humanLocalResolveRef.current;
+      humanLocalResolveRef.current = null;
+      setHumanPrompt(null);
+      setHumanValue('');
+      setHumanError(null);
+      resolve(null);
+      return;
+    }
+
+    // Real API path: POST null to unblock the server run.
+    try {
+      await postHumanAnswer(humanPrompt.key, null);
+    } catch {
+      // Run already ended server-side — just close the dialog.
+    }
+    setHumanPrompt(null);
+    setHumanValue('');
+    setHumanError(null);
+  };
+
 
   const resetRun = () => {
     stopRun();
@@ -1162,9 +1420,15 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
     setLastTraceId(id);
   };
 
-  const startRun = () => {
+  const startRun = (preseededInputs?: Record<string, string>) => {
     // Reset state and mark as running
     abortRef.current = false;
+    runIdRef.current = null;
+    notedHuman.current = new Set();
+    humanLocalResolveRef.current = null;
+    setHumanPrompt(null);
+    setHumanValue('');
+    setHumanError(null);
     const count = workflow.steps.length;
     setRunState({ ...makeInitialRunState(count), baseUrl: baseUrl || undefined });
     setLastTraceId(undefined);
@@ -1172,11 +1436,35 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
     sourceRef.current = 'local-sim';
     setShowLog(true);
 
+    /**
+     * Ask the human for a single key mid-run (local sim path).
+     * Shows the humanPrompt dialog and waits — returns the value entered,
+     * or null if the user cancelled / run was aborted.
+     */
+    const askHumanMidRun = (key: string, stepIndex: number, stepName: string): Promise<string | null> => {
+      return new Promise<string | null>((resolve) => {
+        // Show the same dialog the real API uses for human_input_required.
+        setHumanValue('');
+        setHumanError(null);
+        setHumanPrompt({ key, stepIndex, stepName });
+        // Store the resolver so submitHuman / cancelHuman can complete it.
+        humanLocalResolveRef.current = resolve;
+      });
+    };
+
     // Try the real API first; fall back to local simulation if unavailable
     const runSimulation = async () => {
       // Mark overall phase as running
       setRunState(prev => ({ ...prev, phase: 'running', baseUrl: baseUrl || prev.baseUrl }));
       capturedMemory.current = {};
+
+      if (preseededInputs) {
+        for (const [k, v] of Object.entries(preseededInputs)) {
+          if (v != null && v !== '') {
+            capturedMemory.current[`human:${k}`] = v;
+          }
+        }
+      }
 
       let passed = 0;
       let failed = 0;
@@ -1185,6 +1473,35 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
 
       for (let i = 0; i < count; i++) {
         if (abortRef.current || conditionAborted) break;
+
+        const stepDef = workflow.steps[i];
+        const humanKeys = findHumanKeys(stepDef);
+
+        // ── Mid-run human input pause ────────────────────────────────────
+        // For each {{human:key}} in this step that hasn't been collected yet,
+        // pause and prompt the user before executing the simulated request.
+        for (const key of humanKeys) {
+          if (abortRef.current) break;
+          if (capturedMemory.current[`human:${key}`] !== undefined) continue; // already have it
+
+          // Pause here — mark step as running so the UI shows ⏳
+          setRunState(prev => {
+            const statuses = [...prev.stepStatuses];
+            statuses[i] = 'running';
+            return { ...prev, stepStatuses: statuses, currentStep: i };
+          });
+
+          const value = await askHumanMidRun(key, i, stepDef.name);
+          if (value === null || abortRef.current) {
+            // User cancelled
+            setRunState(prev => ({ ...prev, phase: 'aborted', error: 'Run cancelled by user' }));
+            return;
+          }
+          capturedMemory.current[`human:${key}`] = value;
+          setRunState(prev => ({ ...prev, notes: [...(prev.notes ?? []), `↳ human {{human:${key}}} ← your answer`] }));
+        }
+
+        if (abortRef.current) break;
 
         // Mark current step as running
         setRunState(prev => {
@@ -1204,8 +1521,6 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
         });
 
         if (abortRef.current) break;
-
-        const stepDef = workflow.steps[i];
 
         // Accumulate captured keys into memory (simulated)
         Object.keys(stepDef.capture ?? {}).forEach(k => {
@@ -1311,16 +1626,20 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
     };
 
     // Attempt real API; if it fails / is unavailable, run local simulation
+    // NOTE: res.body can be null (empty 204/404 from proxies or static hosts).
+    // getReader() on null throws OUTSIDE pump's catch and would hang the run
+    // on a spinner forever — hence the explicit guard into the fallback.
     fetch('/api/workflows/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file: workflow._file, baseUrl: baseUrl || undefined }),
+      body: JSON.stringify({ file: workflow._file, baseUrl: baseUrl || undefined, humanInputs: preseededInputs }),
     }).then(res => {
       if (!res.ok || !res.body) {
         // API not available — use local simulation
         runSimulation();
         return;
       }
+      sourceRef.current = 'api';
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -1349,12 +1668,43 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
             let msg: any;
             try { msg = JSON.parse(raw); } catch { continue; }
 
+            // Pause events carry no run-state change — open the dialog directly.
+            // (Doing this outside setRunState keeps the updater pure; updater
+            // side effects can be dropped or double-run under StrictMode.)
+            if (msg.type === 'human_input_required') {
+              setHumanValue('');
+              setHumanError(null);
+              setHumanPrompt({
+                key: String(msg.key ?? ''),
+                stepIndex: Number(msg.stepIndex ?? -1),
+                stepName: String(msg.stepName ?? ''),
+              });
+              continue;
+            }
+
             setRunState(prev => {
               const ns = { ...prev };
 
               if (msg.type === 'start') {
                 ns.phase = 'running';
                 ns.baseUrl = msg.baseUrl;
+                ns.humanKeys = Array.isArray(msg.humanKeys) ? msg.humanKeys : [];
+                ns.notes = [];
+                // Old servers send no humanKeys/human events at all: if this
+                // workflow needs human input, flag it so the UI says so loudly
+                // instead of running with silently-empty values.
+                ns.humanUnsupported =
+                  !Array.isArray(msg.humanKeys) && collectHumanKeys(workflow.steps).length > 0;
+                if (typeof msg.runId === 'string') runIdRef.current = msg.runId;
+              } else if (msg.type === 'human_resolved') {
+                // A human value resolved without pausing (pre-seeded / env /
+                // saved memory / just answered) — note it once per step+key.
+                const dedupe = `${msg.index}:${msg.key}`;
+                if (!notedHuman.current.has(dedupe)) {
+                  notedHuman.current.add(dedupe);
+                  const label = HUMAN_SOURCE_LABEL[String(msg.source)] ?? String(msg.source ?? 'run');
+                  ns.notes = [...(ns.notes ?? []), `↳ human {{human:${msg.key}}} ← ${label}`];
+                }
               } else if (msg.type === 'step_start') {
                 const idx = msg.index;
                 const statuses = [...ns.stepStatuses];
@@ -1451,7 +1801,7 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
       {/* The Chip */}
       <button
         type="button"
-        onClick={startRun}
+        onClick={() => startRun()}
         className="absolute -top-2 -right-2 flex items-center gap-1 rounded-full bg-blue-500 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm z-10 hover:bg-blue-400 transition-colors hover:cursor-pointer"
       >
         <Play size={10} /> Run Workflow
@@ -1490,6 +1840,17 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
               {runState.phase === 'running' ? 'Running…' :
                 runState.phase === 'done' ? `${runState.passed}/${runState.passed + runState.failed}` :
                   runState.phase === 'aborted' ? 'Aborted' : 'Error'}
+            </span>
+          )}
+
+          {/* Server too old for {{human:*}} — visible without opening the log */}
+          {runState.humanUnsupported && (
+            <span
+              title="The connected jetic dev server predates human-input support. Restart it from the latest build — human values will otherwise resolve empty and no dialog appears."
+              className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] shrink-0 bg-red-500/10 text-red-400"
+            >
+              <AlertCircle className="h-2.5 w-2.5" strokeWidth={2} />
+              Old server — no human dialog
             </span>
           )}
 
@@ -1559,7 +1920,7 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
           {!isRunning && (
             <button
               type="button"
-              onClick={startRun}
+              onClick={() => startRun()}
               className="hidden items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-[10px] font-medium text-white hover:bg-blue-400 transition-colors shrink-0 hover:cursor-pointer"
             >
               <Play className="h-3 w-3" strokeWidth={2} />
@@ -1618,7 +1979,7 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
             {/* Live log */}
             {showLog && (
               <div className="border-b border-[var(--border)]">
-                <RunLog runState={runState} steps={workflow.steps} />
+                <RunLog runState={runState} steps={workflow.steps} waitingStepIndex={humanPrompt?.stepIndex ?? null} />
               </div>
             )}
 
@@ -1634,6 +1995,7 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
                     result={runState.stepResults[i] ?? null}
                     allSteps={workflow.steps}
                     onConditionChange={handleConditionChange}
+                    waitingHuman={humanPrompt?.stepIndex === i}
                   />
                 ))}
               </div>
@@ -1647,6 +2009,22 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
           </>
         )}
       </div>
+
+      {/* ── Mid-run human input dialog ── */}
+      {humanPrompt && (
+        <HumanInputDialog
+          title="Human input required"
+          subtitle={humanPrompt.stepName ? `Step ${humanPrompt.stepIndex + 1} · ${humanPrompt.stepName}` : `Step ${humanPrompt.stepIndex + 1}`}
+          fields={[{ key: humanPrompt.key }]}
+          values={{ [humanPrompt.key]: humanValue }}
+          onChange={(_k, v) => setHumanValue(v)}
+          onSubmit={submitHuman}
+          onCancel={cancelHuman}
+          submitLabel="Submit & resume run"
+          error={humanError}
+          submitting={humanSending}
+        />
+      )}
     </div>
   );
 }
