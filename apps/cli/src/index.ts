@@ -15,7 +15,7 @@ const program = new Command();
 program
   .name('jetic')
   .description('AI-Native API Behavior Testing')
-  .version('0.1.9');
+  .version('0.2.0');
 
 program.addCommand(initCommand);
 program.addCommand(scanCommand);

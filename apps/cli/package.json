@@ -1,6 +1,6 @@
 {
   "name": "jetic-cli",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "description": "AI-Native API Behavior Testing & Discovery Tool — CLI and Local Studio Dashboard",
   "main": "dist/index.js",
   "bin": {
@@ -10,7 +10,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && node -e \"try { const fs = require('fs'); fs.rmSync('./dist/dashboard', { recursive: true, force: true }); fs.cpSync('../dashboard/dist', './dist/dashboard', { recursive: true }); console.log('Bundled dashboard into dist/dashboard'); } catch (e) { console.warn('Could not bundle dashboard dist (build @jetic/dashboard first):', e.message); }\"",
     "clean": "rm -rf dist"
   },
   "keywords": [
@@ -50,6 +50,7 @@
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@jetic/core": "workspace:*",
+    "@jetic/dashboard": "workspace:*",
     "@jetic/mcp-server": "workspace:*",
     "@jetic/memory": "workspace:*",
     "@jetic/model": "workspace:*",

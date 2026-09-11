@@ -530,9 +530,38 @@ Output valid JSON only.
       }
     });
 
+    // ─── Interactive human input ({{human:key}}) ──────────────────────────
+    // One pending question per run. POST /api/workflows/human-input resolves it.
+    interface HumanWaiter {
+      key: string;
+      stepIndex: number;
+      resolve: (value: string | null) => void;
+    }
+    const humanInputWaiters = new Map<string, HumanWaiter>();
+    const HUMAN_INPUT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes, then the step fails
+
+    class HumanInputAbort extends Error {
+      constructor(key: string, reason: string) {
+        super(`Human input for "{{human:${key}}}" ${reason}`);
+        this.name = 'HumanInputAbort';
+      }
+    }
+
+    app.post('/api/workflows/human-input', (req, res) => {
+      const { runId, key, value } = req.body as { runId: string; key: string; value?: string | null };
+      if (!runId || !key) { return res.status(400).json({ error: 'runId and key are required' }); }
+      const waiter = humanInputWaiters.get(runId);
+      if (!waiter || waiter.key !== key) {
+        return res.status(404).json({ error: 'no pending human input for this run/key (answered, timed out, or run ended)' });
+      }
+      humanInputWaiters.delete(runId);
+      waiter.resolve(typeof value === 'string' ? value : null);
+      res.json({ ok: true });
+    });
+
     // ─── Workflow run – Server-Sent Events stream ─────────────────────────
     app.post('/api/workflows/run', async (req, res) => {
-      const { file } = req.body as { file: string };
+      const { file, humanInputs: preseededHuman } = req.body as { file: string; humanInputs?: Record<string, string> };
       if (!file) { return res.status(400).json({ error: 'file is required' }); }
 
       const jeticDir = path.join(process.cwd(), '.jetic');
@@ -575,11 +604,56 @@ Output valid JSON only.
       }
       if (!baseUrl) baseUrl = 'http://localhost:4000';
 
-      send('start', { name: workflow.name, totalSteps: workflow.steps.length, baseUrl });
+      // ── Human-input coordination ──────────────────────────────────────
+      // {{human:key}} pauses the run: we emit `human_input_required` over SSE
+      // and wait until POST /api/workflows/human-input delivers the value.
+      const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      // Pre-seeded answers (client collected up-front); used without persisting.
+      const runHumanCache = new Map<string, string>(Object.entries(preseededHuman ?? {}));
+
+      // Pre-scan every {{human:key}} so clients can show up-front what this
+      // run will ask for vs. what is already known (run/env/memory).
+      const HUMAN_KEY_RE = /\{\{\s*human:([^}]+?)\s*\}\}/g;
+      const collectHumanRefs = (): string[] => {
+        const keys = new Set<string>();
+        for (const step of workflow.steps || []) {
+          for (const hay of [step?.path, JSON.stringify(step?.body ?? {}), JSON.stringify(step?.inject ?? {}), JSON.stringify(step?.condition ?? {})]) {
+            if (!hay) continue;
+            HUMAN_KEY_RE.lastIndex = 0;
+            let m: RegExpExecArray | null;
+            while ((m = HUMAN_KEY_RE.exec(hay)) !== null) {
+              const k = (m[1] || '').trim();
+              if (k) keys.add(k);
+            }
+          }
+        }
+        return [...keys];
+      };
+      const humanEnvName = (key: string) => `JETIC_HUMAN_${key.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+      const humanSource = async (key: string): Promise<'run' | 'env' | 'memory' | 'prompt'> => {
+        if (runHumanCache.has(key)) return 'run';
+        if (process.env[humanEnvName(key)]) return 'env';
+        try {
+          const v = await new Mem({ scope: 'human' }).get(key);
+          if (v != null && String(v) !== '') return 'memory';
+        } catch {}
+        return 'prompt';
+      };
+      const neededHuman: Array<{ key: string; source: string }> = [];
+      for (const k of collectHumanRefs()) neededHuman.push({ key: k, source: await humanSource(k) });
+
+      send('start', { name: workflow.name, totalSteps: workflow.steps.length, baseUrl, runId, humanKeys: neededHuman });
 
       // Register close handler AFTER flushing start — any close before this is irrelevant
       let aborted = false;
-      req.on('close', () => { aborted = true; });
+      req.on('close', () => {
+        aborted = true;
+        const waiter = humanInputWaiters.get(runId);
+        if (waiter) {
+          humanInputWaiters.delete(runId);
+          waiter.resolve(null); // unblock the run loop so it can finish cleanly
+        }
+      });
 
       // ── inline the minimal executor (avoids importing CLI internals) ──
       function deepGet(obj: any, dotPath: string): any {
@@ -601,39 +675,115 @@ Output valid JSON only.
         // Note: memory template refs ({{scope:key}}) require async — handled separately
       }
 
-      async function resolveMemoryTemplates(value: string): Promise<string> {
+      async function resolveMemoryTemplates(value: string, stepIndex = -1, stepName = ''): Promise<string> {
         const matches = [...value.matchAll(/\{\{([^}]+)\}\}/g)];
         let result = value;
         for (const [placeholder, expr] of matches.map(m => [m[0], m[1].trim()])) {
           if (expr.includes(':') && !expr.startsWith('faker.')) {
             const [scope, key] = expr.split(':', 2);
-            const mem = new Mem({ scope });
-            const val = await mem.get(key);
-            result = result.replace(placeholder, val != null ? String(val) : '');
+            const val = await resolveMemValue(scope, key, stepIndex, stepName);
+            result = result.replace(placeholder, val);
           }
         }
         return result;
       }
 
-      async function resolveStr(v: string): Promise<string> {
+      async function resolveStr(v: string, stepIndex = -1, stepName = ''): Promise<string> {
         let s = await resolveTemplate(v);
-        s = await resolveMemoryTemplates(s);
+        s = await resolveMemoryTemplates(s, stepIndex, stepName);
         return s;
       }
 
-      async function executeStep(step: any): Promise<any> {
+      async function resolveValueRecursive(val: any, stepIndex = -1, stepName = ''): Promise<any> {
+        if (typeof val === 'string') {
+          return await resolveStr(val, stepIndex, stepName);
+        }
+        if (Array.isArray(val)) {
+          const res = [];
+          for (const item of val) {
+            res.push(await resolveValueRecursive(item, stepIndex, stepName));
+          }
+          return res;
+        }
+        if (val && typeof val === 'object' && val.constructor === Object) {
+          const res: Record<string, any> = {};
+          for (const [k, v] of Object.entries(val)) {
+            res[k] = await resolveValueRecursive(v, stepIndex, stepName);
+          }
+          return res;
+        }
+        return val;
+      }
+
+      /**
+       * Single choke point for scope:key lookups. `human:` pauses the SSE run
+       * until the dashboard user answers (or a pre-seeded/env value exists);
+       * every other scope reads Jetic memory as before.
+       */
+      async function resolveMemValue(scope: string, key: string, stepIndex: number, stepName: string): Promise<string> {
+        if (scope !== 'human') {
+          const mem = new Mem({ scope });
+          const val = await mem.get(key);
+          return val != null ? String(val) : '';
+        }
+        // Pre-seeded for this run (client collected up-front) — used as-is, not persisted.
+        if (runHumanCache.has(key)) {
+          send('human_resolved', { index: stepIndex, key, source: 'run' });
+          return runHumanCache.get(key)!;
+        }
+        // CI-safe override, same convention as the terminal runner.
+        const envVal = process.env[humanEnvName(key)];
+        if (envVal !== undefined && envVal !== '') {
+          send('human_resolved', { index: stepIndex, key, source: 'env' });
+          return envVal;
+        }
+        // Pause and ask the human via SSE.
+        const mem = new Mem({ scope: 'human' });
+        const answer = await waitForHumanInput(runId, key, stepIndex, stepName, send);
+        if (answer === null) {
+          throw new HumanInputAbort(key, aborted ? 'was cancelled' : 'timed out after 10 minutes');
+        }
+        await mem.set(key, answer);
+        send('human_resolved', { index: stepIndex, key, source: 'prompt' });
+        return answer;
+      }
+
+      function waitForHumanInput(
+        forRunId: string,
+        key: string,
+        stepIndex: number,
+        stepName: string,
+        sendFn: (type: string, data: any) => void,
+      ): Promise<string | null> {
+        return new Promise((resolve) => {
+          const timer = setTimeout(() => {
+            if (humanInputWaiters.get(forRunId)?.key === key) {
+              humanInputWaiters.delete(forRunId);
+              resolve(null);
+            }
+          }, HUMAN_INPUT_TIMEOUT_MS);
+          humanInputWaiters.set(forRunId, {
+            key,
+            stepIndex,
+            resolve: (value) => { clearTimeout(timer); resolve(value); },
+          });
+          sendFn('human_input_required', { runId: forRunId, key, stepIndex, stepName });
+        });
+      }
+
+      async function executeStep(step: any, stepIndex: number): Promise<any> {
         const startTime = Date.now();
+        const stepName = step.name || `${step.method} ${step.path}`;
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         const bodyExtra: Record<string, any> = {};
 
         // Resolve inject
         for (const [target, memKeyOrTpl] of Object.entries(step.inject ?? {}) as [string, string][]) {
           const strVal = memKeyOrTpl.includes('{{')
-            ? await resolveStr(memKeyOrTpl)
+            ? await resolveStr(memKeyOrTpl, stepIndex, stepName)
             : await (async () => {
                 const [scope, key] = memKeyOrTpl.includes(':') ? memKeyOrTpl.split(':', 2) : ['workflow', memKeyOrTpl];
-                const val = await new Mem({ scope }).get(key);
-                return val != null ? String(val) : '';
+                return resolveMemValue(scope, key, stepIndex, stepName);
               })();
 
           if (!strVal) continue;
@@ -641,11 +791,8 @@ Output valid JSON only.
           else headers[target.startsWith('header:') ? target.slice(7) : target] = strVal;
         }
 
-        // Resolve body templates
-        const resolvedBody: Record<string, any> = {};
-        for (const [k, v] of Object.entries(step.body ?? {})) {
-          resolvedBody[k] = typeof v === 'string' ? await resolveStr(v) : v;
-        }
+        // Resolve body templates recursively
+        const resolvedBody = await resolveValueRecursive(step.body ?? {}, stepIndex, stepName);
 
         const requestBody = { ...bodyExtra, ...resolvedBody };
 
@@ -663,7 +810,7 @@ Output valid JSON only.
           requestBody[p] !== undefined ? String(requestBody[p]) : `:${p}`
         );
         // Also resolve {{}} in path
-        resolvedPath = await resolveStr(resolvedPath);
+        resolvedPath = await resolveStr(resolvedPath, stepIndex, stepName);
 
         const finalUrl = `${baseUrl.replace(/\/$/, '')}${resolvedPath}`;
         const expectedStatus = step.expectStatus ?? 200;
@@ -716,23 +863,21 @@ Output valid JSON only.
       let passed = 0; let failed = 0;
 
       // ── Inline condition evaluator (mirrors dashboard + CLI logic) ─────────
-      async function resolveCondRef(ref: string): Promise<string> {
+      async function resolveCondRef(ref: string, stepIndex: number, stepName: string): Promise<string> {
         const matches = [...ref.matchAll(/\{\{([^}]+)\}\}/g)];
         let result = ref;
         for (const [placeholder, expr] of matches.map(m => [m[0], m[1].trim()])) {
           if (expr.includes(':') && !expr.startsWith('faker.')) {
             const [scope, key] = expr.split(':', 2);
-            const mem = new Mem({ scope });
-            const val = await mem.get(key);
-            result = result.replace(placeholder, val != null ? String(val) : '');
+            result = result.replace(placeholder, await resolveMemValue(scope, key, stepIndex, stepName));
           }
         }
         return result;
       }
 
-      async function evalCondRule(rule: { left: string; operator: string; right?: string }): Promise<boolean> {
-        const left = await resolveCondRef(rule.left);
-        const right = rule.right !== undefined ? await resolveCondRef(rule.right) : undefined;
+      async function evalCondRule(rule: { left: string; operator: string; right?: string }, stepIndex: number, stepName: string): Promise<boolean> {
+        const left = await resolveCondRef(rule.left, stepIndex, stepName);
+        const right = rule.right !== undefined ? await resolveCondRef(rule.right, stepIndex, stepName) : undefined;
         switch (rule.operator) {
           case 'equals':                return left === right;
           case 'not_equals':            return left !== right;
@@ -752,12 +897,12 @@ Output valid JSON only.
         }
       }
 
-      async function evalCondition(condition: any): Promise<{ passed: boolean; reason: string }> {
+      async function evalCondition(condition: any, stepIndex: number, stepName: string): Promise<{ passed: boolean; reason: string }> {
         const rules: any[] = condition.rules?.all ?? condition.rules?.any ?? [];
         const isAnd = !!(condition.rules?.all);
         if (rules.length === 0) return { passed: true, reason: 'No rules' };
         const results: { rule: any; ok: boolean }[] = [];
-        for (const rule of rules) results.push({ rule, ok: await evalCondRule(rule) });
+        for (const rule of rules) results.push({ rule, ok: await evalCondRule(rule, stepIndex, stepName) });
         const passed = isAnd ? results.every(r => r.ok) : results.some(r => r.ok);
         const failing = results.filter(r => !r.ok);
         const reason = passed
@@ -771,7 +916,17 @@ Output valid JSON only.
         const step = workflow.steps[i];
         send('step_start', { index: i, step: { name: step.name, method: step.method, path: step.path } });
 
-        const result = await executeStep(step);
+        let result;
+        try {
+          result = await executeStep(step, i);
+        } catch (err: any) {
+          if (err instanceof HumanInputAbort || err?.name === 'HumanInputAbort') {
+            send('aborted', { index: i, reason: err.message });
+            res.end();
+            return;
+          }
+          throw err;
+        }
 
         if (result.passed) passed++; else failed++;
         send('step_result', {
@@ -788,7 +943,7 @@ Output valid JSON only.
 
         // ── Evaluate step condition (if present) ──────────────────────────
         if (step.condition && !aborted) {
-          const condResult = await evalCondition(step.condition);
+          const condResult = await evalCondition(step.condition, i, step.name || `${step.method} ${step.path}`);
           send('condition_result', {
             index: i,
             passed: condResult.passed,
@@ -936,35 +1091,48 @@ Output valid JSON only.
       } catch (err: any) { res.status(500).json({ error: err.message }); }
     });
 
-    // Locate the dashboard static files (bundled in dist/dashboard or resolved via workspace)
+    // Locate the dashboard static files.
+    // Resolution order is deliberate:
+    //   1. Workspace source (apps/dashboard/dist) — always the freshest during
+    //      development, so a dashboard-only rebuild takes effect on the next
+    //      `jetic dev` without needing a CLI rebuild.
+    //   2. Bundled copy (dist/dashboard) — what global `npm install -g` serves;
+    //      refreshed on every CLI build (see package.json build script).
     try {
-      let dashboardDistPath = path.join(__dirname, 'dashboard');
-      if (!fs.existsSync(dashboardDistPath)) {
-        dashboardDistPath = path.join(__dirname, '..', 'dashboard');
-      }
-      if (!fs.existsSync(dashboardDistPath)) {
-        try {
-          const dashboardPackagePath = require.resolve('@jetic/dashboard/package.json');
-          dashboardDistPath = path.join(path.dirname(dashboardPackagePath), 'dist');
-        } catch {}
-      }
-      
-      if (!fs.existsSync(dashboardDistPath)) {
-        console.warn(`Dashboard build not found at ${dashboardDistPath}. Please build the dashboard first.`);
+      let dashboardDistPath: string | null = null;
+
+      try {
+        const dashboardPackagePath = require.resolve('@jetic/dashboard/package.json');
+        const workspaceDist = path.join(path.dirname(dashboardPackagePath), 'dist');
+        if (fs.existsSync(workspaceDist)) dashboardDistPath = workspaceDist;
+      } catch {}
+
+      if (!dashboardDistPath) {
+        const bundled = path.join(__dirname, 'dashboard');
+        if (fs.existsSync(bundled)) dashboardDistPath = bundled;
       }
 
-      // Serve static files
-      app.use(express.static(dashboardDistPath));
+      if (!dashboardDistPath) {
+        const sibling = path.join(__dirname, '..', 'dashboard');
+        if (fs.existsSync(sibling)) dashboardDistPath = sibling;
+      }
 
-      // SPA fallback
-      app.get('*', (_req, res) => {
-        const indexPath = path.join(dashboardDistPath, 'index.html');
-        if (fs.existsSync(indexPath)) {
-          res.sendFile(indexPath);
-        } else {
-          res.status(404).send('Dashboard not built yet.');
-        }
-      });
+      if (!dashboardDistPath) {
+        console.warn('Dashboard build not found. Build it with: pnpm --filter @jetic/dashboard run build');
+      } else {
+        // Serve static files
+        app.use(express.static(dashboardDistPath));
+
+        // SPA fallback
+        app.get('*', (_req, res) => {
+          const indexPath = path.join(dashboardDistPath, 'index.html');
+          if (fs.existsSync(indexPath)) {
+            res.sendFile(indexPath);
+          } else {
+            res.status(404).send('Dashboard not built yet.');
+          }
+        });
+      }
     } catch (e) {
       console.error('Could not find dashboard static files. Ensure it is built.', e);
     }

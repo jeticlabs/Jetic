@@ -284,9 +284,15 @@ Use EXACTLY these placeholders in body/inject values:
   {{faker.commerce.productName}}   product name
   {{faker.phone.number}}           phone number
   {{workflow:KEY}}                 value captured from a previous step
+  {{human:KEY}}                    ask the human at runtime (interactive prompt, waits for input).
+                                   Use ONLY for values unknowable beforehand (OTP/2FA codes,
+                                   CAPTCHAs, real personal secrets). First entry is saved to
+                                   human:KEY memory; JETIC_HUMAN_KEY env var skips the prompt.
 
-━━━ FIELD RULES ━━━
+ ━━━ FIELD RULES ━━━
 "body"         — request body. Use {{faker.*}} for generated fields, {{workflow:KEY}} for previously captured values.
+                 Use {{human:KEY}} SPARINGLY and only when no other source exists (OTP codes, real secrets) —
+                 it pauses execution waiting for a person to type a value.
 
 "captureInput" — save RESOLVED body field values to memory BEFORE the HTTP call.
                Only for faker-generated fields you need to re-use in later steps.
@@ -342,7 +348,7 @@ all [requiresAuth] endpoints inject Authorization, captures wired correctly betw
     path:         z.string().describe('Exact endpoint path, e.g. /api/auth/login'),
     description:  z.string().optional().describe('One sentence describing what this step does'),
     body:         z.record(z.string(), z.any()).optional()
-                    .describe('Request body. Use {{faker.X}} for generated values, {{workflow:KEY}} for captured values'),
+                    .describe('Request body. Use {{faker.X}} for generated values, {{workflow:KEY}} for captured values, {{human:KEY}} only for OTP/secret values a person must type at runtime'),
     captureInput: z.record(z.string(), z.string()).optional()
                     .describe('Save resolved request body fields to memory BEFORE the HTTP call. Format: { "workflow:KEY": "bodyFieldName" }'),
     capture:      z.record(z.string(), z.string()).optional()
@@ -390,15 +396,15 @@ function deepGet(obj: any, dotPath: string): any {
 
 const UNARY_OPS: ConditionOperator[] = ['exists', 'not_exists', 'is_empty', 'is_not_empty'];
 
-async function resolveConditionRef(ref: string): Promise<string> {
+async function resolveConditionRef(ref: string, context = 'condition'): Promise<string> {
   return ref.replace(/\{\{([^}]+)\}\}/g, () => '').trim() === ref.trim()
     ? ref // literal value, no templates
-    : await resolveTemplateString(ref);
+    : await resolveTemplateString(ref, context);
 }
 
-async function evalConditionRule(rule: ConditionRule): Promise<boolean> {
-  const left = await resolveConditionRef(rule.left);
-  const right = rule.right !== undefined ? await resolveConditionRef(rule.right) : undefined;
+async function evalConditionRule(rule: ConditionRule, context = 'condition'): Promise<boolean> {
+  const left = await resolveConditionRef(rule.left, context);
+  const right = rule.right !== undefined ? await resolveConditionRef(rule.right, context) : undefined;
   const op = rule.operator;
 
   switch (op) {
@@ -422,6 +428,7 @@ async function evalConditionRule(rule: ConditionRule): Promise<boolean> {
 
 async function evaluateStepCondition(
   condition: StepCondition,
+  context = 'condition',
 ): Promise<{ passed: boolean; reason: string }> {
   const { rules } = condition;
   const ruleList = rules.all ?? rules.any ?? [];
@@ -431,7 +438,7 @@ async function evaluateStepCondition(
 
   const results: { rule: ConditionRule; ok: boolean }[] = [];
   for (const rule of ruleList) {
-    results.push({ rule, ok: await evalConditionRule(rule) });
+    results.push({ rule, ok: await evalConditionRule(rule, context) });
   }
 
   const passed = isAnd ? results.every(r => r.ok) : results.some(r => r.ok);
@@ -445,16 +452,114 @@ async function evaluateStepCondition(
   return { passed, reason };
 }
 
-// ─── Shared template string resolver ────────────────────────────────────────
-// Resolves all {{faker.*}} and {{scope:key}} placeholders in a single string.
+// ─── Human input ({{human:key}}) ─────────────────────────────────────────────
+// Interactive values the runner cannot know beforehand (OTP/2FA codes,
+// CAPTCHAs, real personal secrets). Resolution order:
+//   1. JETIC_HUMAN_<KEY> env var (uppercased, non-alphanumeric → _)
+//   2. Jetic memory scope `human` (saved after the first manual entry)
+//   3. Interactive terminal prompt (TTY only) — waits for the human, then saves
+//      to memory so later steps/reruns reuse it without asking again.
 
-async function resolveTemplateString(value: string): Promise<string> {
+function envKeyForHuman(key: string): string {
+  return `JETIC_HUMAN_${key.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+}
+
+/** Thrown when {{human:key}} cannot be resolved (non-interactive shell, nothing pre-seeded). */
+export class HumanInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'HumanInputError';
+  }
+}
+
+/** Heuristic: mask terminal echo for secret-looking keys. */
+function isSecretHumanKey(key: string): boolean {
+  return /pass|secret|token|pwd|private|credential/i.test(key);
+}
+
+async function promptLine(question: string): Promise<string> {
+  const readline = await (new Function('modulePath', 'return import(modulePath)') as any)('node:readline/promises');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return await rl.question(question);
+  } finally {
+    rl.close();
+  }
+}
+
+async function promptSecret(question: string): Promise<string> {
+  const readline = await (new Function('modulePath', 'return import(modulePath)') as any)('node:readline');
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+    process.stdout.write(question);
+    const w = rl as unknown & { _writeToOutput(s: string): void; output: NodeJS.WriteStream };
+    const orig = w._writeToOutput.bind(rl);
+    w._writeToOutput = (s: string) => {
+      // Mask typed characters with '*', keep line breaks intact.
+      if (s === '\n' || s === '\r\n' || s === '\r') orig(s);
+      else w.output.write('*'.repeat(s.length));
+    };
+    rl.question('', (answer: string) => {
+      w._writeToOutput = orig;
+      process.stdout.write('\n');
+      rl.close();
+      resolve(answer);
+    });
+  });
+}
+
+async function askHuman(key: string, context?: string): Promise<string> {
+  const envName = envKeyForHuman(key);
+  const fromEnv = process.env[envName];
+  if (fromEnv !== undefined && fromEnv !== '') return fromEnv;
+
+  const mem = new JeticMemory({ scope: 'human' });
+  const cached = await mem.get(key);
+  if (cached !== null && cached !== undefined && String(cached) !== '') {
+    console.log(`  ${c.dim}↳ using saved human value for "${key}" (jetic memory set human:${key} … to change)${c.reset}`);
+    return String(cached);
+  }
+
+  if (!process.stdin.isTTY) {
+    throw new HumanInputError(
+      `Workflow needs human input for "{{human:${key}}}"${context ? ` (${context})` : ''} but the terminal is not interactive. ` +
+      `Pre-seed it with: jetic memory set human:${key} <value>  — or export ${envName}=<value>`
+    );
+  }
+
+  console.log(`\n  ${c.yellow}${c.bold}◉ Human input required${c.reset}${context ? `  ${c.dim}${context}${c.reset}` : ''}`);
+  const question = `  ${c.cyan}Enter value for "${key}":${c.reset} `;
+  const value = isSecretHumanKey(key) ? await promptSecret(question) : await promptLine(question);
+
+  if (value !== '') {
+    await mem.set(key, value);
+    console.log(`  ${c.dim}↳ saved to human:${key} memory (reused automatically next time)${c.reset}\n`);
+  } else {
+    console.log(`  ${c.dim}↳ empty value accepted for "${key}" (not saved)${c.reset}\n`);
+  }
+  return value;
+}
+
+// ─── Shared template string resolver ────────────────────────────────────────
+// Resolves all {{faker.*}}, {{scope:key}} and {{human:key}} placeholders.
+
+async function resolveTemplateString(value: string, context?: string): Promise<string> {
   const templateRe = /\{\{([^}]+)\}\}/g;
   let match: RegExpExecArray | null;
   const replacements: Array<{ placeholder: string; resolved: string }> = [];
 
   while ((match = templateRe.exec(value)) !== null) {
     const expr = match[1].trim();
+
+    // ── human:key  → interactive prompt (waits for the human) ────────
+    if (!expr.startsWith('faker.')) {
+      const colonIdx = expr.indexOf(':');
+      if (colonIdx > 0 && expr.slice(0, colonIdx) === 'human') {
+        const key = expr.slice(colonIdx + 1);
+        replacements.push({ placeholder: match[0], resolved: await askHuman(key, context) });
+        continue;
+      }
+    }
 
     // ── scope:key  → read from JeticMemory ───────────────────────────
     if (expr.includes(':') && !expr.startsWith('faker.')) {
@@ -496,11 +601,12 @@ async function resolveTemplateString(value: string): Promise<string> {
 
 async function resolveBodyTemplates(
   body: Record<string, any>,
+  context?: string,
 ): Promise<Record<string, any>> {
   const resolved: Record<string, any> = {};
   for (const [key, value] of Object.entries(body)) {
     resolved[key] = typeof value === 'string'
-      ? await resolveTemplateString(value)
+      ? await resolveTemplateString(value, context)
       : value;
   }
   return resolved;
@@ -515,6 +621,7 @@ async function resolveInjections(
   inject: Record<string, string> | undefined,
   memory: JeticMemory,
   allMemory: JeticMemory,
+  context?: string,
 ): Promise<{ headers: Record<string, string>; body: Record<string, any> }> {
   const headers: Record<string, string> = {};
   const body: Record<string, any> = {};
@@ -525,7 +632,7 @@ async function resolveInjections(
 
     if (memKeyOrTemplate.includes('{{')) {
       // Template mode: resolve {{...}} placeholders (supports Bearer prefix etc.)
-      strValue = await resolveTemplateString(memKeyOrTemplate);
+      strValue = await resolveTemplateString(memKeyOrTemplate, context);
     } else {
       // Legacy mode: treat as a direct "scope:key" memory reference
       const [scope, key] = memKeyOrTemplate.includes(':')
@@ -632,10 +739,11 @@ async function executeStep(
 
   // Resolve memory injections
   const memory = new JeticMemory({ scope: 'workflow' });
-  const { headers, body: injectedBody } = await resolveInjections(step.inject, memory, memory);
+  const stepLabel = step.name || `${step.method} ${step.path}`;
+  const { headers, body: injectedBody } = await resolveInjections(step.inject, memory, memory, stepLabel);
 
-  // Resolve {{faker.*}} / {{workflow:*}} templates in the step body
-  const resolvedStepBody = await resolveBodyTemplates(step.body || {});
+  // Resolve {{faker.*}} / {{workflow:*}} / {{human:*}} templates in the step body
+  const resolvedStepBody = await resolveBodyTemplates(step.body || {}, stepLabel);
 
   // Merge body: step.body overrides defaults, injectedBody adds to body
   const requestBody = { ...defaultBody, ...injectedBody, ...resolvedStepBody };
@@ -1068,12 +1176,14 @@ export const simulateWorkflowCommand = new Command('workflow')
       const spinner = new Spinner();
       spinner.start(`${stepLabel}  ${c.dim}${step.name}${c.reset}...`);
 
-      const result = await executeStep(step, baseUrl, {});
+      let result: StepResult;
+      try {
+        result = await executeStep(step, baseUrl, {});
 
-      // ── Evaluate condition (if present) ───────────────────────────────────
-      if (step.condition) {
-        const condResult = await evaluateStepCondition(step.condition);
-        result.conditionResult = condResult;
+        // ── Evaluate condition (if present) ───────────────────────────────────
+        if (step.condition) {
+          const condResult = await evaluateStepCondition(step.condition, `condition of step "${step.name || step.path}"`);
+          result.conditionResult = condResult;
 
         if (!condResult.passed) {
           const { onFail, switchToWorkflow } = step.condition;
@@ -1108,7 +1218,10 @@ export const simulateWorkflowCommand = new Command('workflow')
                   switchSpinner.start(`${switchLabel}  ${c.dim}${switchStep.name}${c.reset}...`);
                   const switchResult = await executeStep(switchStep, baseUrl, {});
                   if (switchStep.condition) {
-                    switchResult.conditionResult = await evaluateStepCondition(switchStep.condition);
+                    switchResult.conditionResult = await evaluateStepCondition(
+                      switchStep.condition,
+                      `condition of step "${switchStep.name || switchStep.path}"`
+                    );
                   }
                   results.push(switchResult);
                   const switchIcon = switchResult.passed ? TICK : CROSS;
@@ -1132,7 +1245,15 @@ export const simulateWorkflowCommand = new Command('workflow')
           }
 
           continue; // already pushed & rendered
+          }
         }
+      } catch (err: any) {
+        if (err instanceof HumanInputError || err?.name === 'HumanInputError') {
+          spinner.stop(`  ${c.red}✗${c.reset} ${stepLabel}  ${c.dim}needs human input${c.reset}`);
+          console.error(`\n  ${c.red}${err.message}${c.reset}\n`);
+          process.exit(1);
+        }
+        throw err;
       }
 
       results.push(result);
