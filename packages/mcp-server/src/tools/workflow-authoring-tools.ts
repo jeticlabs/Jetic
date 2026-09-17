@@ -5,24 +5,79 @@ import { loadModel, projectRootOfModel, resolveModelPath } from '../types';
 import { handleListWorkflows } from './workflow-tools';
 import type { WorkflowDef, WorkflowStepDef } from '@jetic/simulator';
 
-// ── Step schema (file-workflow dialect — the only dialect the simulator runs) ──
-// NOTE: this deliberately excludes `condition` (declared in WorkflowStepDef but
-// ignored by the simulator) and the model-embedded fields (`call`, `auth`,
-// `bind`). The validator warns when those appear so AI authors don't rely on
-// silently-ignored fields.
+// ── Step schema (file-workflow dialect — the only dialect the simulator runs) ──────────────────────
+// NOTE: this deliberately excludes model-embedded fields (`call`, `auth`, `bind`).
+// The validator warns when those appear so AI authors don’t rely on silently-ignored fields.
+
+// Condition sub-schema: evaluated before the step executes;
+// if not met, the step is skipped (counts as passed so the workflow continues).
+const stepConditionSchema = z
+  .object({
+    if: z.string().min(1).describe('Template expression to resolve, e.g. "{{workflow:role}}"'),
+    equals: z.string().optional().describe('Resolved value must equal this string'),
+    notEquals: z.string().optional().describe('Resolved value must NOT equal this string'),
+    contains: z.string().optional().describe('Resolved value must contain this substring'),
+    exists: z.boolean().optional().describe('true: value must be non-empty; false: value must be empty'),
+    greaterThan: z.number().optional().describe('Numeric greater-than comparison'),
+    lessThan: z.number().optional().describe('Numeric less-than comparison'),
+    in: z.array(z.string()).optional().describe('Resolved value must be one of these strings'),
+  })
+  .describe('Skip this step when the condition is not met');
+
+// Retry sub-schema — usable per step and at the workflow level as a global default.
+const stepRetrySchema = z.object({
+  times: z.number().int().positive().max(10).describe('Max retry attempts (1–10)'),
+  delayMs: z.number().int().nonnegative().optional().describe('Delay between retries in ms (default 0)'),
+});
 
 export const workflowStepSchema = z.object({
   name: z.string().min(1).describe('Step name (must be unique within the workflow)'),
-  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']).describe('HTTP method'),
-  path: z.string().min(1).describe('Route path; :params resolve from body/memory (NOT from {{templates}} — those only work in body/inject)'),
+  method: z
+    .enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'])
+    .describe('HTTP method'),
+  path: z
+    .string()
+    .min(1)
+    .describe('Route path; :params resolve from body/memory (NOT from {{templates}} — those only work in body/inject)'),
   description: z.string().optional().describe('What this step does'),
-  body: z.record(z.any()).optional().describe('Request payload. Values support {{faker.*}}, {{scope:key}}, {{workflow:key}} and {{human:key}} templates (human pauses for interactive input at runtime)'),
-  inject: z.record(z.string()).optional().describe('Memory/header injection: "header:Name" or "body:field" (or bare header name) -> "scope:key" or "{{template}}" ({{human:key}} supported)'),
-  capture: z.record(z.string()).optional().describe('Save RESPONSE fields to memory: "scope:key" -> "dot.path.in.response"'),
-  captureInput: z.record(z.string()).optional().describe('Save REQUEST body fields to memory BEFORE sending: "scope:key" -> "bodyField"'),
-  expectStatus: z.number().int().positive().optional().describe('Expected HTTP status (default 200; any 2xx passes when expecting 2xx)'),
+  body: z
+    .record(z.any())
+    .optional()
+    .describe('Request payload. Values support {{faker.*}}, {{scope:key}}, {{workflow:key}} and {{human:key}} templates'),
+  inject: z
+    .record(z.string())
+    .optional()
+    .describe('Header/body injection: "header:Name" or "body:field" → "scope:key" or "{{template}}"'),
+  capture: z
+    .record(z.string())
+    .optional()
+    .describe('Save RESPONSE fields to memory: "scope:key" → "dot.path.in.response"'),
+  captureInput: z
+    .record(z.string())
+    .optional()
+    .describe('Save REQUEST body fields to memory BEFORE sending: "scope:key" → "bodyField"'),
+  expectStatus: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('Expected HTTP status (default 200; any 2xx passes when expecting 2xx)'),
+  condition: stepConditionSchema
+    .optional()
+    .describe('Skip this step when condition is not met. Use {{workflow:key}} in the "if" field.'),
+  onFailure: z
+    .enum(['abort', 'continue'])
+    .optional()
+    .describe('"abort" (default): stop the workflow on failure. "continue": log failure and proceed (captures skipped).'),
+  continueOnStatus: z
+    .array(z.number().int())
+    .optional()
+    .describe('Additional HTTP status codes treated as pass for this step (e.g. [404]).'),
+  retry: stepRetrySchema
+    .optional()
+    .describe('Retry on failure — overrides the workflow-level global retry.'),
   // NOTE: .passthrough() is intentional — unknown keys must REACH the validator
-  // (MODEL_DIALECT_KEY / UNKNOWN_STEP_KEY diagnostics). Zod's default strip
+  // (MODEL_DIALECT_KEY / UNKNOWN_STEP_KEY diagnostics). Zod’s default strip
   // behavior would silently swallow the exact mistakes we need to report.
 }).passthrough();
 
@@ -30,6 +85,7 @@ const inlineWorkflowSchema = z.object({
   name: z.string().min(1).describe('Workflow name (also used to derive the file slug)'),
   description: z.string().optional(),
   environment: z.string().optional().describe('Target environment name from the model (e.g. local)'),
+  retry: stepRetrySchema.optional().describe('Global retry default applied to all steps (overridden per step)'),
   steps: z.array(workflowStepSchema).min(1).describe('Ordered steps; later steps can use memory captured by earlier ones'),
 }).passthrough();
 
@@ -55,10 +111,11 @@ export interface WorkflowValidationReport {
 }
 
 const TEMPLATE_RE = /\{\{\s*([^}]+?)\s*\}\}/g;
-const KNOWN_WORKFLOW_KEYS = new Set(['name', 'description', 'environment', 'steps', 'generatedAt']);
+const KNOWN_WORKFLOW_KEYS = new Set(['name', 'description', 'environment', 'steps', 'generatedAt', 'retry']);
 const KNOWN_STEP_KEYS = new Set([
   'name', 'method', 'path', 'description', 'inject', 'capture',
   'captureInput', 'expectStatus', 'body', 'condition',
+  'onFailure', 'continueOnStatus', 'retry',
 ]);
 // Keys from the OTHER (model-embedded) workflow dialect — always a mistake here.
 const MODEL_DIALECT_KEYS = new Set(['call', 'auth', 'bind']);
@@ -185,10 +242,47 @@ export function validateWorkflowDefinition(
           'Remove it or check the field name (valid: name, method, path, description, body, inject, capture, captureInput, expectStatus).');
       }
     }
-    if ('condition' in step) {
-      warn(warnings, stepNo, sName, 'CONDITION_IGNORED',
-        `"condition" is accepted but currently ignored by the simulator — the step always runs.`,
-        'Encode branching as separate workflows, or gate with expectStatus per step.');
+    // ── Condition validation ───────────────────────────────────────────────────────────
+    if ('condition' in step && step.condition !== undefined) {
+      const cond = step.condition as any;
+      if (!cond || typeof cond !== 'object' || Array.isArray(cond)) {
+        err(errors, stepNo, sName, 'BAD_CONDITION',
+          `Step ${stepNo} "condition" must be an object.`,
+          'Use { "condition": { "if": "{{workflow:role}}", "equals": "admin" } }.');
+      } else if (!cond.if || typeof cond.if !== 'string' || !cond.if.trim()) {
+        err(errors, stepNo, sName, 'BAD_CONDITION',
+          `Step ${stepNo} "condition" must have a non-empty "if" field.`,
+          'Set "if" to a template expression like "{{workflow:role}}".');
+      } else {
+        const operators = ['equals', 'notEquals', 'contains', 'exists', 'greaterThan', 'lessThan', 'in'];
+        const usedOps = operators.filter((op) => op in cond && cond[op] !== undefined);
+        if (usedOps.length === 0) {
+          warn(warnings, stepNo, sName, 'CONDITION_NO_OPERATOR',
+            `Step ${stepNo} "condition" has no comparison operator — uses bare truthy check.`,
+            'Add one of: equals, notEquals, contains, exists, greaterThan, lessThan, in for explicit logic.');
+        }
+        if (!/\{\{[^}]+\}\}/.test(cond.if)) {
+          warn(warnings, stepNo, sName, 'CONDITION_BARE_IF',
+            `Step ${stepNo} "condition.if" ("${cond.if}") contains no {{template}} and will be compared literally.`,
+            'Use {{workflow:key}} or {{scope:key}} to reference captured memory values.');
+        }
+        // Validate template refs in condition.if against already-defined memory keys.
+        const condRefs: string[] = [];
+        collectTemplateRefs(cond.if, condRefs);
+        for (const ref of condRefs) {
+          if (ref.startsWith('faker.')) continue;
+          if (!ref.includes(':')) continue;
+          const { scope, key } = splitMemKey(ref);
+          if (!key) continue;
+          if (scope === 'human') { humanKeys.add(key); continue; }
+          const full = `${scope}:${key}`;
+          if (!defined.has(full) && !persistedMemory.has(full)) {
+            err(errors, stepNo, sName, 'UNDEFINED_MEMORY_REF',
+              `"{{${ref}}}" in condition.if of step ${stepNo} is not captured by any earlier step and is not in memory.json.`,
+              `Capture "${full}" in an earlier step before referencing it in a condition.`);
+          }
+        }
+      }
     }
 
     if (!sName || !sName.trim()) {
@@ -353,7 +447,63 @@ export function validateWorkflowDefinition(
       }
     }
 
-    // Register this step's captures for later steps.
+    // ── onFailure validation ───────────────────────────────────────────────────────────
+    if (step.onFailure !== undefined) {
+      if (!['abort', 'continue'].includes(String(step.onFailure))) {
+        err(errors, stepNo, sName, 'BAD_ON_FAILURE',
+          `Step ${stepNo} "onFailure" must be "abort" or "continue" (got "${step.onFailure}").`,
+          'Use "abort" (default, stops the workflow) or "continue" (logs failure, proceeds).');
+      }
+      if (step.onFailure === 'continue' && step.capture && Object.keys(step.capture).length > 0) {
+        warn(warnings, stepNo, sName, 'CONTINUE_WITH_CAPTURE',
+          `Step ${stepNo} uses onFailure:"continue" but has captures — captures are only saved when the step passes.`,
+          'This is usually fine for optional captures; ensure later steps handle missing memory gracefully.');
+      }
+    }
+
+    // ── continueOnStatus validation ───────────────────────────────────────────────────
+    if (step.continueOnStatus !== undefined) {
+      if (!Array.isArray(step.continueOnStatus)) {
+        err(errors, stepNo, sName, 'BAD_CONTINUE_ON_STATUS',
+          `Step ${stepNo} "continueOnStatus" must be an array of HTTP status codes.`,
+          'Use [404] or [404, 409].');
+      } else {
+        for (const code of step.continueOnStatus as any[]) {
+          if (typeof code !== 'number' || code < 100 || code > 599) {
+            err(errors, stepNo, sName, 'BAD_CONTINUE_ON_STATUS',
+              `Step ${stepNo} "continueOnStatus" contains invalid status code: ${code}.`,
+              'HTTP status codes must be integers between 100 and 599.');
+          }
+        }
+        if ((step.continueOnStatus as number[]).some((c) => c >= 500)) {
+          warn(warnings, stepNo, sName, 'CONTINUE_ON_5XX',
+            `Step ${stepNo} "continueOnStatus" includes 5xx server error codes — accepting server errors as pass is unusual.`,
+            'Verify this is intentional (e.g. for idempotency checks or async polling).');
+        }
+      }
+    }
+
+    // ── retry validation ────────────────────────────────────────────────────────────────
+    if (step.retry !== undefined) {
+      const r = step.retry as any;
+      if (!r || typeof r !== 'object' || Array.isArray(r)) {
+        err(errors, stepNo, sName, 'BAD_RETRY',
+          `Step ${stepNo} "retry" must be an object { times, delayMs? }.`,
+          'Use { "retry": { "times": 3, "delayMs": 1000 } }.');
+      } else {
+        if (typeof r.times !== 'number' || r.times < 1) {
+          err(errors, stepNo, sName, 'BAD_RETRY',
+            `Step ${stepNo} "retry.times" must be a positive integer.`,
+            'Set retry.times to 1 or more.');
+        } else if (r.times > 5) {
+          warn(warnings, stepNo, sName, 'HIGH_RETRY_COUNT',
+            `Step ${stepNo} "retry.times" is ${r.times} — this may slow down workflows significantly.`,
+            'Keep retry.times ≤ 5 for most use cases.');
+        }
+      }
+    }
+
+    // Register this step’s captures for later steps.
     for (const field of ['capture', 'captureInput'] as const) {
       const cap = step[field];
       if (cap && typeof cap === 'object' && !Array.isArray(cap)) {

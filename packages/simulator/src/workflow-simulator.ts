@@ -2,6 +2,28 @@ import { BehavioralModel, Environment } from '@jetic/model';
 import { JeticMemory } from '@jetic/memory';
 import { faker } from '@faker-js/faker';
 
+// ── Step condition ──────────────────────────────────────────────────────────
+// Evaluated before the step executes. If the condition is not met, the step
+// is skipped (counts as passed so the workflow continues).
+export interface StepCondition {
+  /** Template expression to resolve, e.g. "{{workflow:role}}" */
+  if: string;
+  /** Resolved value must equal this string */
+  equals?: string;
+  /** Resolved value must NOT equal this string */
+  notEquals?: string;
+  /** Resolved value must contain this substring */
+  contains?: string;
+  /** true → value must be non-empty; false → value must be empty */
+  exists?: boolean;
+  /** Numeric greater-than comparison */
+  greaterThan?: number;
+  /** Numeric less-than comparison */
+  lessThan?: number;
+  /** Resolved value must be in this list */
+  in?: string[];
+}
+
 export interface WorkflowStepDef {
   name: string;
   method: string;
@@ -12,7 +34,14 @@ export interface WorkflowStepDef {
   captureInput?: Record<string, string>;
   expectStatus?: number;
   body?: Record<string, any>;
-  condition?: any;
+  /** Skip this step when condition is not met. */
+  condition?: StepCondition;
+  /** What to do when expectStatus/continueOnStatus check fails. Default: 'abort'. */
+  onFailure?: 'abort' | 'continue';
+  /** Additional HTTP status codes treated as pass for this step. */
+  continueOnStatus?: number[];
+  /** Per-step retry (overrides workflow-level default). */
+  retry?: { times: number; delayMs?: number };
 }
 
 export interface WorkflowDef {
@@ -20,6 +49,8 @@ export interface WorkflowDef {
   description?: string;
   generatedAt?: string;
   environment?: string;
+  /** Global retry default applied to every step (overridden per step). */
+  retry?: { times: number; delayMs?: number };
   steps: WorkflowStepDef[];
 }
 
@@ -33,6 +64,14 @@ export interface WorkflowStepResult {
   actualStatus: number;
   durationMs: number;
   passed: boolean;
+  /** True when the step was skipped due to a condition not matching. */
+  skipped: boolean;
+  /** Number of retry attempts made (0 = first attempt succeeded or no retry). */
+  retryCount: number;
+  /** Set when onFailure was evaluated after a step failed. */
+  failureHandling?: 'aborted' | 'continued';
+  /** Set when the step had a condition; shows the resolved value + match result. */
+  conditionResult?: { evaluated: string; matched: boolean };
   requestHeaders: Record<string, string>;
   requestBody: Record<string, any>;
   responseBody: any;
@@ -95,69 +134,139 @@ export class WorkflowSimulator {
       const step = workflow.steps[i];
       const stepStartTime = Date.now();
 
+      // ── Condition gate ────────────────────────────────────────────────────
+      // If the step declares a condition and it resolves to false, skip the
+      // step entirely. Skipped steps count as passed so the workflow continues.
+      if (step.condition) {
+        const condResult = await this.evaluateCondition(step.condition);
+        if (!condResult.matched) {
+          stepResults.push({
+            stepIndex: i + 1,
+            name: step.name || `${step.method} ${step.path}`,
+            method: step.method,
+            path: step.path,
+            targetUrl: '',
+            expectedStatus: step.expectStatus ?? 200,
+            actualStatus: 0,
+            durationMs: Date.now() - stepStartTime,
+            passed: true,
+            skipped: true,
+            retryCount: 0,
+            conditionResult: condResult,
+            requestHeaders: {},
+            requestBody: {},
+            responseBody: null,
+            capturedMemory: [],
+          });
+          continue;
+        }
+      }
+
+      // ── Resolve templates once before any retry attempts ─────────────────
       const { headers: injectedHeaders, body: injectedBody } = await this.resolveInjections(step.inject);
       const resolvedBody = await this.resolveBodyTemplates(step.body || {});
       const finalBody = { ...injectedBody, ...resolvedBody };
-
       const inputCaptured = await this.captureInputToMemory(step.captureInput, finalBody);
       const resolvedPath = await this.resolvePathParams(step.path, finalBody);
       const fullUrl = `${baseUrl.replace(/\/$/, '')}${resolvedPath}`;
+      const expectedStatus = step.expectStatus ?? 200;
 
-      const expectedStatus = step.expectStatus || 200;
+      // ── Retry loop ────────────────────────────────────────────────────────
+      // Per-step retry takes precedence over the workflow-level global default.
+      const maxAttempts = Math.max(1, step.retry?.times ?? workflow.retry?.times ?? 1);
+      const retryDelayMs = step.retry?.delayMs ?? workflow.retry?.delayMs ?? 0;
 
+      let attempts = 0;
       let responseStatus = 0;
       let responseBody: any = null;
       let stepPassed = false;
       let errorMsg: string | undefined;
 
-      try {
-        const fetchOptions: RequestInit = {
-          method: step.method.toUpperCase(),
-          headers: {
-            'Content-Type': 'application/json',
-            ...injectedHeaders,
-          },
-        };
-
-        if (!['GET', 'HEAD'].includes(step.method.toUpperCase()) && Object.keys(finalBody).length > 0) {
-          fetchOptions.body = JSON.stringify(finalBody);
+      while (attempts < maxAttempts) {
+        attempts++;
+        if (attempts > 1 && retryDelayMs > 0) {
+          await new Promise<void>((r) => setTimeout(r, retryDelayMs));
         }
+        responseStatus = 0;
+        responseBody = null;
+        errorMsg = undefined;
 
-        let finalUrl = fullUrl;
-        if (['GET', 'HEAD'].includes(step.method.toUpperCase()) && Object.keys(finalBody).length > 0) {
-          const params = new URLSearchParams();
-          for (const [k, v] of Object.entries(finalBody)) {
-            if (v !== undefined && v !== null) params.set(k, String(v));
+        try {
+          const fetchOptions: RequestInit = {
+            method: step.method.toUpperCase(),
+            headers: { 'Content-Type': 'application/json', ...injectedHeaders },
+          };
+
+          if (!['GET', 'HEAD'].includes(step.method.toUpperCase()) && Object.keys(finalBody).length > 0) {
+            fetchOptions.body = JSON.stringify(finalBody);
           }
-          finalUrl = `${fullUrl}?${params.toString()}`;
-        }
 
-        const resp = await fetch(finalUrl, fetchOptions);
-        responseStatus = resp.status;
-
-        const ct = resp.headers.get('content-type') || '';
-        if (ct.includes('application/json')) {
-          try {
-            responseBody = await resp.json();
-          } catch {
-            responseBody = null;
+          let finalUrl = fullUrl;
+          if (['GET', 'HEAD'].includes(step.method.toUpperCase()) && Object.keys(finalBody).length > 0) {
+            const params = new URLSearchParams();
+            for (const [k, v] of Object.entries(finalBody)) {
+              if (v !== undefined && v !== null) params.set(k, String(v));
+            }
+            finalUrl = `${fullUrl}?${params.toString()}`;
           }
-        } else {
-          responseBody = await resp.text();
-        }
 
-        stepPassed =
-          resp.status === expectedStatus ||
-          (resp.status >= 200 && resp.status < 300 && expectedStatus >= 200 && expectedStatus < 300);
-      } catch (err: any) {
-        stepPassed = false;
-        errorMsg = err.message || String(err);
+          const resp = await fetch(finalUrl, fetchOptions);
+          responseStatus = resp.status;
+
+          const ct = resp.headers.get('content-type') || '';
+          if (ct.includes('application/json')) {
+            try { responseBody = await resp.json(); } catch { responseBody = null; }
+          } else {
+            responseBody = await resp.text();
+          }
+
+          // ── Pass check: expectStatus + continueOnStatus ─────────────────
+          const in2xx = (s: number) => s >= 200 && s < 300;
+          stepPassed =
+            resp.status === expectedStatus ||
+            (in2xx(resp.status) && in2xx(expectedStatus)) ||
+            (step.continueOnStatus || []).includes(resp.status);
+
+          if (stepPassed) break; // success — stop retrying
+        } catch (err: any) {
+          stepPassed = false;
+          errorMsg = err.message || String(err);
+        }
       }
 
-      const responseCaptured = stepPassed ? await this.captureToMemory(step.capture, responseBody) : [];
+      // ── Captures (only when step passed) ─────────────────────────────────
+      const responseCaptured = stepPassed
+        ? await this.captureToMemory(step.capture, responseBody)
+        : [];
 
+      // ── onFailure handling ────────────────────────────────────────────────
       if (!stepPassed) {
         allPassed = false;
+        const onFailure = step.onFailure ?? 'abort';
+
+        stepResults.push({
+          stepIndex: i + 1,
+          name: step.name || `${step.method} ${step.path}`,
+          method: step.method,
+          path: step.path,
+          targetUrl: fullUrl,
+          expectedStatus,
+          actualStatus: responseStatus,
+          durationMs: Date.now() - stepStartTime,
+          passed: false,
+          skipped: false,
+          retryCount: attempts - 1,
+          failureHandling: onFailure === 'continue' ? 'continued' : 'aborted',
+          requestHeaders: injectedHeaders,
+          requestBody: finalBody,
+          responseBody,
+          capturedMemory: [...inputCaptured],
+          error: errorMsg,
+        });
+
+        if (onFailure === 'abort') break;
+        // onFailure === 'continue': log the failure and proceed to next step
+        continue;
       }
 
       stepResults.push({
@@ -169,17 +278,14 @@ export class WorkflowSimulator {
         expectedStatus,
         actualStatus: responseStatus,
         durationMs: Date.now() - stepStartTime,
-        passed: stepPassed,
+        passed: true,
+        skipped: false,
+        retryCount: attempts - 1,
         requestHeaders: injectedHeaders,
         requestBody: finalBody,
         responseBody,
         capturedMemory: [...inputCaptured, ...responseCaptured],
-        error: errorMsg,
       });
-
-      if (!stepPassed) {
-        break;
-      }
     }
 
     const totalTimeMs = Date.now() - startTime;
@@ -204,6 +310,44 @@ export class WorkflowSimulator {
       },
       results: stepResults,
     };
+  }
+
+  // ── Condition evaluator ────────────────────────────────────────────────────
+  // Resolves the `if` template and applies the declared operator. Returns
+  // `matched: true` when the condition passes (step should execute).
+  private async evaluateCondition(
+    condition: StepCondition
+  ): Promise<{ matched: boolean; evaluated: string }> {
+    const evaluated = await this.resolveTemplateString(condition.if);
+    let matched: boolean;
+
+    if (condition.exists !== undefined) {
+      const hasValue =
+        evaluated !== '' && evaluated !== 'null' && evaluated !== 'undefined';
+      matched = condition.exists ? hasValue : !hasValue;
+    } else if (condition.equals !== undefined) {
+      matched = evaluated === condition.equals;
+    } else if (condition.notEquals !== undefined) {
+      matched = evaluated !== condition.notEquals;
+    } else if (condition.contains !== undefined) {
+      matched = evaluated.includes(condition.contains);
+    } else if (condition.greaterThan !== undefined) {
+      matched = Number(evaluated) > condition.greaterThan;
+    } else if (condition.lessThan !== undefined) {
+      matched = Number(evaluated) < condition.lessThan;
+    } else if (condition.in !== undefined) {
+      matched = condition.in.includes(evaluated);
+    } else {
+      // No explicit operator — truthy check (non-empty, not 'false'/'0'/'null')
+      matched =
+        evaluated !== '' &&
+        evaluated !== 'false' &&
+        evaluated !== '0' &&
+        evaluated !== 'null' &&
+        evaluated !== 'undefined';
+    }
+
+    return { matched, evaluated };
   }
 
   private async resolveTemplateString(value: string): Promise<string> {
