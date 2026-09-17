@@ -95,10 +95,39 @@ Jetic comes with a built-in **Model Context Protocol (MCP)** server so your edit
 ```
 *(On Windows, use `"command": ["cmd", "/c", "jetic", "mcp"]`)*
 
-### Recommended Agent Prompts:
-> 1. *"Run `jetic_get_session_phase` and guide me through building the API model for this project."*  
-> 2. *"Scan the backend, check endpoint completeness, fill missing descriptions/tags, and run `jetic_verify_model`."*  
-> 3. *"What workflow or integration test would you like to simulate against local environment?"*
+### 💬 Example Prompts for AI IDE
+
+Use these prompt templates with your editor's AI assistant (opencode, Antigravity, Cursor, Claude Code, VS Code) to manage initialization, model creation, and workflow simulation:
+
+#### 🚀 Phase 1: Initialize Project (`init`)
+> **Session Health & Quickstart:**  
+> *"Call `jetic_get_session_phase`. If the model is not initialized, run `jetic_init` to scaffold `.jetic/` and guide me through setting up the API."*
+
+> **Fresh Repository Scaffold:**  
+> *"Initialize Jetic in this workspace (`jetic_init`), configure project metadata for our TypeScript backend, and verify that `.jetic/model.json` exists."*
+
+#### 📐 Phase 2 & 3: Create & Verify Model (`create model`)
+> **Automated AST Scan & Verification:**  
+> *"Scan our backend codebase (`jetic_scan`) to populate endpoints. Then run `jetic_verify_model` to highlight any missing descriptions, schemas, or tags."*
+
+> **Model Completeness & Audit:**  
+> *"Run `jetic_verify_model`. Update every endpoint with missing descriptions or tags using `jetic_update_endpoint`, and re-verify until the model status is 100% complete and valid."*
+
+> **Manual Endpoint Creation (Custom / Non-Express APIs):**  
+> *"Add a new endpoint `POST /api/v1/auth/login` to `.jetic/model.json` using `jetic_add_endpoint` with `email` and `password` body fields and status 200 token response."*
+
+#### ⚡ Phase 4: Create & Run Workflows (`create workflow`)
+> **Scaffold & Create Workflow:**  
+> *"Scaffold a user onboarding workflow (`jetic_scaffold_workflow`) with `POST /api/auth/register` and `GET /api/users/me`. Automatically inject the auth token, validate the workflow, and save it to `.jetic/workflows/user-onboarding.json`."*
+
+> **Advanced Workflow with Conditions & Retry Logic:**  
+> *"Build an order fulfillment workflow. Step 1: Login. Step 2: Create Order. Step 3: Payment (add step condition `if {{workflow:userRole}} equals "admin"` and `retry` up to 3 times on failure). Validate (`jetic_validate_workflow`) and save it."*
+
+> **Human Input Workflow (2FA / OTP):**  
+> *"Build a sensitive transfer workflow that requires human 2FA. Scaffold the steps, use `{{human:otp_code}}` for the verification payload, set `retry: { "times": 2, "delayMs": 1000 }`, and save to `.jetic/workflows/transfer.json`."*
+
+#### 🎯 All-in-One Master Prompt
+> *"Run `jetic_get_session_phase` and follow the Jetic 4-Phase protocol: 1. Initialize `.jetic/` if missing. 2. Scan the source code and verify the model until all endpoint descriptions are complete. 3. Ask me what integration scenario I want to test, then scaffold, validate, and save the workflow."*
 
 ---
 
