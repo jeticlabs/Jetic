@@ -140,17 +140,102 @@ export function handleVerifyModel(args: z.infer<typeof verifyModelSchema>) {
     }
   }
 
+  // ── Field completeness checks (Phase 3 gate) ────────────────────────────
+  // Surfaces missing/empty user-facing fields as MISSING_FIELD_* warnings so
+  // the AI knows exactly what to fill before advancing to Phase 4.
+
+  const fieldCompleteness: Record<string, { missingFields: string[] }> = {};
+
+  for (const ep of model.endpoints) {
+    const routeKey = `${ep.method.toUpperCase()} ${ep.path}`;
+    const missing: string[] = [];
+
+    if (!ep.description || ep.description.trim() === '') {
+      missing.push('description');
+      issues.push({
+        severity: 'warning',
+        endpointId: ep.id,
+        route: routeKey,
+        code: 'MISSING_FIELD_DESCRIPTION',
+        message: `Endpoint "${routeKey}" has no description.`,
+        recommendation: 'Add a concise description of what this endpoint does.',
+      });
+    }
+
+    if (!ep.tags || ep.tags.length === 0) {
+      missing.push('tags');
+      issues.push({
+        severity: 'warning',
+        endpointId: ep.id,
+        route: routeKey,
+        code: 'MISSING_FIELD_TAGS',
+        message: `Endpoint "${routeKey}" has no tags.`,
+        recommendation: 'Add at least one tag to group this endpoint (e.g. "auth", "users").',
+      });
+    }
+
+    if (ep.parameters) {
+      for (const p of ep.parameters) {
+        if (!p.description || p.description.trim() === '') {
+          const field = `parameters[${p.name}].description`;
+          missing.push(field);
+          issues.push({
+            severity: 'warning',
+            endpointId: ep.id,
+            route: routeKey,
+            code: 'MISSING_FIELD_PARAM_DESCRIPTION',
+            message: `Parameter "${p.name}" on "${routeKey}" has no description.`,
+            recommendation: `Add a description to parameter "${p.name}".`,
+          });
+        }
+      }
+    }
+
+    if (ep.responses) {
+      for (const [statusCode, resp] of Object.entries(ep.responses)) {
+        const r = resp as any;
+        if (!r.description || String(r.description).trim() === '') {
+          const field = `responses[${statusCode}].description`;
+          missing.push(field);
+          issues.push({
+            severity: 'warning',
+            endpointId: ep.id,
+            route: routeKey,
+            code: 'MISSING_FIELD_RESPONSE_DESCRIPTION',
+            message: `Response "${statusCode}" on "${routeKey}" has no description.`,
+            recommendation: `Add a description to the ${statusCode} response (e.g. "User created successfully").`,
+          });
+        }
+      }
+    }
+
+    if (missing.length > 0) {
+      fieldCompleteness[ep.id] = { missingFields: missing };
+    }
+  }
+
+  const allFieldsFilled = Object.keys(fieldCompleteness).length === 0;
+
   const errors = issues.filter((i) => i.severity === 'error');
   const warnings = issues.filter((i) => i.severity === 'warning');
 
   return {
     filePath,
     isValid: errors.length === 0,
+    allFieldsFilled,
     totalEndpoints: model.endpoints.length,
     summary: {
       errorsCount: errors.length,
       warningsCount: warnings.length,
     },
     issues,
+    fieldCompleteness,
+    phaseGate: {
+      phase3Complete: errors.length === 0 && allFieldsFilled,
+      message:
+        errors.length === 0 && allFieldsFilled
+          ? 'Model is valid and all fields are complete. You may advance to Phase 4 — ask the user what simulation or workflow they want to build.'
+          : 'Fix all errors and fill missing fields before proceeding to Phase 4.',
+    },
   };
 }

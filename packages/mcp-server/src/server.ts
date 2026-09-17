@@ -45,6 +45,10 @@ import {
   scanProjectSchema,
   handleScanProject,
 } from './tools/project-tools';
+import {
+  getSessionPhaseSchema,
+  handleGetSessionPhase,
+} from './tools/session-tools';
 
 export const JETIC_MCP_SERVER_NAME = 'jetic-mcp-server';
 
@@ -67,17 +71,41 @@ export function getJeticMcpVersion(): string {
 /**
  * Guidance surfaced to MCP clients via the `instructions` field of the
  * `initialize` response. Modern editors (opencode, Antigravity, Cursor,
- * Claude Code) display this to the model so it picks a sane tool order:
- * read first, mutate second, verify last.
+ * Claude Code) display this to the model so it follows the strict
+ * 4-phase order enforced by `jetic_get_session_phase`.
  */
 export const JETIC_MCP_INSTRUCTIONS = [
-  'Jetic MCP manages API behavioral models in `.jetic/`. Work in this structured order:',
-  '1. INITIALIZE: if there is no `.jetic/model.json` (read tools report modelExists:false), call `jetic_init` first. It scaffolds the folder + model and tells you whether auto-scan applies. Never invent a model file by hand.',
-  '2. MODEL: Express+TypeScript project with tsconfig.json → run `jetic_scan` (static, keyless) to fill model.json, then refine with `jetic_add_endpoint` / `jetic_update_endpoint`. Any other stack — or scan gaps — read the code and model each endpoint yourself with `jetic_add_endpoint` (full fidelity: middleware chains, security, constraints, pagination, produces/consumes). Run `jetic_verify_model` until clean.',
-  '3. SIMULATE (only when the user asks): author workflows with `jetic_validate_workflow` (dry run) → `jetic_create_workflow` → `jetic_simulate_workflow`. Chain steps with capture/captureInput (producer) + inject or {{workflow:key}} templates (consumer). Use {{human:key}} ONLY for values unknowable beforehand (OTP codes, real secrets) — runners pause for interactive input and the create response lists them under needsHuman so you can warn the user.',
-  'No AI-provider setup is needed for any of this: never ask for OpenRouter/OpenAI keys and never use `jetic config ai`.',
-  'Mutating tools (`jetic_add_endpoint`, `jetic_update_endpoint`, `jetic_delete_endpoint`, `jetic_manage_environment`, workflow create/update) write to disk — confirm intent with the user first when the change is destructive (delete/overwrite).',
-  'Project resolution: every tool accepts an optional `projectPath`. If omitted, the server uses the `JETIC_PROJECT_PATH` environment variable, falling back to its own working directory. Set one of them to the project root so the server edits the right `.jetic/model.json`.',
+  'Jetic MCP manages API behavioral models in `.jetic/`. You MUST follow this strict 4-phase order. Never skip, reorder, or bypass any phase.',
+  '',
+  '━━ PHASE 1 — INITIALIZE ━━',
+  'Call `jetic_get_session_phase` at the very start of every session. If phase=1 (modelExists:false), call `jetic_init` to scaffold .jetic/model.json.',
+  'Gate: DO NOT advance to Phase 2 until modelExists is true.',
+  '',
+  '━━ PHASE 2 — SCAN ━━',
+  'Populate the model with endpoints:',
+  '  • Express+TypeScript (tsconfig.json present): call `jetic_scan` (static, keyless, no AI provider needed).',
+  '  • Any other stack or scan gaps: read the source code and call `jetic_add_endpoint` for every route (include middleware chains, security, constraints, pagination, produces/consumes).',
+  'Gate: DO NOT advance to Phase 3 until endpointsCount > 0.',
+  '',
+  '━━ PHASE 3 — VERIFY ━━',
+  'Call `jetic_verify_model`. Fix every error AND every MISSING_FIELD_* warning:',
+  '  • Fill `description` on every endpoint.',
+  '  • Add at least one `tag` per endpoint.',
+  '  • Add `description` to every parameter.',
+  '  • Add `description` to every response status code.',
+  'Use `jetic_update_endpoint` to fill gaps. Call `jetic_verify_model` again after each batch of updates.',
+  'Gate: DO NOT advance to Phase 4 until jetic_get_session_phase returns phase=4 (modelIsValid AND allFieldsFilled both true).',
+  '',
+  '━━ PHASE 4 — SIMULATE ━━',
+  'STOP. Ask the user: "What simulation or workflow do you want to build?"',
+  'Wait for their explicit answer. Then and only then: author the workflow with `jetic_validate_workflow` (dry run) → `jetic_create_workflow` → `jetic_simulate_workflow`.',
+  'Chain steps using capture/captureInput (producer) + inject or {{workflow:key}} (consumer). Use {{human:key}} ONLY for values unknowable beforehand (OTP codes, real secrets).',
+  'Never start Phase 4 without an explicit user-specified goal.',
+  '',
+  '━━ GENERAL RULES ━━',
+  'No AI-provider setup is needed: never ask for OpenRouter/OpenAI keys and never use `jetic config ai`.',
+  'Mutating tools write to disk — confirm intent with the user before destructive operations (delete/overwrite).',
+  'Project resolution: every tool accepts an optional `projectPath`. If omitted, falls back to JETIC_PROJECT_PATH env var, then cwd.',
 ].join('\n');
 
 const READ_ONLY: ToolAnnotations = {
@@ -157,10 +185,41 @@ export function createJeticMcpServer(): McpServer {
     );
   };
 
+  // ── Phase gate (always call this first) ────────────────────────────────
+  register(
+    'jetic_get_session_phase',
+    'Get session phase',
+    'ALWAYS CALL THIS FIRST. Returns the current workflow phase (1=init, 2=scan, 3=verify, 4=simulate), gate conditions (modelExists, endpointsCount, modelIsValid, allFieldsFilled), and the exact nextAction the AI must take. Never skip phase gates.',
+    getSessionPhaseSchema.shape,
+    READ_ONLY,
+    handleGetSessionPhase
+  );
+
+  // ── Phase 1: Initialize ─────────────────────────────────────────────────
+  register(
+    'jetic_init',
+    'Initialize Jetic project',
+    'PHASE 1: Scaffolds .jetic/model.json (+ workflows/, config.json) for repos that have none. Refuses to clobber an existing model (pass overwrite:true to replace). Reports whether auto-scan applies (Express+TypeScript) and what to do next.',
+    initProjectSchema.shape,
+    WRITES_MODEL,
+    handleInitProject
+  );
+
+  // ── Phase 2: Scan ───────────────────────────────────────────────────────
+  register(
+    'jetic_scan',
+    'Scan Express project',
+    'PHASE 2 (Express+TypeScript only — requires tsconfig.json): Static AST scan that fills model.json with routes, middleware, and auth heuristics. Keyless — no AI provider involved. Default merge upserts scanned routes and keeps hand-added endpoints; overwrite replaces all endpoints. Fails with guidance for non-Express stacks (model those manually with jetic_add_endpoint).',
+    scanProjectSchema.shape,
+    WRITES_MODEL,
+    handleScanProject
+  );
+
+  // ── Model read tools (used in all phases) ───────────────────────────────
   register(
     'jetic_read_model',
     'Read Jetic model',
-    'Reads .jetic/model.json from the workspace and returns the full behavioral model or a metadata summary. Start here before any other Jetic tool.',
+    'Reads .jetic/model.json from the workspace and returns the full behavioral model or a metadata summary.',
     readModelSchema.shape,
     READ_ONLY,
     handleReadModel
@@ -299,24 +358,6 @@ export function createJeticMcpServer(): McpServer {
     deleteWorkflowSchema.shape,
     DESTRUCTIVE,
     handleDeleteWorkflow
-  );
-
-  register(
-    'jetic_init',
-    'Initialize Jetic project',
-    'Step 1 of the structured order: scaffolds .jetic/model.json (+ workflows/, config.json) for repos that have none. Refuses to clobber an existing model (pass overwrite:true to replace). Reports whether auto-scan applies (Express+TypeScript) and what to do next.',
-    initProjectSchema.shape,
-    WRITES_MODEL,
-    handleInitProject
-  );
-
-  register(
-    'jetic_scan',
-    'Scan Express project',
-    'Step 2a for Express+TypeScript projects (requires tsconfig.json): static AST scan that fills model.json with routes, middleware, and auth heuristics. Keyless — no AI provider involved. Default merge upserts scanned routes and keeps hand-added endpoints; overwrite replaces all endpoints. Fails with guidance for non-Express stacks (model those manually).',
-    scanProjectSchema.shape,
-    WRITES_MODEL,
-    handleScanProject
   );
 
   return server;
