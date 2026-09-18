@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Copy, Check, Info, AlertTriangle, Lightbulb, AlertCircle } from 'lucide-react';
+import { ImageLightbox } from './ImageLightbox';
 
 interface MarkdownRendererProps {
   content: string;
@@ -103,8 +105,9 @@ function AlertBlockquote({ children }: { children: React.ReactNode }) {
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
-    <div className="prose prose-invert max-w-none text-zinc-300 text-sm leading-relaxed">
+    <div className="prose prose-invert max-w-none text-zinc-300 text-sm leading-relaxed prose-headings:scroll-mt-24 prose-p:mb-4 prose-p:leading-relaxed prose-strong:text-zinc-100 prose-strong:font-semibold prose-em:text-zinc-300">
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         components={{
           h1: ({ children }) => {
             const id = String(children).toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
@@ -131,16 +134,53 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             );
           },
           p: ({ children }) => <p className="mb-4 text-zinc-300 text-sm leading-relaxed">{children}</p>,
-          ul: ({ children }) => <ul className="mb-4 list-disc pl-5 space-y-1.5 text-sm text-zinc-300">{children}</ul>,
+          ul: ({ children, className }: any) => {
+            // GFM task lists get contains-task-list class
+            const isTaskList = className?.includes('contains-task-list');
+            return (
+              <ul className={`mb-4 space-y-1.5 text-sm text-zinc-300 ${isTaskList ? 'list-none pl-0' : 'list-disc pl-5'}`}>
+                {children}
+              </ul>
+            );
+          },
           ol: ({ children }) => <ol className="mb-4 list-decimal pl-5 space-y-1.5 text-sm text-zinc-300">{children}</ol>,
-          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+          li: ({ children, checked, className, ...props }: any) => {
+            const isTaskItem = typeof checked === 'boolean' || className?.includes('task-list-item');
+            if (isTaskItem) {
+              return (
+                <li className="flex items-start gap-2 leading-relaxed list-none" {...props}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    readOnly
+                    className="mt-1 h-3.5 w-3.5 shrink-0 rounded border-zinc-700 bg-zinc-800 text-amber-500 focus:ring-0 focus:ring-offset-0"
+                  />
+                  <span className={`flex-1 ${checked ? 'text-zinc-500 line-through' : 'text-zinc-300'}`}>{children}</span>
+                </li>
+              );
+            }
+            return <li className="leading-relaxed marker:text-zinc-500">{children}</li>;
+          },
           hr: () => <hr className="my-6 border-zinc-800" />,
           blockquote: ({ children }) => <AlertBlockquote>{children}</AlertBlockquote>,
+          strong: ({ children }) => <strong className="font-semibold text-zinc-100">{children}</strong>,
+          em: ({ children }) => <em className="italic text-zinc-300">{children}</em>,
+          del: ({ children }) => <del className="text-zinc-500 line-through decoration-zinc-600">{children}</del>,
+          input: ({ checked, ...props }: any) => {
+            // Fallback for stray checkbox inputs outside li (GFM)
+            if (props.type === 'checkbox') {
+              return <input type="checkbox" checked={checked} readOnly className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-800 text-amber-500" {...props} />;
+            }
+            return <input {...props} />;
+          },
+          pre: ({ children }: any) => <>{children}</>,
           code: ({ inline, className, children, ...props }: any) => {
-            if (inline) {
+            // react-markdown v10: inline is boolean, code blocks have className language-*
+            const isInline = inline ?? !className;
+            if (isInline) {
               return (
                 <code
-                  className="rounded bg-zinc-800/80 px-1.5 py-0.5 text-xs font-mono text-amber-300/90 border border-zinc-700/50"
+                  className="rounded bg-zinc-800/80 px-1.5 py-0.5 text-xs font-mono text-amber-300/90 border border-zinc-700/50 break-words"
                   {...props}
                 >
                   {children}
@@ -150,22 +190,35 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             return <CodeBlock className={className}>{children}</CodeBlock>;
           },
           table: ({ children }) => (
-            <div className="my-5 overflow-x-auto rounded-lg border border-zinc-800 bg-[#0b0d13]">
-              <table className="w-full text-left text-xs">{children}</table>
+            <div className="my-6 overflow-x-auto rounded-xl border border-zinc-800 bg-[#0b0d13] shadow-sm">
+              <table className="w-full text-left text-xs border-collapse">{children}</table>
             </div>
           ),
-          thead: ({ children }) => <thead className="border-b border-zinc-800 bg-zinc-900/60 text-zinc-200 font-semibold">{children}</thead>,
-          th: ({ children }) => <th className="px-4 py-2.5 font-medium text-zinc-200">{children}</th>,
-          td: ({ children }) => <td className="px-4 py-2.5 border-t border-zinc-800/50 text-zinc-300">{children}</td>,
+          thead: ({ children }) => <thead className="bg-zinc-900/80 text-zinc-100">{children}</thead>,
+          tbody: ({ children }) => <tbody className="divide-y divide-zinc-800/50">{children}</tbody>,
+          tr: ({ children }) => <tr className="even:bg-zinc-900/30 hover:bg-zinc-800/30 transition-colors">{children}</tr>,
+          th: ({ children, style }: any) => (
+            <th style={style} className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-zinc-200 border-b border-zinc-800 whitespace-nowrap">
+              {children}
+            </th>
+          ),
+          td: ({ children, style }: any) => (
+            <td style={style} className="px-4 py-3 text-xs leading-relaxed text-zinc-300 align-top">
+              {children}
+            </td>
+          ),
           a: ({ href, children }) => (
             <a
               href={href}
               target={href?.startsWith('http') ? '_blank' : undefined}
               rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
-              className="font-medium text-amber-400 hover:text-amber-300 underline decoration-amber-500/30 underline-offset-4 transition-colors"
+              className="font-medium text-amber-400 hover:text-amber-300 underline decoration-amber-500/30 underline-offset-4 transition-colors break-words"
             >
               {children}
             </a>
+          ),
+          img: ({ src, alt }: any) => (
+            <ImageLightbox src={src || ''} alt={alt || ''} caption={alt || ''} />
           ),
         }}
       >
