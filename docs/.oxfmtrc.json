@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "trailingComma": "all",
+  "tabWidth": 2,
+  "printWidth": 80,
+  "useTabs": false,
+  "semi": true,
+  "singleQuote": true,
+  "quoteProps": "as-needed",
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "jsxBracketSameLine": false,
+  "endOfLine": "lf",
+  "experimentalTailwindcss": {
+    "functions": ["classNames", "classnames", "twMerge", "clsx"],
+    "attributes": ["wrapperClassName", "wrapClassName", "rootClassName"]
+  },
+  "ignorePatterns": [
+    "pnpm-lock.yaml",
+    "build",
+    "dist",
+    "node_modules",
+    ".DS_Store"
+  ]
+}

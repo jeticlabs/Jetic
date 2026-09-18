@@ -1,0 +1,33 @@
+name: Unittest
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '.github/ISSUE_TEMPLATE/**'
+      - 'docker-publish.yml'
+      - 'README.md'
+      - 'SECURITY.md'
+      - 'TERMS.md'
+      - 'privacy.md'
+      - 'CONTRIBUTING.md'
+  pull_request:
+    branches:
+      - '*'
+jobs:
+  unittests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        redis-version: [5]
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v2
+      - uses: zcong1993/setup-timezone@master
+        with:
+          timezone: America/Denver
+      - run: npm run docker-test
+        env:
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          REDIS_PASSWORD: ""
+          SERVER_PORT: 3000

@@ -1,0 +1,14 @@
+services:
+  redis:
+    image: redis:5.0.8-buster
+    hostname: redis
+    volumes:
+      - redis-data:/data
+
+  app:
+    image: novelcovid/novelcovid-api:latest
+    depends_on:
+      - redis
+
+volumes:
+  redis-data:

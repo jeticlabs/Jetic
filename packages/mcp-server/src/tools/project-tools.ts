@@ -206,6 +206,17 @@ export async function handleScanProject(args: z.infer<typeof scanProjectSchema>)
 
   saveModel(filePath, existing);
 
+  // Auto-clear changes.json after a successful scan (model is now up-to-date)
+  const changesPath = path.join(path.dirname(filePath), 'changes.json');
+  if (fs.existsSync(changesPath)) {
+    try {
+      const changesData = JSON.parse(fs.readFileSync(changesPath, 'utf-8'));
+      changesData.changes = [];
+      changesData.watchedSince = new Date().toISOString();
+      fs.writeFileSync(changesPath, JSON.stringify(changesData, null, 2), 'utf-8');
+    } catch { /* changes.json may not exist yet — ignore */ }
+  }
+
   const total = existing.endpoints.length;
   return {
     success: true,
@@ -224,4 +235,85 @@ export async function handleScanProject(args: z.infer<typeof scanProjectSchema>)
         ? 'No endpoints yet — model them manually with jetic_add_endpoint, then jetic_verify_model.'
         : `Next: refine with jetic_add_endpoint / jetic_update_endpoint (AI enrichment is skipped in scans — add constraints, examples, ownership by hand), then jetic_verify_model until clean. Step 3 (only on request): workflows via jetic_validate_workflow → jetic_create_workflow → jetic_simulate_workflow.`,
   };
+}
+
+// ── jetic_get_changes ────────────────────────────────────────────────────────
+// Reads .jetic/changes.json — the lightweight diff log populated by the
+// ChangeScanner in `jetic dev`. Returns the list of source files that were
+// edited since the last scan/clear so the AI doesn't need to read the whole
+// codebase — only the changed files.
+
+export const getChangesSchema = z.object({
+  projectPath: z.string().optional().describe('Path to project root (defaults to JETIC_PROJECT_PATH / cwd)'),
+});
+
+export function handleGetChanges(args: z.infer<typeof getChangesSchema>) {
+  const filePath    = resolveModelPath(args.projectPath);
+  const jeticDir    = path.dirname(filePath);
+  const changesPath = path.join(jeticDir, 'changes.json');
+
+  if (!fs.existsSync(changesPath)) {
+    return {
+      hasChanges: false,
+      changes: [],
+      watchedSince: null,
+      message: 'No changes.json found. Start `jetic dev` to enable automatic file change tracking.',
+    };
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(fs.readFileSync(changesPath, 'utf-8'));
+  } catch {
+    return { hasChanges: false, changes: [], watchedSince: null, message: 'changes.json is unreadable or corrupted.' };
+  }
+
+  const changes: Array<{ filePath: string; absolutePath: string; changedAt: string; eventType: string }> =
+    Array.isArray(data.changes) ? data.changes : [];
+
+  return {
+    hasChanges: changes.length > 0,
+    totalChanged: changes.length,
+    watchedSince: data.watchedSince ?? null,
+    projectRoot: data.projectRoot ?? jeticDir,
+    changes,
+    filePaths: changes.map((c) => c.filePath),
+    hint: changes.length > 0
+      ? `Read ONLY these ${changes.length} file(s) to update model.json — no need to scan the entire codebase. After updating, call jetic_clear_changes.`
+      : 'No file changes recorded since last scan. Model is up-to-date.',
+  };
+}
+
+// ── jetic_clear_changes ──────────────────────────────────────────────────────
+// Clears .jetic/changes.json after the AI has finished updating model.json
+// from the changed files. Automatically called by jetic_scan too.
+
+export const clearChangesSchema = z.object({
+  projectPath: z.string().optional().describe('Path to project root (defaults to JETIC_PROJECT_PATH / cwd)'),
+});
+
+export function handleClearChanges(args: z.infer<typeof clearChangesSchema>) {
+  const filePath    = resolveModelPath(args.projectPath);
+  const jeticDir    = path.dirname(filePath);
+  const changesPath = path.join(jeticDir, 'changes.json');
+
+  if (!fs.existsSync(changesPath)) {
+    return { success: true, message: 'changes.json did not exist — nothing to clear.' };
+  }
+
+  try {
+    const data = JSON.parse(fs.readFileSync(changesPath, 'utf-8'));
+    const cleared = Array.isArray(data.changes) ? data.changes.length : 0;
+    data.changes = [];
+    data.watchedSince = new Date().toISOString();
+    fs.writeFileSync(changesPath, JSON.stringify(data, null, 2), 'utf-8');
+    return {
+      success: true,
+      cleared,
+      watchedSince: data.watchedSince,
+      message: `Cleared ${cleared} change record(s). ChangeScanner will now track future edits from scratch.`,
+    };
+  } catch (err: any) {
+    throw new Error(`Failed to clear changes.json: ${err.message}`);
+  }
 }

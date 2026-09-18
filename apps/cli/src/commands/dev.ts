@@ -5,13 +5,205 @@ import fs from 'fs';
 import { loadConfig } from '@jetic/core';
 import { JeticMemory } from '@jetic/memory';
 
+// ─── Change Scanner ───────────────────────────────────────────────────────────
+// Watches the project root for file edits and persists a lightweight
+// .jetic/changes.json so that AI (via MCP) only needs to look at changed
+// source files when re-modelling, not the entire codebase.
+//
+// No git dependency — works with uncommitted edits and untracked files.
+
+const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.cache', '__pycache__', '.next', '.nuxt', '.venv']);
+const IGNORED_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.mp4', '.webm', '.woff', '.woff2', '.ttf', '.eot', '.map']);
+const SOURCE_EXTS  = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.py', '.go', '.rs', '.java', '.kt', '.cs', '.rb', '.php', '.json', '.yaml', '.yml', '.toml', '.env', '.graphql', '.gql', '.sql', '.prisma', '.proto']);
+
+interface ChangeEntry {
+  filePath: string;   // relative to project root
+  absolutePath: string;
+  changedAt: string;  // ISO timestamp
+  eventType: 'change' | 'rename';
+}
+
+interface ChangesFile {
+  version: number;
+  watchedSince: string;
+  projectRoot: string;
+  changes: ChangeEntry[];
+}
+
+class ChangeScanner {
+  private changesPath: string;
+  private projectRoot: string;
+  private watchers: fs.FSWatcher[] = [];
+  private debounceTimers = new Map<string, NodeJS.Timeout>();
+  private DEBOUNCE_MS = 300;
+  private listeners = new Set<(data: ChangesFile) => void>();
+
+  constructor(projectRoot: string, jeticDir: string) {
+    this.projectRoot = projectRoot;
+    this.changesPath = path.join(jeticDir, 'changes.json');
+  }
+
+  onChange(cb: (data: ChangesFile) => void): () => void {
+    this.listeners.add(cb);
+    return () => this.listeners.delete(cb);
+  }
+
+  private notifyListeners(data: ChangesFile): void {
+    for (const listener of this.listeners) {
+      try { listener(data); } catch { /* ignore */ }
+    }
+  }
+
+  private readChanges(): ChangesFile {
+    try {
+      if (fs.existsSync(this.changesPath)) {
+        return JSON.parse(fs.readFileSync(this.changesPath, 'utf8'));
+      }
+    } catch { /* corrupted — start fresh */ }
+    return {
+      version: 1,
+      watchedSince: new Date().toISOString(),
+      projectRoot: this.projectRoot,
+      changes: [],
+    };
+  }
+
+  private saveChanges(data: ChangesFile): void {
+    fs.writeFileSync(this.changesPath, JSON.stringify(data, null, 2), 'utf8');
+    this.notifyListeners(data);
+  }
+
+  private recordChange(absolutePath: string, eventType: 'change' | 'rename'): void {
+    // Skip .jetic dir itself to avoid infinite loop on changes.json
+    const jeticDir = path.dirname(this.changesPath);
+    if (absolutePath.startsWith(jeticDir)) return;
+
+    // Skip ignored extensions
+    const ext = path.extname(absolutePath).toLowerCase();
+    if (IGNORED_EXTS.has(ext)) return;
+    if (ext && !SOURCE_EXTS.has(ext)) return;
+
+    // Skip non-existent files (deletions from renames)
+    if (!fs.existsSync(absolutePath)) return;
+    // Skip directories
+    try { if (fs.statSync(absolutePath).isDirectory()) return; } catch { return; }
+
+    const relPath = path.relative(this.projectRoot, absolutePath).replace(/\\/g, '/');
+
+    // Debounce: same file within DEBOUNCE_MS = only one entry
+    const existing = this.debounceTimers.get(absolutePath);
+    if (existing) clearTimeout(existing);
+    this.debounceTimers.set(
+      absolutePath,
+      setTimeout(() => {
+        this.debounceTimers.delete(absolutePath);
+        const data = this.readChanges();
+        const now  = new Date().toISOString();
+        // Update existing entry or push new one
+        const idx = data.changes.findIndex(c => c.filePath === relPath);
+        const entry: ChangeEntry = { filePath: relPath, absolutePath, changedAt: now, eventType };
+        if (idx >= 0) data.changes[idx] = entry;
+        else data.changes.push(entry);
+        this.saveChanges(data);
+      }, this.DEBOUNCE_MS)
+    );
+  }
+
+  private watchDir(dir: string): void {
+    try {
+      const watcher = fs.watch(dir, { recursive: false }, (eventType, filename) => {
+        if (!filename) return;
+        const absPath = path.join(dir, filename);
+
+        // If this is a new subdirectory, watch it too
+        try {
+          if (fs.existsSync(absPath) && fs.statSync(absPath).isDirectory()) {
+            const basename = path.basename(absPath);
+            if (!IGNORED_DIRS.has(basename)) this.watchDir(absPath);
+            return;
+          }
+        } catch { return; }
+
+        this.recordChange(absPath, eventType as 'change' | 'rename');
+      });
+      this.watchers.push(watcher);
+    } catch { /* permission denied or path gone */ }
+  }
+
+  /** Recursively enumerate all subdirectories to watch, respecting ignores. */
+  private collectDirs(root: string): string[] {
+    const dirs: string[] = [root];
+    try {
+      for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        if (IGNORED_DIRS.has(entry.name)) continue;
+        if (entry.name.startsWith('.') && entry.name !== '.') continue;
+        dirs.push(...this.collectDirs(path.join(root, entry.name)));
+      }
+    } catch { /* unreadable dir */ }
+    return dirs;
+  }
+
+  start(): void {
+    process.stderr.write(`[jetic] ChangeScanner watching ${this.projectRoot}\n`);
+    // Initialize changes.json if first run
+    if (!fs.existsSync(this.changesPath)) {
+      this.saveChanges({
+        version: 1,
+        watchedSince: new Date().toISOString(),
+        projectRoot: this.projectRoot,
+        changes: [],
+      });
+    }
+    // Watch all current dirs and the project root
+    const dirs = this.collectDirs(this.projectRoot);
+    for (const dir of dirs) this.watchDir(dir);
+
+    // Watch changes.json file itself for external writes
+    try {
+      if (fs.existsSync(this.changesPath)) {
+        const fileWatcher = fs.watch(this.changesPath, () => {
+          const data = this.readChanges();
+          this.notifyListeners(data);
+        });
+        this.watchers.push(fileWatcher);
+      }
+    } catch { /* ignore */ }
+  }
+
+  stop(): void {
+    for (const w of this.watchers) try { w.close(); } catch { /* ignore */ }
+    this.watchers = [];
+  }
+
+  getChanges(): ChangesFile {
+    return this.readChanges();
+  }
+
+  clearChanges(): void {
+    const data = this.readChanges();
+    data.changes = [];
+    data.watchedSince = new Date().toISOString();
+    this.saveChanges(data);
+  }
+}
+
 export const devCommand = new Command('dev')
   .description('Start the Jetic local dashboard')
   .option('-p, --port <number>', 'Port to run the dashboard on', '8787')
   .action(async (options) => {
     const port = parseInt(options.port, 10);
     const app = express();
-    
+    const projectRoot = process.cwd();
+    const jeticDir    = path.join(projectRoot, '.jetic');
+    if (!fs.existsSync(jeticDir)) fs.mkdirSync(jeticDir, { recursive: true });
+
+    // ─── Start the change scanner ─────────────────────────────────────────
+    const changeScanner = new ChangeScanner(projectRoot, jeticDir);
+    changeScanner.start();
+    process.on('SIGINT',  () => { changeScanner.stop(); process.exit(0); });
+    process.on('SIGTERM', () => { changeScanner.stop(); process.exit(0); });
+
     app.use(express.json());
 
     // Allow dashboard dev server to call the API during development
@@ -105,7 +297,57 @@ export const devCommand = new Command('dev')
         const model = await scanner.scan();
         const modelPath = path.join(config.jeticDir, 'model.json');
         writeJsonSync(modelPath, model);
+        // Clear tracked changes after a successful rescan — model is now up-to-date
+        changeScanner.clearChanges();
         res.json({ ok: true, endpointCount: model.endpoints.length, model });
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ─── Changes API ──────────────────────────────────────────────────────
+
+    // GET /api/changes — return the list of changed source files since last scan
+    app.get('/api/changes', (_req, res) => {
+      try {
+        res.json(changeScanner.getChanges());
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    // GET /api/changes/stream — SSE endpoint for real-time live updates of changes.json
+    app.get('/api/changes/stream', (req, res) => {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      if (res.flushHeaders) res.flushHeaders();
+
+      // Send initial data
+      const initial = changeScanner.getChanges();
+      res.write(`data: ${JSON.stringify(initial)}\n\n`);
+
+      // Subscribe to live change events
+      const unsubscribe = changeScanner.onChange((updatedData) => {
+        res.write(`data: ${JSON.stringify(updatedData)}\n\n`);
+      });
+
+      // Heartbeat comment every 15 seconds to keep connection alive
+      const heartbeat = setInterval(() => {
+        res.write(': heartbeat\n\n');
+      }, 15000);
+
+      req.on('close', () => {
+        unsubscribe();
+        clearInterval(heartbeat);
+      });
+    });
+
+    // DELETE /api/changes — clear the list (called after model update is complete)
+    app.delete('/api/changes', (_req, res) => {
+      try {
+        changeScanner.clearChanges();
+        res.json({ ok: true, cleared: true });
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }

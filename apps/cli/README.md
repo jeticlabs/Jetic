@@ -113,8 +113,8 @@ Use these prompt templates with your editor's AI assistant (opencode, Antigravit
 > **Model Completeness & Audit:**  
 > *"Run `jetic_verify_model`. Update every endpoint with missing descriptions or tags using `jetic_update_endpoint`, and re-verify until the model status is 100% complete and valid."*
 
-> **Manual Endpoint Creation (Custom / Non-Express APIs):**  
-> *"Add a new endpoint `POST /api/v1/auth/login` to `.jetic/model.json` using `jetic_add_endpoint` with `email` and `password` body fields and status 200 token response."*
+> **Selective AI Re-Modelling via Change Log (`changes.json`):**  
+> *"Check recent file changes (`jetic_get_changes`). Re-analyse ONLY those modified files to update `.jetic/model.json` instead of reading the entire codebase, then clear the change log (`jetic_clear_changes`)."*
 
 #### ⚡ Phase 4: Create & Run Workflows (`create workflow`)
 > **Scaffold & Create Workflow:**  
@@ -140,9 +140,9 @@ Use these prompt templates with your editor's AI assistant (opencode, Antigravit
 | `jetic inspect` | Inspect summary metrics or specific endpoint schemas in terminal |
 | `jetic simulate endpoint` | Test live HTTP endpoints against local/staging server |
 | `jetic simulate workflow` | Execute multi-step stateful workflows from `.jetic/workflows/` |
-| `jetic dev` | Launch local **Jetic Studio** dashboard UI on port `8787` |
+| `jetic dev` | Launch local **Jetic Studio** dashboard UI on port `8787` with real-time SSE file watcher & `changes.json` live stream |
 | `jetic memory` | View, set, or clear runtime variable memory (`.jetic/memory.json`) |
-| `jetic mcp` | Start stdio MCP server for AI IDE integration |
+| `jetic mcp` | Start stdio MCP server for AI IDE integration (includes `jetic_get_changes` & `jetic_clear_changes`) |
 
 ---
 
@@ -152,12 +152,15 @@ Run `jetic dev` to open the local web developer studio:
 
 - **Behavioral Model (`/model`)**: Explore endpoints, request/response schemas, and AST source code lines.
 - **AI Simulations (`/simulations`)**: Visual step-by-step workflow runner with real-time SSE execution logs.
+- **Files Changes (`/changes`)**: Real-time SSE stream observer for `.jetic/changes.json` — track modified source files live without browser reloads.
 - **Memory Inspector (`/memory`)**: Edit captured tokens, fake test data, and session variables.
 - **Visual Traces (`/traces`)**: Interactive node-graph execution visualizer powered by ReactFlow.
 
 ---
 
-## 📄 Behavioral Model Preview (`.jetic/model.json`)
+## 📄 Artifact Schemas
+
+### `.jetic/model.json` (Behavioral Model)
 
 ```json
 {
@@ -180,6 +183,24 @@ Run `jetic dev` to open the local web developer studio:
       "responses": {
         "200": { "description": "Returns JWT token", "schema": { "token": "string" } }
       }
+    }
+  ]
+}
+```
+
+### `.jetic/changes.json` (File Changes Tracking Log)
+
+```json
+{
+  "version": 1,
+  "watchedSince": "2026-09-18T10:00:00.000Z",
+  "projectRoot": "C:/projects/my-api",
+  "changes": [
+    {
+      "filePath": "src/routes/user.routes.ts",
+      "absolutePath": "C:/projects/my-api/src/routes/user.routes.ts",
+      "changedAt": "2026-09-18T14:20:00.000Z",
+      "eventType": "change"
     }
   ]
 }

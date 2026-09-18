@@ -44,6 +44,10 @@ import {
   handleInitProject,
   scanProjectSchema,
   handleScanProject,
+  getChangesSchema,
+  handleGetChanges,
+  clearChangesSchema,
+  handleClearChanges,
 } from './tools/project-tools';
 import {
   getSessionPhaseSchema,
@@ -151,6 +155,11 @@ export const JETIC_MCP_INSTRUCTIONS = [
   'No AI-provider setup is needed: never ask for OpenRouter/OpenAI keys and never use `jetic config ai`.',
   'Mutating tools write to disk — confirm intent with the user before destructive operations (delete/overwrite).',
   'Project resolution: every tool accepts an optional `projectPath`. If omitted, falls back to JETIC_PROJECT_PATH env var, then cwd.',
+  '━━ CHANGE TRACKING (jetic dev) ━━',
+  'When `jetic dev` is running it watches source files and logs edits to `.jetic/changes.json`.',
+  'Before rescanning: call `jetic_get_changes` — if hasChanges is true, read ONLY the listed filePaths.',
+  'Update model.json for those files, then call `jetic_clear_changes` (or jetic_scan, which clears automatically).',
+  '',
 ].join('\n');
 
 const READ_ONLY: ToolAnnotations = {
@@ -254,10 +263,29 @@ export function createJeticMcpServer(): McpServer {
   register(
     'jetic_scan',
     'Scan Express project',
-    'PHASE 2 (Express+TypeScript only — requires tsconfig.json): Static AST scan that fills model.json with routes, middleware, and auth heuristics. Keyless — no AI provider involved. Default merge upserts scanned routes and keeps hand-added endpoints; overwrite replaces all endpoints. Fails with guidance for non-Express stacks (model those manually with jetic_add_endpoint).',
+    'PHASE 2 (Express+TypeScript only — requires tsconfig.json): Static AST scan that fills model.json with routes, middleware, and auth heuristics. Keyless — no AI provider involved. Default merge upserts scanned routes and keeps hand-added endpoints; overwrite replaces all endpoints. Fails with guidance for non-Express stacks (model those manually with jetic_add_endpoint). Auto-clears .jetic/changes.json after success.',
     scanProjectSchema.shape,
     WRITES_MODEL,
     handleScanProject
+  );
+
+  // ── Change tracking (jetic dev watcher) ────────────────────────────────
+  register(
+    'jetic_get_changes',
+    'Get file change log',
+    'Reads .jetic/changes.json — the lightweight change log populated by the ChangeScanner running inside `jetic dev`. Returns the list of source files edited since the last scan or jetic_clear_changes. Use this BEFORE rescanning to read only changed files instead of the full codebase.',
+    getChangesSchema.shape,
+    READ_ONLY,
+    handleGetChanges
+  );
+
+  register(
+    'jetic_clear_changes',
+    'Clear file change log',
+    'Clears .jetic/changes.json after the AI has finished updating model.json from the changed files. Also called automatically by jetic_scan. Call this when you have finished processing all changes returned by jetic_get_changes.',
+    clearChangesSchema.shape,
+    WRITES_MODEL,
+    handleClearChanges
   );
 
   // ── Model read tools (used in all phases) ───────────────────────────────

@@ -12,5 +12,6 @@ export type PageId =
   | "overview" | "simulations" | "model" | "inspect"
   | "agents" | "tools" | "context" | "memory"
   | "apis" | "email" | "oauth" | "webhooks"
-  | "traces" | "events"
+  | "traces" | "events" | "changes"
   | "settings" | "docs";
+

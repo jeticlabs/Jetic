@@ -83,7 +83,8 @@ Furthermore, conventional HTTP runners only check if an endpoint returns a `200 
   - `captureInput`: Saves generated request body values (e.g. `admin_email`) to `.jetic/memory.json` *before* firing requests so subsequent steps can reuse them.
   - `capture`: Saves response JSONPath fields (e.g. `data.accessToken`, `data.workspace.id`) to `.jetic/memory.json` *after* success.
   - `inject`: Automatically injects memory values into headers (e.g. `header:Authorization = Bearer {{workflow:accessToken}}`) or body fields.
-- 🖥️ **Jetic Studio Dashboard**: Modern React 19 + Vite + TailwindCSS + ReactFlow local developer web IDE (`jetic dev`) for visual API exploration, AST source code viewing, real-time SSE workflow execution, runtime memory editing, and node-graph trace debugging.
+- 🖥️ **Jetic Studio Dashboard**: Modern React 19 + Vite + TailwindCSS + ReactFlow local developer web IDE (`jetic dev`) for visual API exploration, AST source code viewing, real-time SSE workflow execution, runtime memory editing, live file changes tracking, and node-graph trace debugging.
+- ⚡ **Lightweight Change Scanner & Live File Tracking (`changes.json`)**: Automatic zero-dependency file watcher running in `jetic dev`. Tracks edited source files without Git overhead, streaming updates in real time via SSE to the `/changes` UI and allowing AI (via `jetic_get_changes` MCP tool) to re-index only modified files instead of the entire codebase.
 - 💻 **Feature-Rich CLI**: Lightweight command-line interface bringing API intelligence, scanning, simulation, memory control, and config management straight to your terminal.
 
 ---
@@ -415,8 +416,8 @@ jetic mcp --project C:/path/to/your-backend
 
 > **Start here instead:** [Start with Your AI IDE](#-start-with-your-ai-ide-recommended-no-ai-key) — install, one `jetic init`, one editor config snippet, and copy-paste chat prompts. Per-editor configs (opencode, Antigravity, Cursor, Claude Code/Desktop, Windsurf, VS Code): [packages/mcp-server/README.md](packages/mcp-server/README.md).
 
-#### MCP Tools Provided to IDE Assistants (18 — structured order: init → model → simulate):
-- **Setup**: `jetic_init` (scaffold `.jetic/` for new repos, detects Express) · `jetic_scan` (keyless Express+TS auto-scan, merge keeps hand-added endpoints)
+#### MCP Tools Provided to IDE Assistants (20 — structured order: init → model → simulate → maintain):
+- **Setup & Tracking**: `jetic_init` (scaffold `.jetic/` for new repos, detects Express) · `jetic_scan` (keyless Express+TS auto-scan, merge keeps hand-added endpoints) · `jetic_get_changes` (read modified files tracked in `.jetic/changes.json`) · `jetic_clear_changes` (clear change tracking log)
 - **Read**: `jetic_read_model` (full model or summary) · `jetic_list_endpoints` (filter by method/tag/resource/path) · `jetic_get_endpoint` (full structural detail) · `jetic_verify_model` (duplicates, unbound params, bad status codes, dangling sources) · `jetic_list_workflows`
 - **Author endpoints** (full fidelity: middleware chains, security, pagination, rate limits, ownership, produces/consumes, constraints): `jetic_add_endpoint` · `jetic_update_endpoint` · `jetic_delete_endpoint` · `jetic_manage_environment`
 - **Author workflows** (validate → create → simulate loop with memory data-flow checks): `jetic_validate_workflow` · `jetic_create_workflow` · `jetic_update_workflow` · `jetic_delete_workflow`
@@ -521,6 +522,18 @@ Interactive ReactFlow node-graph visualizer for workflow execution traces.
 ![Jetic Studio - Execution Traces](screenshots/jetic_traces.JPG)
 
 ---
+
+### 7. 🔄 Files Changes (`/changes`)
+Real-time source file change observer powered by a zero-dependency file watcher.
+
+- **Key Highlights**:
+  - **Live SSE Watcher Stream**: Establishes a Server-Sent Events (`/api/changes/stream`) stream that automatically pushes file modifications to the UI in real time without requiring browser reloads.
+  - **Live Status & Metrics**: Displays live connection status, total pending changed files, project root path, and watched-since timestamps.
+  - **Category Filtering**: Filter change logs by Source Code (`.ts`, `.py`), Config (`.json`, `.env`), DB (`.sql`, `.prisma`), or custom query search.
+  - **MCP AI Integration**: Integrates directly with `jetic_get_changes` and `jetic_clear_changes` MCP tools so AI assistants read only modified files for instant model sync. Includes quick-action **Clear Changes** and **Rescan & Sync Model** triggers.
+
+---
+
 
 ## 📄 Artifact & File Schemas
 
@@ -655,6 +668,26 @@ Interactive ReactFlow node-graph visualizer for workflow execution traces.
   "global": {
     "baseUrl": "http://localhost:3000"
   }
+}
+```
+
+---
+
+### `.jetic/changes.json` (Change Log Artifact)
+
+```json
+{
+  "version": 1,
+  "watchedSince": "2026-09-18T10:00:00.000Z",
+  "projectRoot": "C:/projects/my-express-api",
+  "changes": [
+    {
+      "filePath": "src/routes/user.routes.ts",
+      "absolutePath": "C:/projects/my-express-api/src/routes/user.routes.ts",
+      "changedAt": "2026-09-18T14:20:00.000Z",
+      "eventType": "change"
+    }
+  ]
 }
 ```
 

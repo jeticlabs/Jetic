@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Sidebar } from "./components/layout/Sidebar";
 //import { Topbar } from "./components/layout/Topbar";
 import { AssistantPanel } from "./components/layout/AssistantPanel";
+import { ChangesNotification } from "./components/layout/ChangesNotification";
 import { type PageId } from "./types";
 import { ThemeProvider } from "./context/ThemeContext";
 
@@ -26,6 +27,7 @@ import { Webhooks } from "./pages/Environment/Webhooks";
 // Observability
 import { Traces } from "./pages/Observability/Traces";
 import { Events } from "./pages/Observability/Events";
+import { Changes } from "./pages/Observability/Changes";
 
 // Misc
 import { Settings } from "./pages/Misc/Settings";
@@ -49,7 +51,7 @@ const VALID_PAGES: PageId[] = [
   "overview", "simulations", "model", "inspect",
   "agents", "tools", "context", "memory",
   "apis", "email", "oauth", "webhooks",
-  "traces", "events", "settings", "docs"
+  "traces", "events", "changes", "settings", "docs"
 ];
 
 function AppInner() {
@@ -122,6 +124,8 @@ function AppInner() {
       // Observability
       case "traces": return <Traces initialFilter={traceFilter} onNavigate={navigateTo} />;
       case "events": return <Events />;
+      case "changes": return <Changes onNavigate={navigateTo as any} />;
+
 
       // Misc
       case "settings": return <Settings />;
@@ -156,6 +160,8 @@ function AppInner() {
           isOpen={isAssistantOpen}
           onClose={() => setIsAssistantOpen(false)}
         />
+
+        <ChangesNotification onNavigateToChanges={() => navigateTo("changes")} />
       </div>
     </div>
   );

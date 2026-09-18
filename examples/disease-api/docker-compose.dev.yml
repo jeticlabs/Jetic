@@ -1,0 +1,41 @@
+services:
+  redis:
+    env_file: .env
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--requirepass",
+        "${REDIS_PASSWORD}",
+        "--port",
+        "${REDIS_PORT}",
+      ]
+    volumes:
+      - redis-data:/data
+
+  scraper:
+    build: .
+    image: covidapi-scraper
+    command: ["npm", "run", "start:scraper"]
+    restart: unless-stopped
+    environment: 
+      - DOCKER=true
+    env_file:
+      - .env
+    depends_on:
+      - redis
+
+  app:
+    build: .
+    image: covidapi-app
+    command: ["npm", "run", "start:devserver"]
+    restart: unless-stopped
+    environment: 
+      - DOCKER=true
+    env_file:
+      - .env
+    ports:
+      - "${SERVER_PORT}:${SERVER_PORT}"
+    depends_on:
+      - scraper

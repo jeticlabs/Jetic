@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="captcha-token" content="<%= captchaToken %>" />
+    <meta name="csrf-token" content="<%= csrfToken %>" />
+
+    <!-- Primary Meta Tags -->
+    <title>disease.sh</title>
+    <meta name="title" content="disease.sh" />
+    <meta
+      name="description"
+      content="An open API for disease-related statistics. No signup required.
+    100,000,000,000+ Requests & 100+ TB of data served to date!"
+    />
+    <meta
+      name="keywords"
+      content="COVID-19, Influenza, API, Open source, Disease"
+    />
+    <link rel="icon" href="/assets/img/icon_caw_simple.png" type="image/png" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://disease.sh" />
+    <meta property="og:title" content="disease.sh" />
+    <meta
+      property="og:description"
+      content="An open API for disease-related statistics. No signup required.
+    100,000,000,000+ Requests & 100+ TB of data served to date!"
+    />
+    <meta
+      property="og:image"
+      content="https://disease.sh/assets/img/rona.jpg"
+    />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.css"
+    />
+    <link rel="stylesheet" href="./assets/css/jsonViewer.css" />
+    <link rel="stylesheet" href="./assets/css/index.css" />
+  </head>
+  <body>
+    <div
+      class="navbar"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 52px;
+        background-image: linear-gradient(
+            rgba(0, 0, 0, 0.4),
+            rgba(0, 0, 0, 0.4)
+          ),
+          url(/assets/img/rona.jpg);
+        background-size: cover;
+        display: flex;
+        transition: box-shadow 0.2s ease;
+      "
+    >
+      <div
+        class="navbar-brand"
+        style="opacity: 0; pointer-events: none; transition: opacity 0.2s ease"
+      >
+        <h4 class="title is-4 has-text-white mt-3 ml-5" id="titleSmall">
+          disease.sh
+        </h4>
+      </div>
+      <div class="navbar-menu" id="navMenu">
+        <div class="navbar-end">
+          <a class="navbar-item has-text-light" href="https://disease.sh/docs/">
+            <span>
+              <svg
+                class="navIcon"
+                xmlns="http://www.w3.org/2000/svg"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                aria-hidden="true"
+                focusable="false"
+                width="1.11em"
+                height="1em"
+                style="
+                  -ms-transform: rotate(360deg);
+                  -webkit-transform: rotate(360deg);
+                  transform: rotate(360deg);
+                "
+                preserveAspectRatio="xMidYMid meet"
+                viewBox="0 0 1696 1536"
+              >
+                <path
+                  d="M1671 350q40 57 18 129l-275 906q-19 64-76.5 107.5T1215 1536H292q-77 0-148.5-53.5T44 1351q-24-67-2-127q0-4 3-27t4-37q1-8-3-21.5t-3-19.5q2-11 8-21t16.5-23.5T84 1051q23-38 45-91.5t30-91.5q3-10 .5-30t-.5-28q3-11 17-28t17-23q21-36 42-92t25-90q1-9-2.5-32t.5-28q4-13 22-30.5t22-22.5q19-26 42.5-84.5T372 283q1-8-3-25.5t-2-26.5q2-8 9-18t18-23t17-21q8-12 16.5-30.5t15-35t16-36t19.5-32T504.5 12t36-11.5T588 6l-1 3q38-9 51-9h761q74 0 114 56t18 130l-274 906q-36 119-71.5 153.5T1057 1280H188q-27 0-38 15q-11 16-1 43q24 70 144 70h923q29 0 56-15.5t35-41.5l300-987q7-22 5-57q38 15 59 43zm-1064 2q-4 13 2 22.5t20 9.5h608q13 0 25.5-9.5T1279 352l21-64q4-13-2-22.5t-20-9.5H670q-13 0-25.5 9.5T628 288zm-83 256q-4 13 2 22.5t20 9.5h608q13 0 25.5-9.5T1196 608l21-64q4-13-2-22.5t-20-9.5H587q-13 0-25.5 9.5T545 544z"
+                  fill="currentColor"
+                />
+              </svg>
+              <span>Docs</span>
+            </span>
+          </a>
+          <a
+            class="navbar-item has-text-light"
+            href="https://github.com/disease-sh/api"
+          >
+            <span>
+              <svg
+                class="navIcon"
+                xmlns="http://www.w3.org/2000/svg"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                aria-hidden="true"
+                focusable="false"
+                width="1em"
+                height="1em"
+                style="
+                  -ms-transform: rotate(360deg);
+                  -webkit-transform: rotate(360deg);
+                  transform: rotate(360deg);
+                "
+                preserveAspectRatio="xMidYMid meet"
+                viewBox="0 0 24 24"
+              >
+                <g fill="none">
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385c.6.105.825-.255.825-.57c0-.285-.015-1.23-.015-2.235c-3.015.555-3.795-.735-4.035-1.41c-.135-.345-.72-1.41-1.23-1.695c-.42-.225-1.02-.78-.015-.795c.945-.015 1.62.87 1.845 1.23c1.08 1.815 2.805 1.305 3.495.99c.105-.78.42-1.305.765-1.605c-2.67-.3-5.46-1.335-5.46-5.925c0-1.305.465-2.385 1.23-3.225c-.12-.3-.54-1.53.12-3.18c0 0 1.005-.315 3.3 1.23c.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23c.66 1.65.24 2.88.12 3.18c.765.84 1.23 1.905 1.23 3.225c0 4.605-2.805 5.625-5.475 5.925c.435.375.81 1.095.81 2.22c0 1.605-.015 2.895-.015 3.3c0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"
+                    fill="currentColor"
+                  />
+                </g>
+              </svg>
+              <span>GitHub</span>
+            </span>
+          </a>
+          <a
+            class="navbar-item has-text-light"
+            href="https://discord.gg/uypdG2h"
+            target="_blank"
+          >
+            <span>
+              <svg
+                class="navIcon"
+                xmlns="http://www.w3.org/2000/svg"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                aria-hidden="true"
+                focusable="false"
+                width="1em"
+                height="1em"
+                style="
+                  -ms-transform: rotate(360deg);
+                  -webkit-transform: rotate(360deg);
+                  transform: rotate(360deg);
+                "
+                preserveAspectRatio="xMidYMid meet"
+                viewBox="0 0 16 16"
+              >
+                <g fill="currentColor">
+                  <path
+                    d="M 13.542969 3.128906 C 12.523438 2.660156 11.429688 2.316406 10.289062 2.117188 C 10.265625 2.113281 10.246094 2.125 10.234375 2.144531 C 10.09375 2.394531 9.9375 2.71875 9.828125 2.976562 C 8.601562 2.792969 7.375 2.792969 6.171875 2.976562 C 6.0625 2.714844 5.902344 2.394531 5.761719 2.144531 C 5.75 2.125 5.730469 2.117188 5.707031 2.117188 C 4.566406 2.316406 3.472656 2.660156 2.453125 3.128906 C 2.441406 3.128906 2.433594 3.136719 2.429688 3.144531 C 0.355469 6.238281 -0.210938 9.257812 0.0664062 12.238281 C 0.0664062 12.253906 0.0742188 12.265625 0.0859375 12.277344 C 1.457031 13.277344 2.78125 13.886719 4.082031 14.292969 C 4.101562 14.296875 4.125 14.289062 4.136719 14.273438 C 4.445312 13.855469 4.71875 13.410156 4.957031 12.945312 C 4.96875 12.917969 4.957031 12.886719 4.929688 12.875 C 4.492188 12.710938 4.078125 12.511719 3.679688 12.28125 C 3.648438 12.261719 3.644531 12.21875 3.675781 12.195312 C 3.757812 12.132812 3.84375 12.070312 3.921875 12.003906 C 3.9375 11.992188 3.957031 11.988281 3.972656 11.996094 C 6.59375 13.191406 9.425781 13.191406 12.015625 11.996094 C 12.03125 11.988281 12.050781 11.988281 12.066406 12.003906 C 12.148438 12.066406 12.230469 12.132812 12.316406 12.195312 C 12.34375 12.21875 12.34375 12.261719 12.3125 12.28125 C 11.914062 12.515625 11.5 12.710938 11.0625 12.875 C 11.035156 12.886719 11.023438 12.917969 11.035156 12.945312 C 11.277344 13.410156 11.550781 13.851562 11.851562 14.273438 C 11.863281 14.289062 11.886719 14.296875 11.910156 14.292969 C 13.214844 13.886719 14.542969 13.277344 15.910156 12.277344 C 15.921875 12.265625 15.929688 12.253906 15.929688 12.238281 C 16.265625 8.792969 15.371094 5.800781 13.566406 3.144531 C 13.5625 3.136719 13.554688 3.128906 13.542969 3.128906 Z M 5.347656 10.421875 C 4.558594 10.421875 3.910156 9.699219 3.910156 8.8125 C 3.910156 7.925781 4.546875 7.203125 5.347656 7.203125 C 6.152344 7.203125 6.796875 7.933594 6.785156 8.8125 C 6.785156 9.699219 6.148438 10.421875 5.347656 10.421875 Z M 10.664062 10.421875 C 9.875 10.421875 9.226562 9.699219 9.226562 8.8125 C 9.226562 7.925781 9.863281 7.203125 10.664062 7.203125 C 11.46875 7.203125 12.113281 7.933594 12.101562 8.8125 C 12.101562 9.699219 11.46875 10.421875 10.664062 10.421875 Z M 10.664062 10.421875"
+                  />
+                </g>
+              </svg>
+              <span>Discord</span>
+            </span>
+          </a>
+          <a
+            class="navbar-item has-text-light"
+            href="https://twitter.com/DiseaseAPI"
+            target="_blank"
+          >
+            <span>
+              <svg
+                class="navIcon"
+                xmlns="http://www.w3.org/2000/svg"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                aria-hidden="true"
+                focusable="false"
+                width="1em"
+                height="1em"
+                style="
+                  -ms-transform: rotate(360deg);
+                  -webkit-transform: rotate(360deg);
+                  transform: rotate(360deg);
+                "
+                preserveAspectRatio="xMidYMid meet"
+                viewBox="0 0 24 24"
+              >
+                <g fill="none">
+                  <path
+                    d="M23.643 4.937c-.835.37-1.732.62-2.675.733a4.67 4.67 0 0 0 2.048-2.578a9.3 9.3 0 0 1-2.958 1.13a4.66 4.66 0 0 0-7.938 4.25a13.229 13.229 0 0 1-9.602-4.868c-.4.69-.63 1.49-.63 2.342A4.66 4.66 0 0 0 3.96 9.824a4.647 4.647 0 0 1-2.11-.583v.06a4.66 4.66 0 0 0 3.737 4.568a4.692 4.692 0 0 1-2.104.08a4.661 4.661 0 0 0 4.352 3.234a9.348 9.348 0 0 1-5.786 1.995a9.5 9.5 0 0 1-1.112-.065a13.175 13.175 0 0 0 7.14 2.093c8.57 0 13.255-7.098 13.255-13.254c0-.2-.005-.402-.014-.602a9.47 9.47 0 0 0 2.323-2.41l.002-.003z"
+                    fill="currentColor"
+                  />
+                </g>
+              </svg>
+              <span>Twitter</span>
+            </span>
+          </a>
+        </div>
+      </div>
+      <a
+        role="button"
+        class="navbar-burger has-text-light"
+        data-target="navMenu"
+        aria-label="menu"
+        aria-expanded="false"
+      >
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </a>
+    </div>
+    <header
+      class="hero"
+      style="
+        background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)),
+          url(/assets/img/rona.jpg);
+        background-size: cover;
+        z-index: 10;
+      "
+    >
+      <div class="hero-body">
+        <div class="container has-text-white" id="titleBig">
+          <h1 class="title is-1 has-text-white">
+            disease.sh - Open Disease Data API
+          </h1>
+          <h3 class="subtitle is-3 has-text-grey-lighter">
+            100,000,000,000+ Requests Served to Date
+          </h3>
+          <!-- <div class="columns my-6 pt-6 is-justify-content-center">
+            <a href="https://disease.sh/docs/" class="button py-5 mr-4">
+              <i class="fas fa-book is-size-4 mr-3"></i>
+              <h4 class="title is-4">Docs</h4>
+            </a>
+            <a
+              href="https://app.getpostman.com/run-collection/11144369-e27366d6-7699-46f4-b58e-2b2b2e637be5-Szf6Z9B3"
+              class="button py-5"
+            >
+              <img src="./postman.png" alt="" width="30px" class="mr-3" />
+              <h4 class="title is-4">Postman</h4>
+            </a>
+          </div> -->
+        </div>
+      </div>
+    </header>
+
+    <section class="section">
+      <div class="container">
+        <h3 class="title is-3">Examples</h3>
+        <div class="tabs">
+          <ul>
+            <li class="is-active">
+              <a id="exampleHistory">COVID-19 History</a>
+            </li>
+            <li><a id="exampleWorldwide">COVID-19 Worldwide</a></li>
+            <li><a id="exampleUsa">COVID-19 USA</a></li>
+            <li><a id="exampleVaccines">COVID-19 Vaccines Worldwide</a></li>
+          </ul>
+        </div>
+        <p class="mb-1">Request URL</p>
+        <pre><a id="requestUrl" target="_blank"></a></pre>
+        <div class="columns">
+          <div class="column is-one-third">
+            <p class="mt-4 mb-1">Response</p>
+            <pre style="height: 400px">
+            <div id="response"></div></pre>
+          </div>
+          <div class="column">
+            <div id="chart" class="mt-6 pl-4"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="container">
+      <hr />
+    </div>
+
+    <section class="section">
+      <div class="container">
+        <h3 class="title is-3">Features</h3>
+        <p style="max-width: 600px">
+          Build anything from console widgets to mobile applications, with our
+          free and easy to use API. We provide data on current global outbreaks,
+          including COVID-19 and Influenza.
+        </p>
+        <div class="columns my-5">
+          <div class="card column m-4">
+            <div class="card-content">
+              <h4 class="title is-4">
+                <svg
+                  class="icon mr-2 has-text-success"
+                  aria-hidden="true"
+                  focusable="false"
+                  width="1em"
+                  height="1em"
+                  data-icon="dollar-sign"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 288 512"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M209.2 233.4l-108-31.6C88.7 198.2 80 186.5 80 173.5c0-16.3 13.2-29.5 29.5-29.5h66.3c12.2 0 24.2 3.7 34.2 10.5 6.1 4.1 14.3 3.1 19.5-2l34.8-34c7.1-6.9 6.1-18.4-1.8-24.5C238 74.8 207.4 64.1 176 64V16c0-8.8-7.2-16-16-16h-32c-8.8 0-16 7.2-16 16v48h-2.5C45.8 64-5.4 118.7.5 183.6c4.2 46.1 39.4 83.6 83.8 96.6l102.5 30c12.5 3.7 21.2 15.3 21.2 28.3 0 16.3-13.2 29.5-29.5 29.5h-66.3C100 368 88 364.3 78 357.5c-6.1-4.1-14.3-3.1-19.5 2l-34.8 34c-7.1 6.9-6.1 18.4 1.8 24.5 24.5 19.2 55.1 29.9 86.5 30v48c0 8.8 7.2 16 16 16h32c8.8 0 16-7.2 16-16v-48.2c46.6-.9 90.3-28.6 105.7-72.7 21.5-61.6-14.6-124.8-72.5-141.7z"
+                  ></path></svg
+                >Free
+              </h4>
+              <p>
+                Our services are free to use, and have a 100/100 page insight
+                performance score.
+              </p>
+            </div>
+          </div>
+
+          <div class="card column m-4">
+            <div class="card-content">
+              <h4 class="title is-4">
+                <svg
+                  class="icon mr-3 has-text-link"
+                  aria-hidden="true"
+                  focusable="false"
+                  width="1em"
+                  height="1em"
+                  data-icon="dollar-sign"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 512 512"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M448 73.143v45.714C448 159.143 347.667 192 224 192S0 159.143 0 118.857V73.143C0 32.857 100.333 0 224 0s224 32.857 224 73.143zM448 176v102.857C448 319.143 347.667 352 224 352S0 319.143 0 278.857V176c48.125 33.143 136.208 48.572 224 48.572S399.874 209.143 448 176zm0 160v102.857C448 479.143 347.667 512 224 512S0 479.143 0 438.857V336c48.125 33.143 136.208 48.572 224 48.572S399.874 369.143 448 336z"
+                  ></path></svg
+                >Multi-Source
+              </h4>
+              <p>
+                We source data from multiple places to give you a comprehensive
+                view. A full list of sources can be found
+                <a
+                  href="https://github.com/disease-sh/api/blob/master/README.md#sources"
+                  target="_blank"
+                  >here</a
+                >.
+              </p>
+            </div>
+          </div>
+
+          <div class="card column m-4">
+            <div class="card-content">
+              <h4 class="title is-4">
+                <svg
+                  class="icon mr-3 has-text-primary"
+                  aria-hidden="true"
+                  focusable="false"
+                  width="1em"
+                  height="1em"
+                  data-icon="dollar-sign"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 550 512"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M440.65 12.57l4 82.77A247.16 247.16 0 0 0 255.83 8C134.73 8 33.91 94.92 12.29 209.82A12 12 0 0 0 24.09 224h49.05a12 12 0 0 0 11.67-9.26 175.91 175.91 0 0 1 317-56.94l-101.46-4.86a12 12 0 0 0-12.57 12v47.41a12 12 0 0 0 12 12H500a12 12 0 0 0 12-12V12a12 12 0 0 0-12-12h-47.37a12 12 0 0 0-11.98 12.57zM255.83 432a175.61 175.61 0 0 1-146-77.8l101.8 4.87a12 12 0 0 0 12.57-12v-47.4a12 12 0 0 0-12-12H12a12 12 0 0 0-12 12V500a12 12 0 0 0 12 12h47.35a12 12 0 0 0 12-12.6l-4.15-82.57A247.17 247.17 0 0 0 255.83 504c121.11 0 221.93-86.92 243.55-201.82a12 12 0 0 0-11.8-14.18h-49.05a12 12 0 0 0-11.67 9.26A175.86 175.86 0 0 1 255.83 432z"
+                  ></path></svg
+                >Up to Date
+              </h4>
+              <p>
+                We update our data as soon as our sources do. The whole process
+                is automated, so you will always get the newest data.
+              </p>
+            </div>
+          </div>
+
+          <div class="card column m-4">
+            <div class="card-content">
+              <h4 class="title is-4">
+                <svg
+                  class="icon mr-3 has-text-danger"
+                  aria-hidden="true"
+                  focusable="false"
+                  width="1em"
+                  height="1em"
+                  data-icon="dollar-sign"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 650 512"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M278.9 511.5l-61-17.7c-6.4-1.8-10-8.5-8.2-14.9L346.2 8.7c1.8-6.4 8.5-10 14.9-8.2l61 17.7c6.4 1.8 10 8.5 8.2 14.9L293.8 503.3c-1.9 6.4-8.5 10.1-14.9 8.2zm-114-112.2l43.5-46.4c4.6-4.9 4.3-12.7-.8-17.2L117 256l90.6-79.7c5.1-4.5 5.5-12.3.8-17.2l-43.5-46.4c-4.5-4.8-12.1-5.1-17-.5L3.8 247.2c-5.1 4.7-5.1 12.8 0 17.5l144.1 135.1c4.9 4.6 12.5 4.4 17-.5zm327.2.6l144.1-135.1c5.1-4.7 5.1-12.8 0-17.5L492.1 112.1c-4.8-4.5-12.4-4.3-17 .5L431.6 159c-4.6 4.9-4.3 12.7.8 17.2L523 256l-90.6 79.7c-5.1 4.5-5.5 12.3-.8 17.2l43.5 46.4c4.5 4.9 12.1 5.1 17 .6z"
+                  ></path></svg
+                >JSON Formatted
+              </h4>
+              <p>
+                Our responses are served in JSON format, making for easy and
+                reliable integration to your service.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="container">
+      <hr />
+    </div>
+
+    <section class="section mb-6">
+      <div class="container">
+        <center>
+          <div class="title is-3">Use it now</div>
+          <a
+            class="button is-link is-large mr-1 mb-3"
+            href="https://disease.sh/docs/"
+          >
+            <span>
+              <span>View</span>
+              <strong>docs</strong>
+            </span>
+          </a>
+          <a
+            class="button is-light is-large"
+            href="https://app.getpostman.com/run-collection/11144369-e27366d6-7699-46f4-b58e-2b2b2e637be5-Szf6Z9B3"
+            target="_blank"
+          >
+            <span>
+              <span>View on</span>
+              <strong>Postman</strong>
+            </span>
+          </a>
+        </center>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="content has-text-centered">
+        <div class="title is-5">🎉 Special thanks to 🎉</div>
+        <a href="https://pufler.dev" target="_blank" class="mr-3">Julian Pufler</a>
+        <a href="https://github.com/ebwinters" target="_blank" class="mr-3">Ethan Winters</a>
+        <a href="https://ravy.dev/mint" target="_blank" class="mr-3">mint</a>
+        <a
+          href="https://github.com/disease-sh/api/blob/master/TERMS.md"
+          style="display: block"
+          class="mt-6"
+          target="_blank"
+          >Terms of Service</a
+        >
+      </div>
+    </footer>
+
+    <article
+      class="message m-5 is-hidden"
+      style="position: fixed; bottom: 0; right: 0"
+      id="newsletter"
+    >
+      <div class="message-header">
+        <p>Are you a developer?</p>
+        <button
+          class="delete"
+          s
+          aria-label="delete"
+          id="newsletterClose"
+        ></button>
+      </div>
+      <div class="message-body">
+        <p class="mb-3" id="newsletterMessage">
+          Join our API Newsletter to stay updated!
+        </p>
+        <form id="newsletterForm">
+          <div class="field has-addons">
+            <div class="control">
+              <input
+                class="input"
+                type="text"
+                placeholder="your-email@domain.com"
+                name="email"
+                id="email"
+              />
+            </div>
+            <div class="control">
+              <button
+                type="submit"
+                class="button is-dark"
+                id="newsletterFormBtn"
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </article>
+    <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+    <script src="./assets/js/index.js" type="module"></script>
+  </body>
+</html>

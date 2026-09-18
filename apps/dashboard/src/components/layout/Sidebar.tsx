@@ -7,6 +7,7 @@ import {
   Layers2,
   Sun,
   Moon,
+  GitCommitHorizontal,
 
 } from 'lucide-react';
 import { type PageId, type NavItemData } from '../../types';
@@ -49,7 +50,7 @@ const sidebarGroups: SidebarGroup[] = [
     label: "OBSERVABILITY",
     items: [
       { id: "traces", label: "Traces", icon: Activity },
-      // { id: "events", label: "Events", icon: List },
+      { id: "changes", label: "Files changes", icon: GitCommitHorizontal },
     ]
   }
 ];
@@ -119,7 +120,7 @@ export function Sidebar({ currentPage, onNavigate, onToggleAssistant, isAssistan
           }}
         >
           <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-          v0.1.4
+          v0.2.4
         </div>
       </div>
 

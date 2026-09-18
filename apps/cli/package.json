@@ -1,6 +1,6 @@
 {
   "name": "jetic-cli",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "AI-Native API Behavior Testing & Discovery Tool — CLI and Local Studio Dashboard",
   "main": "dist/index.js",
   "bin": {

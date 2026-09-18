@@ -1,0 +1,41 @@
+services:
+  redis:
+    restart: unless-stopped
+    env_file: .env
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--requirepass",
+        "${REDIS_PASSWORD}",
+        "--port",
+        "${REDIS_PORT}",
+      ]
+    volumes:
+      - redis-data:/data
+
+  scraper:
+    image: novelcovid/novelcovid-api:latest
+    restart: unless-stopped
+    command: ["npm", "run", "start:scraper"]
+    environment: 
+      - DOCKER=true
+    env_file:
+      - .env
+    depends_on:
+      - redis
+
+  app:
+    image: novelcovid/novelcovid-api:latest
+    restart: unless-stopped
+    container_name: covid-api-server
+    command: ["npm", "start"]
+    environment: 
+      - DOCKER=true
+    env_file:
+      - .env
+    ports:
+      - "${SERVER_PORT}:${SERVER_PORT}"
+    depends_on:
+      - scraper
