@@ -36,14 +36,14 @@ function SectionHeader({
   description?: string;
 }) {
   return (
-    <div className="flex items-start gap-3 pb-4 border-b border-white/10">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
+    <div className="flex items-start gap-3 pb-4 border-b theme-border">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border theme-border theme-bg-overlay">
         <Icon className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
       </div>
       <div>
-        <p className="text-[13.5px] font-medium text-white">{label}</p>
+        <p className="text-[13.5px] font-medium theme-text-primary">{label}</p>
         {description && (
-          <p className="mt-0.5 text-[11px] text-zinc-500">{description}</p>
+          <p className="mt-0.5 text-[11px] theme-text-muted">{description}</p>
         )}
       </div>
     </div>
@@ -60,11 +60,11 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-3 border-b border-white/[0.06] last:border-0">
+    <div className="flex items-center justify-between gap-4 py-3 border-b theme-border last:border-0">
       <div className="min-w-0">
-        <p className="text-[13px] text-zinc-200">{label}</p>
+        <p className="text-[13px] theme-text-primary">{label}</p>
         {description && (
-          <p className="text-[11px] text-zinc-500 mt-0.5">{description}</p>
+          <p className="text-[11px] theme-text-muted mt-0.5">{description}</p>
         )}
       </div>
       <div className="shrink-0">{children}</div>
@@ -114,7 +114,7 @@ function TextInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className={`w-56 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[12px] text-zinc-200 outline-none focus:border-blue-500/50 focus:bg-white/[0.05] placeholder-zinc-600 transition-colors ${mono ? 'font-mono' : ''
+      className={`w-56 rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 text-[12px] theme-text-primary outline-none focus:border-blue-500/50 focus:theme-bg-overlay-md placeholder:theme-text-faint transition-colors ${mono ? 'font-mono' : ''
         }`}
     />
   );
@@ -133,7 +133,7 @@ function SelectInput({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 text-[12px] text-zinc-200 outline-none focus:border-blue-500/50 transition-colors"
+      className="rounded-lg border theme-border theme-bg-surface px-3 py-1.5 text-[12px] theme-text-primary outline-none focus:border-blue-500/50 transition-colors"
     >
       {options.map((o) => (
         <option key={o} value={o}>
@@ -296,10 +296,10 @@ function EnvironmentsSection({ model }: { model: SettingsData | null }) {
       <Card>
         <div className="space-y-2">
           <div className="flex items-center gap-4 px-1 mb-2">
-            <p className="w-24 text-[10px] uppercase tracking-wider text-zinc-600 font-semibold">
+            <p className="w-24 text-[10px] uppercase tracking-wider theme-text-faint font-semibold">
               Name
             </p>
-            <p className="flex-1 text-[10px] uppercase tracking-wider text-zinc-600 font-semibold">
+            <p className="flex-1 text-[10px] uppercase tracking-wider theme-text-faint font-semibold">
               Base URL
             </p>
           </div>
@@ -309,17 +309,17 @@ function EnvironmentsSection({ model }: { model: SettingsData | null }) {
                 value={env.name}
                 onChange={(e) => updateEnv(i, 'name', e.target.value)}
                 placeholder="local"
-                className="w-24 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[12px] text-zinc-200 outline-none focus:border-blue-500/50 focus:bg-white/[0.05] placeholder-zinc-600 transition-colors"
+                className="w-24 rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 text-[12px] theme-text-primary outline-none focus:border-blue-500/50 focus:theme-bg-overlay-md placeholder:theme-text-faint transition-colors"
               />
               <input
                 value={env.baseUrl}
                 onChange={(e) => updateEnv(i, 'baseUrl', e.target.value)}
                 placeholder="http://localhost:3000"
-                className="flex-1 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 font-mono text-[12px] text-zinc-200 outline-none focus:border-blue-500/50 focus:bg-white/[0.05] placeholder-zinc-600 transition-colors"
+                className="flex-1 rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 font-mono text-[12px] theme-text-primary outline-none focus:border-blue-500/50 focus:theme-bg-overlay-md placeholder:theme-text-faint transition-colors"
               />
               <button
                 onClick={() => removeEnv(i)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-zinc-500 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-colors"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border theme-border theme-bg-overlay theme-text-muted hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-colors"
               >
                 <X className="h-3.5 w-3.5" strokeWidth={2} />
               </button>
@@ -342,11 +342,11 @@ function EnvironmentsSection({ model }: { model: SettingsData | null }) {
         </div>
       </Card>
 
-      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 flex items-start gap-2.5">
+      <div className="rounded-lg border theme-border theme-bg-overlay px-4 py-3 flex items-start gap-2.5">
         <Info className="h-3.5 w-3.5 text-blue-400/70 shrink-0 mt-0.5" strokeWidth={2} />
-        <p className="text-[11px] text-zinc-500">
+        <p className="text-[11px] theme-text-muted">
           The{' '}
-          <code className="text-zinc-300 bg-white/[0.06] px-1 py-0.5 rounded text-[10px]">
+          <code className="theme-text-primary theme-bg-overlay-md px-1 py-0.5 rounded text-[10px]">
             local
           </code>{' '}
           environment is used as the default base URL for simulations and endpoint testing.
@@ -626,8 +626,8 @@ function AdvancedSection({ onClearMemory }: { onClearMemory: () => void }) {
         <div className="p-4 space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-[13px] text-zinc-200">Clear Runtime Memory</p>
-              <p className="text-[11px] text-zinc-500 mt-0.5">
+              <p className="text-[13px] theme-text-primary">Clear Runtime Memory</p>
+              <p className="text-[11px] theme-text-muted mt-0.5">
                 Delete all stored memory keys and values
               </p>
             </div>
@@ -648,10 +648,10 @@ function AdvancedSection({ onClearMemory }: { onClearMemory: () => void }) {
           </div>
           <div className="flex items-center justify-between gap-4 pt-3 border-t border-red-500/10">
             <div>
-              <p className="text-[13px] text-zinc-200">Reset Model</p>
-              <p className="text-[11px] text-zinc-500 mt-0.5">
+              <p className="text-[13px] theme-text-primary">Reset Model</p>
+              <p className="text-[11px] theme-text-muted mt-0.5">
                 Delete{' '}
-                <code className="text-zinc-400 bg-white/[0.06] px-1 py-0.5 rounded text-[10px]">
+                <code className="theme-text-muted theme-bg-overlay-md px-1 py-0.5 rounded text-[10px]">
                   .jetic/model.json
                 </code>{' '}
                 and start fresh
@@ -671,17 +671,17 @@ function AdvancedSection({ onClearMemory }: { onClearMemory: () => void }) {
 
 function AboutBadge() {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 flex items-center gap-3">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
+    <div className="rounded-lg border theme-border theme-bg-overlay p-4 flex items-center gap-3">
+      <div className="flex h-9 w-9 items-center justify-center rounded-lg border theme-border theme-bg-overlay-md">
         <Zap className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
       </div>
       <div>
-        <p className="text-[13.5px] font-medium text-white">Jetic Studio</p>
-        <p className="text-[11px] text-zinc-500">v0.1.0 · Local development dashboard</p>
+        <p className="text-[13.5px] font-medium theme-text-primary">Jetic Studio</p>
+        <p className="text-[11px] theme-text-muted">v0.1.0 · Local development dashboard</p>
       </div>
-      <div className="ml-auto flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-2.5 py-1">
+      <div className="ml-auto flex items-center gap-1.5 rounded-full border theme-border theme-bg-overlay px-2.5 py-1">
         <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
-        <span className="text-[11px] text-zinc-400 font-medium">Running</span>
+        <span className="text-[11px] theme-text-muted font-medium">Running</span>
       </div>
     </div>
   );
@@ -705,8 +705,8 @@ function SettingsNavItem({
       type="button"
       onClick={onClick}
       className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-1.5 text-left text-[13.5px] transition-colors ${active
-        ? 'bg-white/[0.07] text-white font-medium'
-        : 'text-zinc-400 hover:bg-white/[0.03] hover:text-zinc-200'
+        ? 'theme-bg-overlay-md theme-text-primary font-medium'
+        : 'theme-text-muted hover:theme-bg-overlay hover:theme-text-primary'
         }`}
     >
       {active && (
@@ -753,10 +753,10 @@ export function Settings() {
     <div className="flex min-h-full w-full flex-col">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+      <div className="flex items-center justify-between border-b theme-border px-6 py-5">
         <div>
-          <h1 className="text-[15px] font-medium text-white leading-none">Settings</h1>
-          <p className="mt-0.5 text-[11px] text-zinc-500">Configure Jetic Studio</p>
+          <h1 className="text-[15px] font-medium theme-text-primary leading-none">Settings</h1>
+          <p className="mt-0.5 text-[11px] theme-text-muted">Configure Jetic Studio</p>
         </div>
       </div>
 
@@ -764,10 +764,10 @@ export function Settings() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Settings sidebar ── */}
-        <nav className="w-52 shrink-0 border-r border-white/10 bg-black/20 select-none overflow-y-auto p-3 space-y-0.5">
+        <nav className="w-52 shrink-0 border-r theme-border theme-sidebar select-none overflow-y-auto p-3 space-y-0.5">
 
           {/* Group label */}
-          <span className="px-3 pb-1.5 pt-1 block text-[11px] font-semibold tracking-wider text-zinc-500">
+          <span className="px-3 pb-1.5 pt-1 block text-[11px] font-semibold tracking-wider theme-text-muted">
             CONFIGURATION
           </span>
 
@@ -784,10 +784,10 @@ export function Settings() {
           </div>
 
           {/* Version pill */}
-          <div className="hidden pt-4 mt-2 border-t border-white/10">
-            <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-2.5 py-1 w-fit">
+          <div className="hidden pt-4 mt-2 border-t theme-border">
+            <div className="flex items-center gap-1.5 rounded-full border theme-border theme-bg-overlay px-2.5 py-1 w-fit">
               <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-              <span className="text-[11px] font-medium text-zinc-400">v0.1.0</span>
+              <span className="text-[11px] font-medium theme-text-muted">v0.1.0</span>
             </div>
           </div>
         </nav>

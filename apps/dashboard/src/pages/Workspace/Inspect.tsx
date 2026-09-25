@@ -45,7 +45,7 @@ const METHOD_COLORS: Record<string, { bg: string; text: string; border: string }
   PUT: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30' },
   PATCH: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30' },
   DELETE: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30' },
-  HEAD: { bg: 'bg-[var(--bg-overlay-md)]', text: 'text-[var(--text-muted)]', border: 'border-[var(--border)]' },
+  HEAD: { bg: 'theme-bg-overlay-md', text: 'theme-text-muted', border: 'theme-border' },
   OPTIONS: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30' },
 };
 function mc(m: string) {
@@ -89,7 +89,7 @@ function fakeValue(fieldName: string, type: string, format?: string): string {
 function SectionCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <div
-      className={`rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] overflow-hidden ${className}`}
+      className={`rounded-lg border theme-border theme-bg-overlay overflow-hidden ${className}`}
     >
       {children}
     </div>
@@ -108,11 +108,11 @@ function SectionHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2.5 border-b border-[var(--border)] px-4 py-2.5 bg-[var(--bg-overlay-md)]">
+    <div className="flex items-center gap-2.5 border-b theme-border px-4 py-2.5 theme-bg-overlay-md">
       <Icon className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
-      <span className="text-[11px] font-semibold tracking-wider text-[var(--text-faint)] uppercase">{label}</span>
+      <span className="text-[11px] font-semibold tracking-wider theme-text-faint uppercase">{label}</span>
       {count !== undefined && (
-        <span className="rounded-full border border-[var(--border)] bg-[var(--bg-overlay)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">
+        <span className="rounded-full border theme-border theme-bg-overlay px-2 py-0.5 text-[10px] theme-text-muted">
           {count}
         </span>
       )}
@@ -171,18 +171,18 @@ function SourcePanel({ endpoint }: { endpoint: Endpoint }) {
   return (
     <SectionCard>
       {/* Header */}
-      <div className="flex items-center gap-2.5 border-b border-[var(--border)] px-4 py-2.5 bg-[var(--bg-overlay-md)]">
+      <div className="flex items-center gap-2.5 border-b theme-border px-4 py-2.5 theme-bg-overlay-md">
         <FileCode2 className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
-        <span className="text-[11px] font-semibold tracking-wider text-[var(--text-faint)] uppercase">Source</span>
-        <span className="ml-2 font-mono text-[11px] text-[var(--text-muted)] truncate">{shortPath}</span>
-        <span className="rounded border border-[var(--border)] bg-[var(--bg-overlay)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)]">
+        <span className="text-[11px] font-semibold tracking-wider theme-text-faint uppercase">Source</span>
+        <span className="ml-2 font-mono text-[11px] theme-text-muted truncate">{shortPath}</span>
+        <span className="rounded border theme-border theme-bg-overlay px-1.5 py-0.5 font-mono text-[10px] theme-text">
           :{endpoint.source.line}
         </span>
         <button
           type="button"
           onClick={load}
           disabled={loading}
-          className="ml-auto flex h-6 w-6 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] text-[var(--text-muted)] hover:bg-[var(--bg-overlay-md)] hover:text-[var(--text-secondary)] transition-colors hover:cursor-pointer"
+          className="ml-auto flex h-6 w-6 items-center justify-center rounded-lg border theme-border theme-bg-overlay theme-text-muted hover:theme-bg-overlay-md hover:theme-text transition-colors hover:cursor-pointer"
         >
           <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} strokeWidth={2} />
         </button>
@@ -191,7 +191,7 @@ function SourcePanel({ endpoint }: { endpoint: Endpoint }) {
       {/* Body */}
       <div className="relative bg-[var(--sidebar-bg)]">
         {loading && (
-          <div className="flex items-center gap-2 px-4 py-4 text-[11px] text-[var(--text-muted)]">
+          <div className="flex items-center gap-2 px-4 py-4 text-[11px] theme-text-muted">
             <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} /> Loading source…
           </div>
         )}
@@ -209,15 +209,15 @@ function SourcePanel({ endpoint }: { endpoint: Endpoint }) {
                   const lineNum = startLine + i;
                   const isHighlight = i === highlightOffset;
                   return (
-                    <tr key={i} className={isHighlight ? 'bg-blue-500/[0.08]' : 'hover:bg-[var(--bg-overlay-md)]'}>
+                    <tr key={i} className={isHighlight ? 'bg-blue-500/[0.08]' : 'hover:theme-bg-overlay-md'}>
                       <td
-                        className={`select-none w-12 px-3 py-0 text-right font-mono text-[10px] border-r border-[var(--border)] leading-5 ${isHighlight ? 'text-blue-400' : 'text-[var(--text-faint)]'
+                        className={`select-none w-12 px-3 py-0 text-right font-mono text-[10px] border-r theme-border leading-5 ${isHighlight ? 'text-blue-400' : 'theme-text-faint'
                           }`}
                       >
                         {lineNum}
                       </td>
                       <td
-                        className={`px-4 py-0 font-mono text-[11px] whitespace-pre leading-5 ${isHighlight ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'
+                        className={`px-4 py-0 font-mono text-[11px] whitespace-pre leading-5 ${isHighlight ? 'theme-text-primary' : 'theme-text-muted'
                           }`}
                       >
                         {line || ' '}
@@ -270,7 +270,7 @@ function RelatedFilesPanel({ endpoint }: { endpoint: Endpoint }) {
       {/* Body */}
       <div className="divide-y divide-[var(--border)]">
         {loading && (
-          <div className="flex items-center gap-2 px-4 py-3 text-[11px] text-[var(--text-muted)]">
+          <div className="flex items-center gap-2 px-4 py-3 text-[11px] theme-text-muted">
             <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} /> Resolving files…
           </div>
         )}
@@ -281,25 +281,25 @@ function RelatedFilesPanel({ endpoint }: { endpoint: Endpoint }) {
           </div>
         )}
         {!loading && !err && files.length === 0 && (
-          <p className="px-4 py-4 text-[12px] text-[var(--text-faint)] italic">No related files resolved</p>
+          <p className="px-4 py-4 text-[12px] theme-text-faint italic">No related files resolved</p>
         )}
         {files.map(f => {
           const parts = f.split(/[/\\]/);
           const name = parts.pop() ?? f;
           const dir = parts.slice(-2).join('/');
           const ext = name.split('.').pop() ?? '';
-          const extColor = extColors[ext] ?? 'text-[var(--text-faint)]';
+          const extColor = extColors[ext] ?? 'theme-text-faint';
           return (
             <div
               key={f}
-              className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--bg-overlay-md)] transition-colors"
+              className="flex items-center gap-3 px-4 py-2.5 hover:theme-bg-overlay-md transition-colors"
             >
               <Code2 className={`h-[15px] w-[15px] shrink-0 ${extColor}`} strokeWidth={2} />
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] text-[var(--text-secondary)] truncate">{name}</p>
-                {dir && <p className="text-[10px] text-[var(--text-faint)] truncate font-mono">{dir}</p>}
+                <p className="text-[13px] theme-text truncate">{name}</p>
+                {dir && <p className="text-[10px] theme-text-faint truncate font-mono">{dir}</p>}
               </div>
-              <span className={`shrink-0 rounded border border-[var(--border)] bg-[var(--bg-overlay-md)] px-1.5 py-0.5 text-[10px] font-mono ${extColor}`}>
+              <span className={`shrink-0 rounded border theme-border theme-bg-overlay-md px-1.5 py-0.5 text-[10px] font-mono ${extColor}`}>
                 .{ext}
               </span>
             </div>
@@ -412,19 +412,19 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
     <div className="flex flex-col gap-4">
 
       {/* Endpoint being simulated */}
-      <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] px-3 py-2">
+      <div className="flex items-center gap-2 rounded-lg border theme-border theme-bg-overlay px-3 py-2">
         <MethodChip method={endpoint.method} size="sm" />
-        <code className="font-mono text-[12px] text-[var(--text-secondary)] truncate">{endpoint.path}</code>
+        <code className="font-mono text-[12px] theme-text truncate">{endpoint.path}</code>
       </div>
       <p className='hidden'>{envsLoaded}</p>
       {/* Mode switch — mirrors the sidebar's Dark/Light segmented control */}
-      <div className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-overlay)] p-1">
+      <div className="flex items-center gap-2 rounded-xl border theme-border theme-bg-overlay p-1">
         <button
           type="button"
           onClick={() => setMode('fake')}
           className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-[11px] font-medium transition-all duration-200 hover:cursor-pointer ${mode === 'fake'
             ? 'bg-blue-500/15 text-blue-400 shadow-sm'
-            : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'
+            : 'theme-text-faint hover:theme-text-muted'
             }`}
         >
           <Zap className="h-3 w-3 shrink-0" strokeWidth={2} />
@@ -435,7 +435,7 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
           onClick={() => setMode('real')}
           className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-[11px] font-medium transition-all duration-200 hover:cursor-pointer ${mode === 'real'
             ? 'bg-blue-500/15 text-blue-400 shadow-sm'
-            : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'
+            : 'theme-text-faint hover:theme-text-muted'
             }`}
         >
           <Send className="h-3 w-3 shrink-0" strokeWidth={2} />
@@ -445,9 +445,9 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
 
       {/* Base URL / Environment picker */}
       <div className="space-y-1.5">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">Base URL</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint">Base URL</span>
         {environments.length > 0 ? (
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] overflow-hidden">
+          <div className="rounded-lg border theme-border theme-bg-overlay overflow-hidden">
             {environments.map(env => {
               const isSelected = defaultEnv === env.name;
               return (
@@ -455,18 +455,16 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
                   key={env.name}
                   type="button"
                   onClick={() => { setDefaultEnv(env.name); setBaseUrl(env.baseUrl); }}
-                  className={`group flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:cursor-pointer ${isSelected ? 'bg-blue-500/10' : 'hover:bg-[var(--bg-overlay-md)]'}`}
-                  style={{ borderTop: '1px solid var(--border)' }}
+                  className={`group flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:cursor-pointer border-t theme-border ${isSelected ? 'bg-blue-500/10' : 'hover:theme-bg-overlay-md'}`}
                 >
                   <div
-                    className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors"
-                    style={{ borderColor: isSelected ? '#60a5fa' : 'var(--border)', backgroundColor: isSelected ? '#60a5fa22' : 'transparent' }}
+                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${isSelected ? 'border-blue-400 bg-blue-500/20' : 'theme-border bg-transparent'}`}
                   >
                     {isSelected && <Check className="h-2.5 w-2.5 text-blue-400" strokeWidth={3} />}
                   </div>
-                  <Globe className={`h-3 w-3 shrink-0 ${isSelected ? 'text-blue-400' : 'text-[var(--text-faint)]'}`} strokeWidth={2} />
-                  <span className={`text-[11px] w-14 shrink-0 font-medium ${isSelected ? 'text-blue-400' : 'text-[var(--text-muted)]'}`}>{env.name}</span>
-                  <span className="font-mono text-[11px] text-[var(--text-faint)] truncate">{env.baseUrl}</span>
+                  <Globe className={`h-3 w-3 shrink-0 ${isSelected ? 'text-blue-400' : 'theme-text-faint'}`} strokeWidth={2} />
+                  <span className={`text-[11px] w-14 shrink-0 font-medium ${isSelected ? 'text-blue-400' : 'theme-text-muted'}`}>{env.name}</span>
+                  <span className="font-mono text-[11px] theme-text-faint truncate">{env.baseUrl}</span>
                 </button>
               );
             })}
@@ -475,7 +473,7 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
           <input
             value={baseUrl}
             onChange={e => setBaseUrl(e.target.value)}
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] px-3 py-1.5 font-mono text-[12px] text-[var(--text-primary)] outline-none focus:border-blue-500/50 focus:bg-[var(--bg-overlay-md)] placeholder-[var(--text-faint)] transition-colors"
+            className="w-full rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 font-mono text-[12px] theme-text-primary outline-none focus:border-blue-500/50 focus:theme-bg-overlay-md placeholder-[var(--text-faint)] transition-colors"
             placeholder="http://localhost:3000"
           />
         )}
@@ -484,14 +482,14 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
       {/* Bearer token */}
       {(needsAuth || mode === 'real') && (
         <label className="flex flex-col gap-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] flex items-center gap-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint flex items-center gap-1">
             <Key className="h-3 w-3" strokeWidth={2} /> Bearer Token
           </span>
           <input
             type="password"
             value={bearerToken}
             onChange={e => setBearerToken(e.target.value)}
-            className="w-full rounded-lg border border-amber-500/25 bg-amber-500/[0.04] px-3 py-1.5 font-mono text-[12px] text-[var(--text-primary)] outline-none focus:border-amber-400/50 focus:bg-amber-500/[0.07] placeholder-[var(--text-faint)] transition-colors"
+            className="w-full rounded-lg border border-amber-500/25 bg-amber-500/[0.04] px-3 py-1.5 font-mono text-[12px] theme-text-primary outline-none focus:border-amber-400/50 focus:bg-amber-500/[0.07] placeholder-[var(--text-faint)] transition-colors"
             placeholder="Optional"
           />
         </label>
@@ -500,17 +498,17 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
       {/* Fake data preview */}
       {mode === 'fake' && Object.keys(fields).length > 0 && (
         <div>
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] flex items-center gap-1.5">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider theme-text-faint flex items-center gap-1.5">
             <Zap className="h-3 w-3 text-blue-400" strokeWidth={2} /> Auto-generated body
           </p>
           <div className="space-y-1">
             {Object.entries(fields).map(([name, def]) => (
               <div
                 key={name}
-                className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] px-3 py-2"
+                className="flex items-center gap-2 rounded-lg border theme-border theme-bg-overlay px-3 py-2"
               >
-                <span className="text-[11px] text-[var(--text-secondary)] w-20 truncate shrink-0">{name}</span>
-                <span className="text-[11px] text-[var(--text-faint)] shrink-0">{def.type}</span>
+                <span className="text-[11px] theme-text w-20 truncate shrink-0">{name}</span>
+                <span className="text-[11px] theme-text-faint shrink-0">{def.type}</span>
                 <span className="ml-auto font-mono text-[11px] text-blue-400/80 truncate">
                   {fakeValue(name, def.type, def.format)}
                 </span>
@@ -523,13 +521,13 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
       {/* Real data form */}
       {mode === 'real' && Object.keys(fields).length > 0 && (
         <div>
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] flex items-center gap-1.5">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider theme-text-faint flex items-center gap-1.5">
             <Send className="h-3 w-3 text-blue-400" strokeWidth={2} /> Request body
           </p>
           <div className="space-y-2">
             {Object.entries(fields).map(([name, def]) => (
               <label key={name} className="flex flex-col gap-1">
-                <span className="text-[11px] text-[var(--text-secondary)]">
+                <span className="text-[11px] theme-text">
                   {name}
                   {def.required && <span className="ml-1 text-[10px] text-rose-400">*</span>}
                 </span>
@@ -537,7 +535,7 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
                   value={formValues[name] ?? ''}
                   onChange={e => setFormValues(p => ({ ...p, [name]: e.target.value }))}
                   placeholder={`${def.type}${def.format ? ` (${def.format})` : ''}`}
-                  className="rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] px-3 py-1.5 font-mono text-[12px] text-[var(--text-primary)] outline-none focus:border-blue-500/50 focus:bg-[var(--bg-overlay-md)] placeholder-[var(--text-faint)] transition-colors"
+                  className="rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 font-mono text-[12px] theme-text-primary outline-none focus:border-blue-500/50 focus:theme-bg-overlay-md placeholder-[var(--text-faint)] transition-colors"
                 />
               </label>
             ))}
@@ -547,7 +545,7 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
 
       {/* No body notice */}
       {mode === 'real' && Object.keys(fields).length === 0 && !isPost && (
-        <p className="text-[12px] text-[var(--text-faint)] italic">
+        <p className="text-[12px] theme-text-faint italic">
           No body required for {endpoint.method.toUpperCase()} requests.
         </p>
       )}
@@ -557,7 +555,7 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
         type="button"
         onClick={run}
         disabled={running}
-        className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-blue-500 py-2 text-[12px] font-medium text-white hover:bg-blue-400 disabled:opacity-50 transition-colors hover:cursor-pointer"
+        className="flex w-full items-center justify-center gap-2 rounded-lg border theme-border bg-blue-500 py-2 text-[12px] font-medium text-white hover:bg-blue-400 disabled:opacity-50 transition-colors hover:cursor-pointer"
       >
         {running
           ? <Loader2 className="h-[15px] w-[15px] animate-spin" strokeWidth={2} />
@@ -571,18 +569,18 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
           className={`rounded-lg border overflow-hidden ${statusOk ? 'border-emerald-500/25 bg-emerald-500/[0.05]' : 'border-red-500/25 bg-red-500/[0.05]'
             }`}
         >
-          <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--border)]">
+          <div className="flex items-center gap-2 px-3 py-2.5 border-b theme-border">
             {statusOk
               ? <Check className="h-[15px] w-[15px] text-emerald-400" strokeWidth={2} />
               : <AlertCircle className="h-[15px] w-[15px] text-red-400" strokeWidth={2} />}
             <span className={`text-[12px] font-medium ${statusOk ? 'text-emerald-400' : 'text-red-400'}`}>
               {result.status > 0 ? result.status : 'Error'}
             </span>
-            <span className="text-[11px] text-[var(--text-faint)]">{result.durationMs}ms</span>
+            <span className="text-[11px] theme-text-faint">{result.durationMs}ms</span>
             <button
               type="button"
               onClick={() => setResult(null)}
-              className="ml-auto flex h-6 w-6 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors hover:cursor-pointer"
+              className="ml-auto flex h-6 w-6 items-center justify-center rounded-lg border theme-border theme-bg-overlay theme-text-faint hover:theme-text transition-colors hover:cursor-pointer"
             >
               <X className="h-3 w-3" strokeWidth={2} />
             </button>
@@ -591,7 +589,7 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
             <p className="px-3 py-2.5 text-[12px] text-red-400">{result.error}</p>
           )}
           {!result.error && result.body != null && (
-            <pre className="overflow-auto max-h-72 p-3 text-[11px] text-[var(--text-muted)] whitespace-pre-wrap break-all leading-5">
+            <pre className="overflow-auto max-h-72 p-3 text-[11px] theme-text-muted whitespace-pre-wrap break-all leading-5">
               {typeof result.body === 'string' ? result.body : JSON.stringify(result.body, null, 2)}
             </pre>
           )}
@@ -616,20 +614,20 @@ export const Inspect = ({ endpoint, onBack }: InspectProps) => {
       <div className="flex min-h-full w-full flex-col items-center justify-center gap-5 text-center p-12">
         <div className="relative flex h-16 w-16 items-center justify-center">
           <div className="absolute inset-0 rounded-full bg-blue-500/10 blur-xl" />
-          <div className="relative flex h-16 w-16 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] text-blue-400">
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-lg border theme-border theme-bg-overlay text-blue-400">
             <FileCode2 className="h-7 w-7" strokeWidth={2} />
           </div>
         </div>
         <div>
-          <p className="text-[13.5px] font-medium text-[var(--text-primary)]">No endpoint selected</p>
-          <p className="mt-1 text-[12px] text-[var(--text-muted)]">
+          <p className="text-[13.5px] font-medium theme-text-primary">No endpoint selected</p>
+          <p className="mt-1 text-[12px] theme-text-muted">
             Click <span className="text-blue-400 font-medium">INSPECT</span> on any endpoint in the Model view.
           </p>
         </div>
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] px-4 py-2 text-[12px] text-[var(--text-muted)] hover:bg-[var(--bg-overlay-md)] hover:text-[var(--text-secondary)] transition-colors hover:cursor-pointer"
+          className="flex items-center gap-1.5 rounded-lg border theme-border theme-bg-overlay px-4 py-2 text-[12px] theme-text-muted hover:theme-bg-overlay-md hover:theme-text transition-colors hover:cursor-pointer"
         >
           <ArrowLeft className="h-[15px] w-[15px]" strokeWidth={2} /> Back to Model
         </button>
@@ -654,11 +652,11 @@ export const Inspect = ({ endpoint, onBack }: InspectProps) => {
       <div className="flex min-w-0 flex-1 flex-col">
 
         {/* Header */}
-        <div className="flex items-center gap-4 border-b border-[var(--border)] px-6 py-5">
+        <div className="flex items-center gap-4 border-b theme-border px-6 py-5">
           <button
             type="button"
             onClick={onBack}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] text-[var(--text-muted)] hover:bg-[var(--bg-overlay-md)] hover:text-[var(--text-secondary)] transition-colors hover:cursor-pointer"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border theme-border theme-bg-overlay theme-text-muted hover:theme-bg-overlay-md hover:theme-text transition-colors hover:cursor-pointer"
           >
             <ArrowLeft className="h-[15px] w-[15px]" strokeWidth={2} />
           </button>
@@ -666,9 +664,9 @@ export const Inspect = ({ endpoint, onBack }: InspectProps) => {
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <MethodChip method={endpoint.method} />
             <div className="min-w-0">
-              <h1 className="text-[13.5px] font-medium text-[var(--text-primary)] leading-none truncate">{endpoint.path}</h1>
+              <h1 className="text-[13.5px] font-medium theme-text-primary leading-none truncate">{endpoint.path}</h1>
               {endpoint.handlerName && (
-                <p className="mt-0.5 text-[11px] text-[var(--text-muted)] truncate">{endpoint.handlerName}</p>
+                <p className="mt-0.5 text-[11px] theme-text-muted truncate">{endpoint.handlerName}</p>
               )}
             </div>
           </div>
@@ -681,7 +679,7 @@ export const Inspect = ({ endpoint, onBack }: InspectProps) => {
               </span>
             )}
             {shortSource && (
-              <span className="hidden sm:block font-mono text-[11px] text-[var(--text-faint)] truncate max-w-[200px]">
+              <span className="hidden sm:block font-mono text-[11px] theme-text-faint truncate max-w-[200px]">
                 {shortSource}
               </span>
             )}
@@ -696,39 +694,39 @@ export const Inspect = ({ endpoint, onBack }: InspectProps) => {
             <SectionHeader icon={FileText} label="Details" />
             <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-1.5">Method</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint mb-1.5">Method</p>
                 <MethodChip method={endpoint.method} />
               </div>
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-1.5">Path</p>
-                <code className="font-mono text-[12px] text-[var(--text-secondary)]">{endpoint.path}</code>
+                <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint mb-1.5">Path</p>
+                <code className="font-mono text-[12px] theme-text">{endpoint.path}</code>
               </div>
               {endpoint.handlerName && (
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-1.5">Handler</p>
-                  <code className="font-mono text-[12px] text-[var(--text-muted)]">{endpoint.handlerName}</code>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint mb-1.5">Handler</p>
+                  <code className="font-mono text-[12px] theme-text-muted">{endpoint.handlerName}</code>
                 </div>
               )}
               {endpoint.source && (
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-1.5">Source</p>
-                  <code className="font-mono text-[11px] text-[var(--text-faint)]">{shortSource}</code>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint mb-1.5">Source</p>
+                  <code className="font-mono text-[11px] theme-text-faint">{shortSource}</code>
                 </div>
               )}
               {endpoint.requestBody?.contentType && (
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-1.5">Content-Type</p>
-                  <code className="font-mono text-[11px] text-[var(--text-faint)]">{endpoint.requestBody.contentType}</code>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint mb-1.5">Content-Type</p>
+                  <code className="font-mono text-[11px] theme-text-faint">{endpoint.requestBody.contentType}</code>
                 </div>
               )}
               {hasMiddleware && (
                 <div className="col-span-2 sm:col-span-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-1.5">Middleware</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint mb-1.5">Middleware</p>
                   <div className="flex flex-wrap gap-1.5">
                     {endpoint.middleware!.map((m, i) => (
                       <span
                         key={i}
-                        className="rounded-lg border border-[var(--border)] bg-[var(--bg-overlay-md)] px-2.5 py-0.5 text-[11px] text-[var(--text-secondary)]"
+                        className="rounded-lg border theme-border theme-bg-overlay-md px-2.5 py-0.5 text-[11px] theme-text"
                       >
                         {m.name}
                       </span>
@@ -744,7 +742,7 @@ export const Inspect = ({ endpoint, onBack }: InspectProps) => {
             <SectionCard>
               <SectionHeader icon={Send} label="Request Body" count={Object.keys(fields).length} />
               <div className="p-4 space-y-1.5">
-                <div className="flex items-center gap-4 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">
+                <div className="flex items-center gap-4 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider theme-text-faint">
                   <span className="w-28">Field</span>
                   <span className="w-16">Type</span>
                   <span>Format</span>
@@ -753,14 +751,14 @@ export const Inspect = ({ endpoint, onBack }: InspectProps) => {
                 {Object.entries(fields).map(([name, def]) => (
                   <div
                     key={name}
-                    className="flex items-center gap-4 rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] px-3 py-2 hover:bg-[var(--bg-overlay-md)] transition-colors"
+                    className="flex items-center gap-4 rounded-lg border theme-border theme-bg-overlay px-3 py-2 hover:theme-bg-overlay-md transition-colors"
                   >
-                    <span className="w-28 shrink-0 font-mono text-[12px] text-[var(--text-primary)] truncate">{name}</span>
+                    <span className="w-28 shrink-0 font-mono text-[12px] theme-text-primary truncate">{name}</span>
                     <span className="w-16 shrink-0 text-[11px] text-blue-400">{def.type}</span>
-                    <span className="flex-1 text-[11px] text-[var(--text-faint)]">{def.format ?? '—'}</span>
+                    <span className="flex-1 text-[11px] theme-text-faint">{def.format ?? '—'}</span>
                     {def.required
                       ? <span className="ml-auto shrink-0 rounded border border-rose-500/25 bg-rose-500/10 px-1.5 py-0.5 text-[10px] text-rose-400">required</span>
-                      : <span className="ml-auto shrink-0 text-[10px] text-[var(--text-faint)]">optional</span>}
+                      : <span className="ml-auto shrink-0 text-[10px] theme-text-faint">optional</span>}
                   </div>
                 ))}
               </div>
@@ -788,7 +786,7 @@ export const Inspect = ({ endpoint, onBack }: InspectProps) => {
                           {Object.keys(def.schema).map(k => (
                             <span
                               key={k}
-                              className="rounded border border-[var(--border)] bg-[var(--bg-overlay-md)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-muted)]"
+                              className="rounded border theme-border theme-bg-overlay-md px-1.5 py-0.5 font-mono text-[10px] theme-text-muted"
                             >
                               {k}
                             </span>
@@ -819,10 +817,10 @@ export const Inspect = ({ endpoint, onBack }: InspectProps) => {
       </div>
 
       {/* ══════════════════════ Right: simulate rail ══════════════════════ */}
-      <aside className="hidden lg:flex w-[400px] shrink-0 flex-col border-l border-[var(--border)] bg-[var(--sidebar-bg)]">
-        <div className="flex items-center gap-2.5 border-b border-[var(--border)] px-5 py-[18px]">
+      <aside className="hidden lg:flex w-[400px] shrink-0 flex-col border-l theme-border bg-[var(--sidebar-bg)]">
+        <div className="flex items-center gap-2.5 border-b theme-border px-5 py-[18px]">
           <Zap className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
-          <span className="text-[13.5px] font-medium text-[var(--text-primary)]">Simulate Endpoint</span>
+          <span className="text-[13.5px] font-medium theme-text-primary">Simulate Endpoint</span>
         </div>
         <div className="flex-1 overflow-y-auto p-5">
           <SimulatePanel endpoint={endpoint} />

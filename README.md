@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://avatars.githubusercontent.com/u/275651463?s=200&v=4" alt="Jetic Banner" width="160">
+  <img src="./public/banner.jpg" alt="Jetic Banner" width="full">
 </p>
 
 <h1 align="center">Jetic 🚀</h1>

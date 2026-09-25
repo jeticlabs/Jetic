@@ -136,10 +136,7 @@ function AppInner() {
   };
 
   return (
-    <div
-      className="flex h-screen w-full overflow-hidden antialiased [font-feature-settings:'ss01'] font-sans text-xs transition-colors duration-300"
-      style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-secondary)' }}
-    >
+    <div className="flex h-screen w-full overflow-hidden antialiased [font-feature-settings:'ss01'] font-sans text-xs transition-colors duration-300 theme-bg-base theme-text">
       <Sidebar
         currentPage={currentPage}
         onNavigate={navigateTo}
@@ -149,10 +146,7 @@ function AppInner() {
 
       <div className="flex min-w-0 flex-1 flex-col relative">
 
-        <div
-          className="flex min-h-0 flex-1 overflow-auto transition-colors duration-300"
-          style={{ backgroundColor: 'var(--bg-base)' }}
-        >
+        <div className="flex min-h-0 flex-1 overflow-auto transition-colors duration-300 theme-bg-base">
           {renderPage()}
         </div>
 

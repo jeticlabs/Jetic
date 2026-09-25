@@ -82,12 +82,9 @@ export function ChangesNotification({ onNavigateToChanges }: ChangesNotification
 
   return (
     <div
-      className="fixed bottom-6 right-6 z-[100] w-[420px] max-w-[calc(100vw-3rem)] rounded-xl border p-4 shadow-2xl transition-all duration-300 animate-in slide-in-from-bottom-5 dark:bg-black"
+      className="fixed bottom-6 right-6 z-[100] w-[420px] max-w-[calc(100vw-3rem)] rounded-xl border border-amber-500/35 p-4 shadow-2xl transition-all duration-300 animate-in slide-in-from-bottom-5 theme-sidebar theme-text-primary"
       style={{
-        backgroundColor: 'var(--sidebar-bg)',
-        borderColor: 'rgba(245, 158, 11, 0.35)',
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4), 0 0 15px rgba(245, 158, 11, 0.1)',
-        color: 'var(--text-primary)',
       }}
     >
       {/* Toast Header */}
@@ -97,10 +94,10 @@ export function ChangesNotification({ onNavigateToChanges }: ChangesNotification
             <AlertTriangle className="h-4 w-4" strokeWidth={2} />
           </div>
           <div>
-            <h4 className="text-[13px] font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            <h4 className="text-[13px] font-semibold tracking-tight theme-text-primary">
               Model is not currently in sync with codebase
             </h4>
-            <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-[11px] theme-text-muted">
               Detected <span className="font-medium text-amber-400">{changesCount} change{changesCount > 1 ? 's' : ''}</span> in your codebase.
             </p>
           </div>
@@ -111,8 +108,7 @@ export function ChangesNotification({ onNavigateToChanges }: ChangesNotification
           type="button"
           onClick={() => setIsDismissed(true)}
           title="Cancel"
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-overlay-md)] hover:cursor-pointer"
-          style={{ color: 'var(--text-muted)' }}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-colors theme-text-muted hover:theme-bg-overlay-md hover:cursor-pointer"
         >
           <X className="h-3.5 w-3.5" strokeWidth={2} />
         </button>
@@ -126,12 +122,7 @@ export function ChangesNotification({ onNavigateToChanges }: ChangesNotification
             <span
               key={c.filePath}
               onClick={() => onNavigateToChanges?.()}
-              className="truncate max-w-[130px] rounded px-2 py-0.5 font-mono text-[10.5px] hover:border-amber-500/50 hover:cursor-pointer transition-colors"
-              style={{
-                backgroundColor: 'var(--bg-overlay)',
-                border: '1px solid var(--border)',
-                color: 'var(--text-muted)',
-              }}
+              className="truncate max-w-[130px] rounded px-2 py-0.5 font-mono text-[10.5px] hover:border-amber-500/50 hover:cursor-pointer transition-colors theme-bg-overlay border theme-border theme-text-muted"
               title={c.filePath}
             >
               {fileName}
@@ -141,11 +132,7 @@ export function ChangesNotification({ onNavigateToChanges }: ChangesNotification
         {changesCount > 3 && (
           <span
             onClick={() => onNavigateToChanges?.()}
-            className="rounded px-1.5 py-0.5 text-[10.5px] font-medium hover:cursor-pointer"
-            style={{
-              backgroundColor: 'var(--bg-overlay-md)',
-              color: 'var(--text-faint)',
-            }}
+            className="rounded px-1.5 py-0.5 text-[10.5px] font-medium hover:cursor-pointer theme-bg-overlay-md theme-text-faint"
           >
             +{changesCount - 3} more
           </span>
@@ -153,20 +140,15 @@ export function ChangesNotification({ onNavigateToChanges }: ChangesNotification
       </div>
 
       {/* Rescan prompt block */}
-      <div className="mt-3.5 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
-        <p className="text-[11px] mb-2 font-medium" style={{ color: 'var(--text-muted)' }}>
+      <div className="mt-3.5 pt-3 border-t theme-border">
+        <p className="text-[11px] mb-2 font-medium theme-text-muted">
           Then you need to rescan the codebase:
         </p>
 
         <div
-          className="relative flex items-center justify-between rounded-lg p-2.5 font-mono text-[11px] leading-relaxed group"
-          style={{
-            backgroundColor: 'var(--bg-base)',
-            border: '1px solid var(--border)',
-            color: 'var(--text-secondary)',
-          }}
+          className="relative flex items-center justify-between rounded-lg p-2.5 font-mono text-[11px] leading-relaxed group theme-bg-base border theme-border theme-text"
         >
-          <span className="pr-16 select-all font-mono text-[11px] leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+          <span className="pr-16 select-all font-mono text-[11px] leading-relaxed theme-text-primary">
             {SYNC_PROMPT}
           </span>
 
@@ -174,12 +156,7 @@ export function ChangesNotification({ onNavigateToChanges }: ChangesNotification
             type="button"
             onClick={handleCopyPrompt}
             title="Copy prompt"
-            className="absolute right-2 top-2.5 flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-sans font-medium transition-all shadow-sm hover:cursor-pointer"
-            style={{
-              backgroundColor: copiedPrompt ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-overlay-md)',
-              border: '1px solid var(--border)',
-              color: copiedPrompt ? '#60a5fa' : 'var(--text-muted)',
-            }}
+            className={`absolute right-2 top-2.5 flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-sans font-medium transition-all shadow-sm hover:cursor-pointer border theme-border ${copiedPrompt ? 'bg-blue-500/20 text-blue-400' : 'theme-bg-overlay-md theme-text-muted'}`}
           >
             {copiedPrompt ? (
               <>

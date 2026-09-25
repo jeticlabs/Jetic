@@ -1,39 +1,71 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+
+  /* Brand tokens — theme-aware via the custom properties defined below */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-secondary: var(--brand-secondary);
+  --color-brand-secondary-foreground: var(--brand-secondary-foreground);
+  --color-brand-200: var(--brand-200);
+  --color-landing-foreground: var(--landing-foreground);
+  --color-landing-foreground-200: var(--landing-foreground-200);
 }
 
 /* ─── Dark mode (default) ─────────────────────────────────────────── */
 :root {
-  --bg-base:       #0a0a0a;
-  --bg-surface:    #111111;
-  --bg-elevated:   #161616;
-  --bg-overlay:    rgba(255,255,255,0.03);
-  --bg-overlay-md: rgba(255,255,255,0.06);
-  --border:        rgba(255,255,255,0.08);
-  --border-md:     rgba(255,255,255,0.12);
-  --text-primary:  #ffffff;
-  --text-secondary:#d4d4d8;  /* zinc-300 */
-  --text-muted:    #71717a;  /* zinc-500 */
-  --text-faint:    #3f3f46;  /* zinc-700 */
-  --sidebar-bg:    rgba(0,0,0,0.30);
+  /* base surfaces — from my-styles.css's .dark fd-* tokens */
+  --bg-base:        var(--color-neutral-950);   /* fd-background (dark) */
+  --bg-surface:     hsl(0, 0%, 9.8%);           /* fd-card (dark) */
+  --bg-elevated:    hsl(0, 0%, 11.6%);          /* fd-popover (dark) */
+  --bg-overlay:     hsla(0, 0%, 40.9%, 0.12);   /* derived from fd-accent (dark) */
+  --bg-overlay-md:  hsla(0, 0%, 40.9%, 0.30);   /* fd-accent (dark) */
+  --border:         hsla(0, 0%, 40%, 0.20);     /* fd-border (dark) */
+  --border-md:      hsla(0, 0%, 40%, 0.35);     /* derived, stronger fd-border */
+  --text-primary:   hsl(0, 0%, 92%);            /* fd-foreground (dark) */
+  --text-secondary: hsl(0, 0%, 86.9%);          /* fd-popover-foreground (dark) */
+  --text-muted:     hsla(0, 0%, 70%, 0.8);      /* fd-muted-foreground (dark) */
+  --text-faint:     hsl(0, 0%, 38%);            /* derived, below muted */
+  --sidebar-bg:     hsla(0, 0%, 0%, 0.2);       /* fd-overlay */
+  --ring:           hsl(0, 0%, 54.9%);          /* fd-ring (dark) */
+
+  /* brand — from my-styles.css's .dark overrides */
+  --brand:                      #fff383;
+  --brand-foreground:           black;
+  --brand-secondary:            #fc7744;
+  --brand-secondary-foreground: #521700;
+  --brand-200:                  #fff7c8;
+  --landing-foreground:         #e4e2d0;
+  --landing-foreground-200:     #b7af7e;
 }
 
 /* ─── Light mode ──────────────────────────────────────────────────── */
 html.light {
-  --bg-base:       #f4f4f5;
-  --bg-surface:    #ffffff;
-  --bg-elevated:   #fafafa;
-  --bg-overlay:    rgba(0,0,0,0.03);
-  --bg-overlay-md: rgba(0,0,0,0.06);
-  --border:        rgba(0,0,0,0.10);
-  --border-md:     rgba(0,0,0,0.16);
-  --text-primary:  #09090b;
-  --text-secondary:#27272a;  /* zinc-800 */
-  --text-muted:    #71717a;  /* zinc-500 */
-  --text-faint:    #a1a1aa;  /* zinc-400 */
-  --sidebar-bg:    #ffffff;
+  --bg-base:        hsl(0, 0%, 96%);            /* fd-background */
+  --bg-surface:     hsl(0, 0%, 94.7%);          /* fd-card */
+  --bg-elevated:    hsl(0, 0%, 98%);            /* fd-popover */
+  --bg-overlay:     hsla(0, 0%, 82%, 0.20);     /* derived from fd-accent */
+  --bg-overlay-md:  hsla(0, 0%, 82%, 0.50);     /* fd-accent */
+  --border:         hsla(0, 0%, 80%, 0.50);     /* fd-border */
+  --border-md:      hsla(0, 0%, 80%, 0.75);     /* derived, stronger fd-border */
+  --text-primary:   hsl(0, 0%, 3.9%);           /* fd-foreground */
+  --text-secondary: hsl(0, 0%, 15.1%);          /* fd-popover-foreground */
+  --text-muted:     hsl(0, 0%, 45.1%);          /* fd-muted-foreground */
+  --text-faint:     hsl(0, 0%, 63.9%);          /* fd-ring, doubles as faint text */
+  --sidebar-bg:     hsl(0, 0%, 98%);            /* fd-popover */
+  --ring:           hsl(0, 0%, 63.9%);          /* fd-ring */
+
+  /* brand — from my-styles.css's default (light) values */
+  --brand:                      hsl(26, 73%, 51%);
+  --brand-foreground:           white;
+  --brand-secondary:            #c6bb58;
+  --brand-secondary-foreground: #97890c;
+  --brand-200:                  hsl(33, 100%, 50%);
+  --landing-foreground:         #59592a;
+  --landing-foreground-200:     #a8a866;
 }
 
 /* Apply base background to body */
@@ -44,12 +76,18 @@ body {
 }
 
 /* ─── Theme-aware utility shims ───────────────────────────────────── */
-.theme-bg-base     { background-color: var(--bg-base); }
-.theme-bg-surface  { background-color: var(--bg-surface); }
-.theme-bg-elevated { background-color: var(--bg-elevated); }
-.theme-border      { border-color: var(--border); }
-.theme-text        { color: var(--text-secondary); }
-.theme-text-muted  { color: var(--text-muted); }
-.theme-text-primary{ color: var(--text-primary); }
-.theme-sidebar     { background-color: var(--sidebar-bg); }
+.theme-bg-base      { background-color: var(--bg-base); }
+.theme-bg-surface   { background-color: var(--bg-surface); }
+.theme-bg-elevated  { background-color: var(--bg-elevated); }
+.theme-border       { border-color: var(--border); }
+.theme-border-md    { border-color: var(--border-md); }
+.theme-text         { color: var(--text-secondary); }
+.theme-text-muted   { color: var(--text-muted); }
+.theme-text-primary { color: var(--text-primary); }
+.theme-text-faint   { color: var(--text-faint); }
+.theme-sidebar      { background-color: var(--sidebar-bg); }
+.theme-bg-brand     { background-color: var(--brand); }
+.theme-text-brand   { color: var(--brand); }
+.theme-bg-overlay   { background-color: var(--bg-overlay); }
+.theme-bg-overlay-md{ background-color: var(--bg-overlay-md); }
 

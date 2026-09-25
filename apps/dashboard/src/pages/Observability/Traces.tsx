@@ -46,7 +46,7 @@ const MC: Record<string, { bg: string; text: string; border: string; dot: string
   PUT: { bg: '#422006', text: '#fbbf24', border: '#92400e', dot: '#fbbf24' },
   PATCH: { bg: '#431407', text: '#fb923c', border: '#9a3412', dot: '#fb923c' },
   DELETE: { bg: '#3f0000', text: '#f87171', border: '#991b1b', dot: '#f87171' },
-  HEAD: { bg: '#18181b', text: '#a1a1aa', border: '#3f3f46', dot: '#a1a1aa' },
+  HEAD: { bg: '#18181b', text: 'var(--text-muted)', border: 'var(--text-faint)', dot: 'var(--text-muted)' },
   OPTIONS: { bg: '#2e1065', text: '#c084fc', border: '#6b21a8', dot: '#c084fc' },
 };
 function mc(m: string) { return MC[m.toUpperCase()] ?? MC['GET']; }
@@ -60,7 +60,7 @@ function StepNode({ data }: { data: any }) {
   const borderColor = data.selected ? '#60a5fa'
     : data.passed === true ? '#166534'
       : data.passed === false ? '#991b1b'
-        : '#3f3f46';
+        : 'var(--text-faint)';
 
   return (
     <div
@@ -69,7 +69,7 @@ function StepNode({ data }: { data: any }) {
         width: 260,
         border: `1.5px solid ${borderColor}`,
         borderRadius: 10,
-        background: 'var(--bg-surface, #111)',
+        background: 'var(--bg-surface)',
         cursor: 'pointer',
         boxShadow: data.selected ? '0 0 0 2px rgba(96,165,250,0.4)' : '0 2px 12px rgba(0,0,0,0.4)',
         transition: 'box-shadow 0.15s ease',
@@ -87,7 +87,7 @@ function StepNode({ data }: { data: any }) {
         }}>
           {data.method}
         </span>
-        <span style={{ fontSize: 11, color: '#e4e4e7', fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: 11, color: 'var(--text-primary)', fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {data.path}
         </span>
         {data.status > 0 && (
@@ -100,7 +100,7 @@ function StepNode({ data }: { data: any }) {
       {/* Body: step name + timing + status */}
       <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
         {data.name && (
-          <span style={{ fontSize: 10, color: '#71717a', fontStyle: 'italic' }}>{data.name}</span>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>{data.name}</span>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {/* Pass/fail badge */}
@@ -115,7 +115,7 @@ function StepNode({ data }: { data: any }) {
           </span>
           {/* Duration */}
           {data.durationMs > 0 && (
-            <span style={{ fontSize: 10, color: '#52525b' }}>{data.durationMs}ms</span>
+            <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{data.durationMs}ms</span>
           )}
         </div>
 
@@ -156,7 +156,7 @@ function StepNode({ data }: { data: any }) {
         )}
 
         {/* Click hint */}
-        <span style={{ fontSize: 9, color: '#3f3f46', marginTop: 2 }}>Click for details</span>
+        <span style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 2 }}>Click for details</span>
       </div>
 
       <Handle type="source" position={Position.Bottom} style={{ background: 'transparent', border: 'none' }} />
@@ -182,13 +182,13 @@ function MemoryNode({ data }: { data: any }) {
         <span style={{ fontSize: 10, fontWeight: 600, color: '#a78bfa', letterSpacing: '0.06em' }}>MEMORY</span>
       </div>
       {entries.length === 0 && (
-        <span style={{ fontSize: 9, color: '#52525b' }}>No variables captured</span>
+        <span style={{ fontSize: 9, color: 'var(--text-faint)' }}>No variables captured</span>
       )}
       {entries.map(([key, val]: any) => (
         <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
           <span style={{ fontSize: 10, color: '#c4b5fd', fontFamily: 'monospace' }}>{key}</span>
-          <ArrowRight style={{ width: 10, height: 10, color: '#52525b', flexShrink: 0 }} />
-          <span style={{ fontSize: 9, color: '#a1a1aa', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+          <ArrowRight style={{ width: 10, height: 10, color: 'var(--text-faint)', flexShrink: 0 }} />
+          <span style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
             {String(val).length > 20 ? String(val).slice(0, 20) + '…' : val}
           </span>
         </div>
@@ -276,8 +276,8 @@ function BranchNode({ data }: { data: any }) {
       </span>
       {data.returnsOnComplete && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
-          <RefreshCw style={{ width: 9, height: 9, color: '#71717a' }} />
-          <span style={{ fontSize: 9, color: '#71717a' }}>resumes main flow after</span>
+          <RefreshCw style={{ width: 9, height: 9, color: 'var(--text-muted)' }} />
+          <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>resumes main flow after</span>
         </div>
       )}
       <Handle type="source" position={Position.Right} id="return" style={{ background: 'transparent', border: 'none' }} />
@@ -558,7 +558,7 @@ function TraceGraph({ trace, selectedStep, onSelectStep }: {
       style={{ background: 'transparent' }}
     >
       <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="rgba(255,255,255,0.04)" />
-      <Controls style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8 }} showInteractive={false} />
+      <Controls className='theme-bg-surface border theme-border rounded-lg' showInteractive={false} />
       <MiniMap
         nodeColor={n => {
           if (n.type === 'memory') return 'rgba(167,139,250,0.5)';
@@ -567,7 +567,7 @@ function TraceGraph({ trace, selectedStep, onSelectStep }: {
           if (n.id === 'spine-rail') return 'transparent';
           return (n.data?.passed ? 'rgba(74,222,128,0.5)' : 'rgba(248,113,113,0.5)');
         }}
-        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8 }}
+        className='theme-bg-elevated border theme-border rounded-lg'
         maskColor="rgba(0,0,0,0.4)"
       />
     </ReactFlow>
@@ -609,7 +609,7 @@ function StepDetailDrawer({ step, onClose }: { step: TraceRecord['steps'][number
         <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {step.path}
         </span>
-        <button onClick={onClose} style={{ color: 'var(--text-faint)', display: 'flex', alignItems: 'center' }}>
+        <button onClick={onClose} className='theme-text-faint flex items-center'>
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -634,7 +634,7 @@ function StepDetailDrawer({ step, onClose }: { step: TraceRecord['steps'][number
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
+      <div className='flex border-b theme-border'>
         {(['overview', 'request', 'response', 'vars', 'conditions'] as const).map(t => (
           <button
             key={t}
@@ -854,8 +854,8 @@ function TraceViewer({ trace }: { trace: TraceRecord; onNavigate?: (p: PageId) =
           <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
             <Clock className="h-3 w-3 inline" />
             {new Date(trace.startedAt).toLocaleString()}
-            {trace.baseUrl && <> · <code style={{ color: 'var(--text-faint)' }}>{trace.baseUrl}</code></>}
-            · <span style={{ color: 'var(--text-faint)' }}>{trace.source === 'local-sim' ? 'Simulated locally' : 'Real API run'}</span>
+            {trace.baseUrl && <> · <code className='theme-text-faint'>{trace.baseUrl}</code></>}
+            · <span className='theme-text-faint'>{trace.source === 'local-sim' ? 'Simulated locally' : 'Real API run'}</span>
           </p>
         </div>
 

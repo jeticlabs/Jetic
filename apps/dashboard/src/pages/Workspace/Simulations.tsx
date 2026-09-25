@@ -131,7 +131,7 @@ const METHOD_COLORS: Record<string, { bg: string; text: string; dot: string }> =
   PUT: { bg: 'bg-amber-500/10', text: 'text-amber-400', dot: '#fbbf24' },
   PATCH: { bg: 'bg-orange-500/10', text: 'text-orange-400', dot: '#fb923c' },
   DELETE: { bg: 'bg-red-500/10', text: 'text-red-400', dot: '#f87171' },
-  HEAD: { bg: 'bg-[var(--bg-overlay-md)]', text: 'text-[var(--text-muted)]', dot: '#a1a1aa' },
+  HEAD: { bg: 'theme-bg-overlay-md', text: 'theme-text-muted', dot: 'var(--text-muted)' },
   OPTIONS: { bg: 'bg-purple-500/10', text: 'text-purple-400', dot: '#c084fc' },
 };
 function mc(m: string) { return METHOD_COLORS[m.toUpperCase()] ?? METHOD_COLORS['GET']; }
@@ -303,18 +303,18 @@ function HumanInputDialog({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-sm rounded-xl border border-amber-500/25 bg-[var(--bg-overlay)] shadow-2xl">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)]">
+      <div className="w-full max-w-sm rounded-xl border border-amber-500/25 theme-bg-overlay shadow-2xl">
+        <div className="flex items-center gap-2 px-4 py-3 border-b theme-border">
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
             <User className="h-3.5 w-3.5" strokeWidth={2} />
           </span>
           <div className="min-w-0">
-            <p className="text-[12px] font-medium text-[var(--text-primary)]">{title}</p>
-            {subtitle && <p className="text-[10px] text-[var(--text-faint)] truncate">{subtitle}</p>}
+            <p className="text-[12px] font-medium theme-text-primary">{title}</p>
+            {subtitle && <p className="text-[10px] theme-text-faint truncate">{subtitle}</p>}
           </div>
         </div>
         <div className="space-y-2.5 p-4">
-          <p className="text-[11px] text-[var(--text-muted)]">
+          <p className="text-[11px] theme-text-muted">
             This workflow needs a value only you know. The run stays paused until you answer.
           </p>
           {fields.map(f => (
@@ -327,7 +327,7 @@ function HumanInputDialog({
                 onChange={e => onChange(f.key, e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') onSubmit(); }}
                 placeholder={f.hint ?? `Enter ${f.key}…`}
-                className="h-8 w-full rounded-lg border border-amber-500/30 bg-[var(--bg-overlay-md)] px-2.5 text-[12px] text-[var(--text-primary)] placeholder-[var(--text-faint)] outline-none focus:border-amber-500/70 transition-colors"
+                className="h-8 w-full rounded-lg border border-amber-500/30 theme-bg-overlay-md px-2.5 text-[12px] theme-text-primary placeholder-[var(--text-faint)] outline-none focus:border-amber-500/70 transition-colors"
               />
             </div>
           ))}
@@ -346,7 +346,7 @@ function HumanInputDialog({
               <button
                 type="button"
                 onClick={onCancel}
-                className="flex h-8 items-center gap-1 rounded-lg border border-[var(--border)] px-3 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors hover:cursor-pointer"
+                className="flex h-8 items-center gap-1 rounded-lg border theme-border px-3 text-[11px] theme-text-muted hover:theme-text transition-colors hover:cursor-pointer"
               >
                 <X className="h-3 w-3" strokeWidth={2} /> Cancel run
               </button>
@@ -366,11 +366,11 @@ const NODE_H = 64;
 function StepNode({ data }: { data: any }) {
   const s = mc(data.method);
   const statusColors: Record<StepStatus, string> = {
-    idle: 'border-[var(--border)]',
+    idle: 'theme-border',
     running: 'border-blue-500/60',
     passed: 'border-emerald-500/40',
     failed: 'border-red-500/40',
-    skipped: 'border-[var(--border)]',
+    skipped: 'theme-border',
   };
   const glows: Record<StepStatus, string> = {
     idle: '',
@@ -383,7 +383,7 @@ function StepNode({ data }: { data: any }) {
 
   return (
     <div
-      className={`rounded-lg border bg-[var(--bg-overlay)] flex items-center gap-2.5 px-3 overflow-hidden transition-all duration-300 ${statusColors[status]} ${glows[status]}`}
+      className={`rounded-lg border theme-bg-overlay flex items-center gap-2.5 px-3 overflow-hidden transition-all duration-300 ${statusColors[status]} ${glows[status]}`}
       style={{ width: NODE_W, height: NODE_H }}
     >
       <Handle type="target" position={Position.Top} style={{ background: 'transparent', border: 'none' }} />
@@ -398,21 +398,21 @@ function StepNode({ data }: { data: any }) {
         {status === 'running' && <Loader2 className="h-3.5 w-3.5 text-blue-400 animate-spin" strokeWidth={2} />}
         {status === 'passed' && <Check className="h-3.5 w-3.5 text-emerald-400" strokeWidth={2} />}
         {status === 'failed' && <AlertCircle className="h-3.5 w-3.5 text-red-400" strokeWidth={2} />}
-        {status === 'idle' && <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[var(--border)] text-[8px] font-medium text-[var(--text-faint)]">{data.index + 1}</span>}
-        {status === 'skipped' && <span className="h-3.5 w-3.5 rounded-full border border-[var(--border)] bg-[var(--bg-overlay-md)]" />}
+        {status === 'idle' && <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border theme-border text-[8px] font-medium theme-text-faint">{data.index + 1}</span>}
+        {status === 'skipped' && <span className="h-3.5 w-3.5 rounded-full border theme-border theme-bg-overlay-md" />}
       </div>
 
       <div className="min-w-0 flex-1 pl-0.5">
         <div className="flex items-center gap-1.5 mb-0.5">
           <span className={`text-[9px] font-medium ${s.text}`}>{data.method}</span>
-          <span className="font-mono text-[10px] text-[var(--text-secondary)] truncate">{data.path}</span>
+          <span className="font-mono text-[10px] theme-text truncate">{data.path}</span>
           {data.result && (
             <span className={`ml-auto shrink-0 font-mono text-[9px] ${data.result.passed ? 'text-emerald-400' : 'text-red-400'}`}>
               {data.result.status > 0 ? data.result.status : 'ERR'} · {data.result.durationMs}ms
             </span>
           )}
         </div>
-        <p className="text-[9px] text-[var(--text-faint)] truncate">{data.name}</p>
+        <p className="text-[9px] theme-text-faint truncate">{data.name}</p>
       </div>
 
       <Handle type="source" position={Position.Bottom} style={{ background: 'transparent', border: 'none' }} />
@@ -571,7 +571,7 @@ function SimFlowGraph({ steps, runState }: { steps: WorkflowStep[]; runState: Ru
         maxZoom={2}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--border)" />
-        <Controls showInteractive={false} style={{ background: 'var(--bg-overlay)', border: '1px solid var(--border)' }} />
+        <Controls showInteractive={false} className='theme-bg-overlay border theme-border' />
       </ReactFlow>
     </div>
   );
@@ -588,11 +588,11 @@ function RunLog({ runState, steps, waitingStepIndex }: { runState: RunState; ste
   if (runState.phase === 'idle') return null;
 
   return (
-    <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)]">
+    <div className="mt-3 rounded-lg border theme-border theme-bg-overlay">
       {/* Log header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border)] bg-[var(--bg-overlay-md)]">
-        <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Run Log</span>
-        {runState.baseUrl && <span className="font-mono text-[10px] text-[var(--text-faint)]">→ {runState.baseUrl}</span>}
+      <div className="flex items-center gap-2 px-3 py-2 border-b theme-border theme-bg-overlay-md">
+        <span className="text-[10px] font-semibold theme-text-muted uppercase tracking-wider">Run Log</span>
+        {runState.baseUrl && <span className="font-mono text-[10px] theme-text-faint">→ {runState.baseUrl}</span>}
         <span className="ml-auto flex items-center gap-2 text-[10px]">
           {runState.passed > 0 && <span className="text-emerald-400">{runState.passed} passed</span>}
           {runState.failed > 0 && <span className="text-red-400">{runState.failed} failed</span>}
@@ -605,7 +605,7 @@ function RunLog({ runState, steps, waitingStepIndex }: { runState: RunState; ste
       {/* Log body */}
       <div ref={scrollRef} className="overflow-y-auto max-h-80 font-mono text-[11px] p-3 space-y-1">
         {/* Start line */}
-        <p className="text-[var(--text-faint)]">▶ Starting workflow execution…</p>
+        <p className="theme-text-faint">▶ Starting workflow execution…</p>
 
         {/* Connected server predates {{human:*}} support — say so loudly */}
         {runState.humanUnsupported && (
@@ -620,12 +620,12 @@ function RunLog({ runState, steps, waitingStepIndex }: { runState: RunState; ste
           <p key={`need-${h.key}`} className="text-amber-400">◉ will ask for {`{{human:${h.key}}}`} when reached</p>
         ))}
         {(runState.humanKeys ?? []).filter(h => h.source !== 'prompt').map(h => (
-          <p key={`have-${h.key}`} className="text-[var(--text-faint)]">
+          <p key={`have-${h.key}`} className="theme-text-faint">
             ↳ human {`{{human:${h.key}}}`} ← {HUMAN_SOURCE_LABEL[h.source] ?? h.source} (ready)
           </p>
         ))}
         {(runState.notes ?? []).map((n, ni) => (
-          <p key={`note-${ni}`} className="text-[var(--text-faint)]">{n}</p>
+          <p key={`note-${ni}`} className="theme-text-faint">{n}</p>
         ))}
 
         {runState.stepResults.map((result, i) => {
@@ -638,12 +638,12 @@ function RunLog({ runState, steps, waitingStepIndex }: { runState: RunState; ste
           if (isRunning) {
             return (
               <div key={i}>
-                <div className="flex items-center gap-2 text-[var(--text-muted)]">
+                <div className="flex items-center gap-2 theme-text-muted">
                   <Loader2 className="h-3 w-3 animate-spin text-blue-400" strokeWidth={2} />
-                  <span className="text-[var(--text-faint)]">Step {i + 1}/{steps.length}</span>
+                  <span className="theme-text-faint">Step {i + 1}/{steps.length}</span>
                   <span className={s.text}>{step.method}</span>
-                  <span className="text-[var(--text-secondary)]">{step.path}</span>
-                  <span className="text-[var(--text-faint)]">…</span>
+                  <span className="theme-text">{step.path}</span>
+                  <span className="theme-text-faint">…</span>
                 </div>
                 {waitingStepIndex === i && (
                   <p className="pl-5 text-amber-400">⏳ Waiting for your input — answer the dialog to resume the run.</p>
@@ -661,23 +661,23 @@ function RunLog({ runState, steps, waitingStepIndex }: { runState: RunState; ste
                 <span className={result.passed ? 'text-emerald-400' : 'text-red-400'}>
                   {result.passed ? '✓' : '✗'}
                 </span>
-                <span className="text-[var(--text-faint)]">Step {i + 1}/{steps.length}</span>
+                <span className="theme-text-faint">Step {i + 1}/{steps.length}</span>
                 <span className={`${s.text}`}>{step.method.padEnd(6)}</span>
-                <span className="text-[var(--text-secondary)]">{step.path}</span>
+                <span className="theme-text">{step.path}</span>
                 <span className={`${result.passed ? 'text-emerald-400' : 'text-red-400'}`}>
                   {result.status > 0 ? result.status : 'NO RESPONSE'}
                 </span>
-                <span className="text-[var(--text-faint)]">{result.durationMs}ms</span>
+                <span className="theme-text-faint">{result.durationMs}ms</span>
               </div>
 
               {/* Step name */}
-              {step.name && <p className="pl-5 text-[var(--text-faint)] italic">{step.name}</p>}
+              {step.name && <p className="pl-5 theme-text-faint italic">{step.name}</p>}
 
               {/* Injected headers */}
               {Object.entries(result.injected ?? {}).filter(([k]) => k !== 'Content-Type').map(([k, v]) => (
-                <p key={k} className="pl-5 text-[var(--text-faint)]">
+                <p key={k} className="pl-5 theme-text-faint">
                   ↳ <span className="text-amber-500/80">{k}:</span>{' '}
-                  <span className="text-[var(--text-faint)]">{String(v).length > 60 ? String(v).slice(0, 57) + '…' : v}</span>
+                  <span className="theme-text-faint">{String(v).length > 60 ? String(v).slice(0, 57) + '…' : v}</span>
                 </p>
               ))}
 
@@ -814,7 +814,7 @@ function ConditionEditor({
     onSave(condition);
   };
 
-  const inputCls = 'h-7 rounded-lg border border-[var(--border)] bg-[var(--bg-overlay-md)] px-2 text-[11px] text-[var(--text-primary)] placeholder-[var(--text-faint)] outline-none focus:border-purple-500/60 transition-colors';
+  const inputCls = 'h-7 rounded-lg border theme-border theme-bg-overlay-md px-2 text-[11px] theme-text-primary placeholder-[var(--text-faint)] outline-none focus:border-purple-500/60 transition-colors';
   const selectCls = `${inputCls} cursor-pointer`;
 
   return (
@@ -823,7 +823,7 @@ function ConditionEditor({
       <div className="flex items-center gap-2">
         <Diamond className="h-3 w-3 text-purple-400" strokeWidth={2} />
         <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">Step Condition</span>
-        <span className="text-[10px] text-[var(--text-faint)] ml-1">— evaluated after this step runs</span>
+        <span className="text-[10px] theme-text-faint ml-1">— evaluated after this step runs</span>
         <div className="ml-auto flex items-center gap-1">
           {/* Logic toggle: AND / OR */}
           {(['all', 'any'] as const).map(l => (
@@ -833,7 +833,7 @@ function ConditionEditor({
               onClick={() => setLogic(l)}
               className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors hover:cursor-pointer ${logic === l
                 ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40'
-                : 'bg-[var(--bg-overlay-md)] text-[var(--text-faint)] border border-[var(--border)] hover:text-[var(--text-muted)]'
+                : 'theme-bg-overlay-md theme-text-faint border theme-border hover:theme-text-muted'
                 }`}
             >
               {l === 'all' ? 'AND' : 'OR'}
@@ -885,7 +885,7 @@ function ConditionEditor({
 
             {/* Remove rule */}
             {rules.length > 1 && (
-              <button type="button" onClick={() => removeRule(idx)} className="shrink-0 text-[var(--text-faint)] hover:text-red-400 transition-colors hover:cursor-pointer">
+              <button type="button" onClick={() => removeRule(idx)} className="shrink-0 theme-text-faint hover:text-red-400 transition-colors hover:cursor-pointer">
                 <X className="h-3 w-3" strokeWidth={2} />
               </button>
             )}
@@ -904,21 +904,20 @@ function ConditionEditor({
       {/* onFail action */}
       <div className="flex flex-col gap-2 pt-1 border-t border-purple-500/10">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-[var(--text-faint)] shrink-0">If condition fails →</span>
+          <span className="text-[10px] theme-text-faint shrink-0">If condition fails →</span>
           {(['abort', 'continue', 'switch'] as const).map(action => (
             <button
               key={action}
               type="button"
               onClick={() => setOnFail(action)}
-              className={`px-2 py-0.5 rounded text-[9px] font-medium capitalize transition-colors border hover:cursor-pointer ${
-                onFail === action
+              className={`px-2 py-0.5 rounded text-[9px] font-medium capitalize transition-colors border hover:cursor-pointer ${onFail === action
                   ? action === 'abort'
                     ? 'bg-red-500/20 text-red-400 border-red-500/40'
                     : action === 'continue'
-                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                    : 'bg-blue-500/20 text-blue-400 border-blue-500/40'
-                  : 'bg-[var(--bg-overlay-md)] text-[var(--text-faint)] border-[var(--border)] hover:text-[var(--text-muted)]'
-              }`}
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                      : 'bg-blue-500/20 text-blue-400 border-blue-500/40'
+                  : 'theme-bg-overlay-md theme-text-faint theme-border hover:theme-text-muted'
+                }`}
             >
               {action}
             </button>
@@ -934,12 +933,12 @@ function ConditionEditor({
         </div>
 
         {onFail === 'switch' && (
-          <label className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)] cursor-pointer select-none ml-1">
+          <label className="flex items-center gap-1.5 text-[10px] theme-text-muted cursor-pointer select-none ml-1">
             <input
               type="checkbox"
               checked={returnOnComplete}
               onChange={e => setReturnOnComplete(e.target.checked)}
-              className="rounded border-[var(--border)] bg-[var(--bg-overlay-md)] text-purple-500 focus:ring-0"
+              className="rounded theme-border theme-bg-overlay-md text-purple-500 focus:ring-0"
             />
             <span>Return to main workflow after completing <code className="text-purple-400">{switchSlug || 'sub-workflow'}</code></span>
           </label>
@@ -968,7 +967,7 @@ function ConditionEditor({
         <button
           type="button"
           onClick={onCancel}
-          className="ml-auto flex items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors hover:cursor-pointer"
+          className="ml-auto flex items-center gap-1 rounded-lg border theme-border px-3 py-1 text-[10px] theme-text-muted hover:theme-text transition-colors hover:cursor-pointer"
         >
           <X className="h-3 w-3" strokeWidth={2} /> Cancel
         </button>
@@ -1009,12 +1008,12 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
   const statusIcon = waitingHuman
     ? <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/15 text-amber-400" title="Waiting for your input — answer the dialog to resume"><User className="h-3 w-3 animate-pulse" strokeWidth={2} /></span>
     : {
-    idle: <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border)] text-[9px] text-[var(--text-faint)]">{index + 1}</span>,
-    running: <Loader2 className="h-5 w-5 text-blue-400 animate-spin" strokeWidth={2} />,
-    passed: <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400"><Check className="h-3 w-3" strokeWidth={2} /></span>,
-    failed: <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500/10 text-red-400"><AlertCircle className="h-3 w-3" strokeWidth={2} /></span>,
-    skipped: <span className="h-5 w-5 rounded-full border border-[var(--border)] bg-[var(--bg-overlay-md)]" />,
-  }[status];
+      idle: <span className="flex h-5 w-5 items-center justify-center rounded-full border theme-border text-[9px] theme-text-faint">{index + 1}</span>,
+      running: <Loader2 className="h-5 w-5 text-blue-400 animate-spin" strokeWidth={2} />,
+      passed: <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400"><Check className="h-3 w-3" strokeWidth={2} /></span>,
+      failed: <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500/10 text-red-400"><AlertCircle className="h-3 w-3" strokeWidth={2} /></span>,
+      skipped: <span className="h-5 w-5 rounded-full border theme-border theme-bg-overlay-md" />,
+    }[status];
 
   // Condition summary badge label
   const condSummary = hasCondition && step.condition
@@ -1034,11 +1033,11 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
         <button
           type="button"
           onClick={() => setOpen(o => !o)}
-          className="flex w-full items-center gap-3 px-4 py-2.5 hover:bg-[var(--bg-overlay-md)] transition-colors text-left hover:cursor-pointer"
+          className="flex w-full items-center gap-3 px-4 py-2.5 hover:theme-bg-overlay-md transition-colors text-left hover:cursor-pointer"
         >
           <span className="shrink-0">{statusIcon}</span>
           <MethodChip method={step.method} />
-          <span className="font-mono text-xs text-[var(--text-secondary)] flex-1 truncate">{step.path}</span>
+          <span className="font-mono text-xs theme-text flex-1 truncate">{step.path}</span>
           {result && (
             <span className={`font-mono text-[10px] ${result.passed ? 'text-emerald-400' : 'text-red-400'}`}>
               {result.status > 0 ? result.status : 'ERR'} · {result.durationMs}ms
@@ -1066,19 +1065,19 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
               </span>
             )}
           </span>
-          <span className="text-[var(--text-faint)] shrink-0">{open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</span>
+          <span className="theme-text-faint shrink-0">{open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</span>
         </button>
 
         {open && (
-          <div className="ml-12 mr-4 my-3 space-y-2.5 rounded-lg border-y border-[var(--border)] bg-[var(--bg-overlay)] p-3">
-            {step.description && <p className="text-[11px] text-[var(--text-muted)]">{step.description}</p>}
+          <div className="ml-12 mr-4 my-3 space-y-2.5 rounded-lg border-y theme-border theme-bg-overlay p-3">
+            {step.description && <p className="text-[11px] theme-text-muted">{step.description}</p>}
 
             {result && (
               <div className={`rounded-lg border px-3 py-2 ${result.passed ? 'border-emerald-500/15 bg-emerald-500/[0.05]' : 'border-red-500/15 bg-red-500/[0.05]'}`}>
-                <p className="text-[10px] text-[var(--text-faint)] mb-1 uppercase tracking-wider">Response</p>
+                <p className="text-[10px] theme-text-faint mb-1 uppercase tracking-wider">Response</p>
                 {result.error
                   ? <p className="text-[11px] text-red-400">{result.error}</p>
-                  : <pre className="text-[10px] text-[var(--text-muted)] overflow-auto max-h-24 whitespace-pre-wrap break-all">
+                  : <pre className="text-[10px] theme-text-muted overflow-auto max-h-24 whitespace-pre-wrap break-all">
                     {typeof result.responseBody === 'string'
                       ? result.responseBody.slice(0, 300)
                       : JSON.stringify(result.responseBody, null, 2).slice(0, 300)}
@@ -1089,11 +1088,11 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
 
             {hasBody && (
               <div>
-                <p className="text-[10px] text-[var(--text-faint)] mb-1 uppercase tracking-wider">Request Body</p>
+                <p className="text-[10px] theme-text-faint mb-1 uppercase tracking-wider">Request Body</p>
                 <div className="space-y-1">
                   {Object.entries(step.body!).map(([k, v]) => (
-                    <div key={k} className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-overlay-md)] px-3 py-1.5">
-                      <span className="font-mono text-[10px] text-[var(--text-secondary)]">{k}</span>
+                    <div key={k} className="flex items-center gap-2 rounded-lg border theme-border theme-bg-overlay-md px-3 py-1.5">
+                      <span className="font-mono text-[10px] theme-text">{k}</span>
                       <span className="font-mono text-[10px] text-blue-400/80 truncate">{String(v)}</span>
                     </div>
                   ))}
@@ -1103,13 +1102,13 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
 
             {hasInject && (
               <div>
-                <p className="text-[10px] text-[var(--text-faint)] mb-1 uppercase tracking-wider flex items-center gap-1"><Key className="h-3 w-3" strokeWidth={2} /> Inject</p>
+                <p className="text-[10px] theme-text-faint mb-1 uppercase tracking-wider flex items-center gap-1"><Key className="h-3 w-3" strokeWidth={2} /> Inject</p>
                 <div className="space-y-1">
                   {Object.entries(step.inject!).map(([k, v]) => (
                     <div key={k} className="flex items-center gap-2 rounded-lg bg-amber-500/[0.05] border border-amber-500/15 px-3 py-1.5">
                       <span className="font-mono text-[10px] text-amber-400/80">{k}</span>
-                      <ArrowRight className="h-3 w-3 text-[var(--text-faint)] shrink-0" strokeWidth={2} />
-                      <span className="font-mono text-[10px] text-[var(--text-muted)]">{v}</span>
+                      <ArrowRight className="h-3 w-3 theme-text-faint shrink-0" strokeWidth={2} />
+                      <span className="font-mono text-[10px] theme-text-muted">{v}</span>
                     </div>
                   ))}
                 </div>
@@ -1118,13 +1117,13 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
 
             {hasCapture && (
               <div>
-                <p className="text-[10px] text-[var(--text-faint)] mb-1 uppercase tracking-wider flex items-center gap-1"><Zap className="h-3 w-3" strokeWidth={2} /> Capture</p>
+                <p className="text-[10px] theme-text-faint mb-1 uppercase tracking-wider flex items-center gap-1"><Zap className="h-3 w-3" strokeWidth={2} /> Capture</p>
                 <div className="space-y-1">
                   {Object.entries(step.capture!).map(([k, v]) => (
                     <div key={k} className="flex items-center gap-2 rounded-lg bg-blue-500/[0.05] border border-blue-500/15 px-3 py-1.5">
                       <span className="font-mono text-[10px] text-blue-400">{k}</span>
-                      <ArrowRight className="h-3 w-3 text-[var(--text-faint)] shrink-0" strokeWidth={2} />
-                      <span className="font-mono text-[10px] text-[var(--text-muted)]">{v}</span>
+                      <ArrowRight className="h-3 w-3 theme-text-faint shrink-0" strokeWidth={2} />
+                      <span className="font-mono text-[10px] theme-text-muted">{v}</span>
                     </div>
                   ))}
                 </div>
@@ -1145,7 +1144,7 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
                   <button
                     type="button"
                     onClick={() => setEditingCondition(true)}
-                    className="shrink-0 text-[var(--text-faint)] hover:text-purple-400 transition-colors hover:cursor-pointer"
+                    className="shrink-0 theme-text-faint hover:text-purple-400 transition-colors hover:cursor-pointer"
                   >
                     <Edit2 className="h-3 w-3" strokeWidth={2} />
                   </button>
@@ -1166,7 +1165,7 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
                   <button
                     type="button"
                     onClick={() => setEditingCondition(true)}
-                    className="flex items-center gap-1.5 text-[10px] text-[var(--text-faint)] hover:text-purple-400 transition-colors hover:cursor-pointer"
+                    className="flex items-center gap-1.5 text-[10px] theme-text-faint hover:text-purple-400 transition-colors hover:cursor-pointer"
                   >
                     <Plus className="h-3 w-3" strokeWidth={2} />
                     <Diamond className="h-3 w-3" strokeWidth={2} />
@@ -1802,29 +1801,29 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
       <button
         type="button"
         onClick={() => startRun()}
-        className="absolute -top-2 -right-2 flex items-center gap-1 rounded-full bg-blue-500 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm z-10 hover:bg-blue-400 transition-colors hover:cursor-pointer"
+        className="absolute -top-2 -right-2 flex items-center gap-1 rounded-full theme-bg-brand px-2 py-0.5 text-[10px] font-medium text-[color:var(--brand-foreground)] shadow-sm z-10 hover:opacity-90 transition-colors hover:cursor-pointer"
       >
         <Play size={10} /> Run Workflow
       </button>
 
-      <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] overflow-hidden">
+      <div className="rounded-lg border theme-border theme-bg-overlay overflow-hidden">
         {/* ── Card header ── */}
-        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[var(--border)]">
-          <button type="button" onClick={() => setCollapsed(c => !c)} className="text-blue-400/70 hover:text-blue-400 transition-colors shrink-0 hover:cursor-pointer">
+        <div className="flex items-center gap-2.5 px-4 py-3 border-b theme-border">
+          <button type="button" onClick={() => setCollapsed(c => !c)} className="text-[color:var(--brand)]/70 hover:text-[color:var(--brand)] transition-colors shrink-0 hover:cursor-pointer">
             {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </button>
 
           <div className="flex-1 min-w-0">
-            <p className="text-[var(--text-primary)] truncate">{workflow.name}</p>
+            <p className="theme-text-primary truncate">{workflow.name}</p>
             {workflow.generatedAt && (
-              <p className="flex items-center gap-1 text-[10px] text-[var(--text-faint)] mt-0.5">
+              <p className="flex items-center gap-1 text-[10px] theme-text-faint mt-0.5">
                 <Clock className="h-2.5 w-2.5" strokeWidth={2} />
                 {new Date(workflow.generatedAt).toLocaleString()}
               </p>
             )}
           </div>
 
-          <span className="rounded-full border border-[var(--border)] bg-[var(--bg-overlay-md)] px-2 py-0.5 text-[10px] text-[var(--text-muted)] shrink-0">
+          <span className="rounded-full border theme-border theme-bg-overlay-md px-2 py-0.5 text-[10px] theme-text-muted shrink-0">
             {workflow.steps.length} steps
           </span>
 
@@ -1856,13 +1855,13 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
 
           {/* View toggle — segmented, matches Model page */}
           {!collapsed && (
-            <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--bg-overlay-md)] p-0.5 shrink-0">
+            <div className="flex items-center gap-0.5 rounded-lg border theme-border theme-bg-overlay-md p-0.5 shrink-0">
               {(['list', 'graph'] as const).map(v => (
                 <button
                   type="button"
                   key={v}
                   onClick={() => setView(v)}
-                  className={`flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-colors hover:cursor-pointer ${view === v ? 'bg-blue-500/20 text-blue-400' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
+                  className={`flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-colors hover:cursor-pointer ${view === v ? 'bg-[color:var(--brand)]/20 text-[color:var(--brand)]' : 'theme-text-faint hover:theme-text-muted'}`}
                 >
                   {v === 'list' ? <List className="h-3 w-3" strokeWidth={2} /> : <GitBranch className="h-3 w-3" strokeWidth={2} />}
                   {v.charAt(0).toUpperCase() + v.slice(1)}
@@ -1876,7 +1875,7 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
             <button
               type="button"
               onClick={() => setShowLog(l => !l)}
-              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] transition-colors border border-[var(--border)] hover:cursor-pointer ${showLog ? 'bg-[var(--bg-overlay-md)] text-[var(--text-secondary)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)] bg-[var(--bg-overlay)]'}`}
+              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] transition-colors border theme-border hover:cursor-pointer ${showLog ? 'theme-bg-overlay-md theme-text' : 'theme-text-faint hover:theme-text theme-bg-overlay'}`}
             >
               <LogsIcon className="h-3 w-3" strokeWidth={2} /> Log
             </button>
@@ -1898,7 +1897,7 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
             <button
               type="button"
               onClick={resetRun}
-              className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] px-2.5 py-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors shrink-0 hover:cursor-pointer"
+              className="flex items-center gap-1 rounded-lg border theme-border theme-bg-overlay px-2.5 py-1 text-[10px] theme-text-muted hover:theme-text transition-colors shrink-0 hover:cursor-pointer"
             >
               <RotateCcw className="h-3 w-3" strokeWidth={2} /> Reset
             </button>
@@ -1909,7 +1908,7 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
             <button
               type="button"
               onClick={() => onViewTraces(workflow.name, lastTraceId)}
-              className="flex items-center gap-1 rounded-lg border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 text-[10px] text-blue-400 hover:bg-blue-500/20 transition-colors shrink-0 hover:cursor-pointer"
+              className="flex items-center gap-1 rounded-lg border border-[color:var(--brand)]/30 bg-[color:var(--brand)]/10 px-2.5 py-1 text-[10px] text-[color:var(--brand)] hover:bg-[color:var(--brand)]/20 transition-colors shrink-0 hover:cursor-pointer"
             >
               <Activity className="h-3 w-3" strokeWidth={2} />
               {lastTraceId ? 'View Trace' : 'Traces'}
@@ -1921,7 +1920,7 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
             <button
               type="button"
               onClick={() => startRun()}
-              className="hidden items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-[10px] font-medium text-white hover:bg-blue-400 transition-colors shrink-0 hover:cursor-pointer"
+              className="hidden items-center gap-1.5 rounded-lg theme-bg-brand px-3 py-1.5 text-[10px] font-medium text-[color:var(--brand-foreground)] hover:opacity-90 transition-colors shrink-0 hover:cursor-pointer"
             >
               <Play className="h-3 w-3" strokeWidth={2} />
               {hasResult ? 'Re-run' : 'Run'}
@@ -1947,9 +1946,9 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
           <>
             {/* Environment bar */}
             {environments.length > 0 && (
-              <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-2 bg-[var(--bg-overlay-md)] flex-wrap">
-                <Globe className="h-3 w-3 text-[var(--text-faint)] shrink-0" strokeWidth={2} />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mr-1">Env:</span>
+              <div className="flex items-center gap-2 border-b theme-border px-4 py-2 theme-bg-overlay-md flex-wrap">
+                <Globe className="h-3 w-3 theme-text-faint shrink-0" strokeWidth={2} />
+                <span className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint mr-1">Env:</span>
                 {environments.map(env => {
                   const isSelected = selectedEnv === env.name;
                   return (
@@ -1958,27 +1957,26 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
                       type="button"
                       onClick={() => { setSelectedEnv(env.name); setBaseUrl(env.baseUrl); }}
                       className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-all hover:cursor-pointer ${isSelected
-                        ? 'border-blue-500/40 bg-blue-500/10 text-blue-400'
-                        : 'border-[var(--border)] text-[var(--text-faint)] hover:border-blue-500/20 hover:text-[var(--text-muted)]'
+                        ? 'border-[color:var(--brand)]/40 bg-[color:var(--brand)]/10 text-[color:var(--brand)]'
+                        : 'theme-border theme-text-faint hover:border-[color:var(--brand)]/20 hover:theme-text-muted'
                         }`}
                     >
                       <span
-                        className="h-1.5 w-1.5 rounded-full shrink-0"
-                        style={{ background: isSelected ? '#60a5fa' : 'var(--text-faint)' }}
+                        className={`h-1.5 w-1.5 rounded-full shrink-0 ${isSelected ? 'bg-[color:var(--brand)]' : 'bg-[var(--text-faint)]'}`}
                       />
                       {env.name}
                     </button>
                   );
                 })}
                 {selectedEnv && (
-                  <span className="ml-auto font-mono text-[10px] text-[var(--text-faint)] truncate max-w-[180px]">{baseUrl}</span>
+                  <span className="ml-auto font-mono text-[10px] theme-text-faint truncate max-w-[180px]">{baseUrl}</span>
                 )}
               </div>
             )}
 
             {/* Live log */}
             {showLog && (
-              <div className="border-b border-[var(--border)]">
+              <div className="border-b theme-border">
                 <RunLog runState={runState} steps={workflow.steps} waitingStepIndex={humanPrompt?.stepIndex ?? null} />
               </div>
             )}
@@ -2035,20 +2033,20 @@ function EmptyState() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-5 py-20 text-center">
       <div className="relative flex h-16 w-16 items-center justify-center">
-        <div className="absolute inset-0 rounded-full bg-blue-500/10 blur-xl" />
-        <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-overlay)] text-blue-400">
+        <div className="absolute inset-0 rounded-full bg-[color:var(--brand)]/10 blur-xl" />
+        <div className="relative flex h-16 w-16 items-center justify-center rounded-full border theme-border theme-bg-overlay text-[color:var(--brand)]">
           <Diamond className="h-7 w-7" strokeWidth={2} />
         </div>
       </div>
       <div>
-        <p className="font-medium text-[var(--text-primary)]">No workflows yet</p>
-        <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+        <p className="font-medium theme-text-primary">No workflows yet</p>
+        <p className="mt-1 text-[11px] theme-text-muted">
           Create one with the{' '}
-          <span className="text-[var(--text-secondary)]">+ New Workflow</span> button, or run{' '}
-          <code className="text-[var(--text-secondary)]">jetic simulate workflow --goal "..."</code>
+          <span className="theme-text">+ New Workflow</span> button, or run{' '}
+          <code className="theme-text">jetic simulate workflow --goal "..."</code>
         </p>
-        <p className="mt-1 text-[11px] text-[var(--text-faint)]">
-          Workflows are stored in <code className="text-[var(--text-faint)]">.jetic/workflows/</code>
+        <p className="mt-1 text-[11px] theme-text-faint">
+          Workflows are stored in <code className="theme-text-faint">.jetic/workflows/</code>
         </p>
       </div>
     </div>
@@ -2109,11 +2107,11 @@ export function Simulations({ onViewTraces }: { onViewTraces?: (filter: { workfl
     <div className="flex min-h-full w-full flex-col">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-5 sticky">
+      <div className="flex items-center justify-between border-b theme-border px-6 py-5 sticky">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-[15px] font-medium text-[var(--text-primary)] leading-none">Simulations</h1>
-            <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+            <h1 className="text-[15px] font-medium theme-text-primary leading-none">Simulations</h1>
+            <p className="mt-0.5 text-[11px] theme-text-muted">
               {loading ? 'Loading…' : `${workflows.length} workflow${workflows.length !== 1 ? 's' : ''} found`}
             </p>
           </div>
@@ -2122,8 +2120,8 @@ export function Simulations({ onViewTraces }: { onViewTraces?: (filter: { workfl
         <div className="flex items-center gap-2">
           {/* New Workflow button / inline form */}
           {creating ? (
-            <div className="flex flex-col gap-2 rounded-lg border border-blue-500/20 bg-blue-500/[0.05] p-3 w-80">
-              <div className="flex items-center gap-1.5 text-[10px] text-blue-400 font-medium">
+            <div className="flex flex-col gap-2 rounded-lg border border-[color:var(--brand)]/20 bg-[color:var(--brand)]/[0.05] p-3 w-80">
+              <div className="flex items-center gap-1.5 text-[10px] text-[color:var(--brand)] font-medium">
                 <Zap className="h-3 w-3" strokeWidth={2} /> AI Workflow Generator
               </div>
               <input
@@ -2135,14 +2133,14 @@ export function Simulations({ onViewTraces }: { onViewTraces?: (filter: { workfl
                   if (e.key === 'Escape') resetCreate();
                 }}
                 placeholder="Describe the workflow goal, e.g. Admin creates workspace, invites teacher and logs out"
-                className="h-7 w-full rounded-lg border border-blue-500/30 bg-[var(--bg-overlay-md)] px-2 text-[11px] text-[var(--text-primary)] placeholder-[var(--text-faint)] outline-none focus:border-blue-500/60"
+                className="h-7 w-full rounded-lg border border-[color:var(--brand)]/30 theme-bg-overlay-md px-2 text-[11px] theme-text-primary placeholder-[var(--text-faint)] outline-none focus:border-[color:var(--brand)]/60"
               />
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={handleCreate}
                   disabled={createLoading || !newGoal.trim()}
-                  className="flex h-6 flex-1 items-center justify-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-500/20 px-2 text-[10px] text-blue-400 hover:bg-blue-500/30 transition-colors disabled:opacity-40 hover:cursor-pointer"
+                  className="flex h-6 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--brand)]/40 bg-[color:var(--brand)]/20 px-2 text-[10px] text-[color:var(--brand)] hover:bg-[color:var(--brand)]/30 transition-colors disabled:opacity-40 hover:cursor-pointer"
                 >
                   {createLoading
                     ? <><Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} /> AI generating…</>
@@ -2151,7 +2149,7 @@ export function Simulations({ onViewTraces }: { onViewTraces?: (filter: { workfl
                 <button
                   type="button"
                   onClick={resetCreate}
-                  className="flex h-6 w-6 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors hover:cursor-pointer"
+                  className="flex h-6 w-6 items-center justify-center rounded-lg border theme-border theme-bg-overlay theme-text-muted hover:theme-text transition-colors hover:cursor-pointer"
                 >
                   <X className="h-3 w-3" strokeWidth={2} />
                 </button>
@@ -2162,7 +2160,7 @@ export function Simulations({ onViewTraces }: { onViewTraces?: (filter: { workfl
             <button
               type="button"
               onClick={() => setCreating(true)}
-              className="flex h-6 items-center gap-1.5 rounded-lg border border-blue-500/30 bg-blue-500/10 px-2.5 text-[10px] text-blue-400 hover:bg-blue-500/20 transition-colors hover:cursor-pointer"
+              className="flex h-6 items-center gap-1.5 rounded-lg border border-[color:var(--brand)]/30 bg-[color:var(--brand)]/10 px-2.5 text-[10px] text-[color:var(--brand)] hover:bg-[color:var(--brand)]/20 transition-colors hover:cursor-pointer"
             >
               <Plus className="h-3 w-3" strokeWidth={2} /> New Workflow
             </button>
@@ -2172,7 +2170,7 @@ export function Simulations({ onViewTraces }: { onViewTraces?: (filter: { workfl
             type="button"
             onClick={() => load(true)}
             disabled={refreshing || loading}
-            className="flex h-6 w-6 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)] text-[var(--text-muted)] hover:bg-[var(--bg-overlay-md)] hover:text-[var(--text-secondary)] disabled:opacity-40 transition-all hover:cursor-pointer"
+            className="flex h-6 w-6 items-center justify-center rounded-lg border theme-border theme-bg-overlay theme-text-muted hover:theme-bg-overlay-md hover:theme-text disabled:opacity-40 transition-all hover:cursor-pointer"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} strokeWidth={2} />
           </button>
@@ -2185,7 +2183,7 @@ export function Simulations({ onViewTraces }: { onViewTraces?: (filter: { workfl
         {loading && (
           <div className="space-y-3">
             {[1, 2].map(i => (
-              <div key={i} className="h-16 animate-pulse rounded-lg border border-[var(--border)] bg-[var(--bg-overlay)]" style={{ opacity: 1 - i * 0.3 }} />
+              <div key={i} className="h-16 animate-pulse rounded-lg border theme-border theme-bg-overlay" style={{ opacity: 1 - i * 0.3 }} />
             ))}
           </div>
         )}
@@ -2217,8 +2215,8 @@ export function Simulations({ onViewTraces }: { onViewTraces?: (filter: { workfl
         )}
 
         {!loading && !error && workflows.length > 0 && (
-          <div className="flex items-center gap-1.5 border-t border-[var(--border)] pt-3 text-[10px] text-[var(--text-faint)]">
-            Workflows from <code className="text-[var(--text-faint)]">.jetic/workflows/</code>
+          <div className="flex items-center gap-1.5 border-t theme-border pt-3 text-[10px] theme-text-faint">
+            Workflows from <code className="theme-text-faint">.jetic/workflows/</code>
           </div>
         )}
       </div>

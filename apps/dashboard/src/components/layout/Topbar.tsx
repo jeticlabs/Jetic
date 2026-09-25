@@ -31,15 +31,15 @@ export function Topbar({ currentPage }: { currentPage: PageId }) {
   };
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-6 bg-[#0a0a0a] dark:bg-[#0a0a0a]">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b theme-border theme-bg-base px-6">
       <div className="flex items-center gap-2">
-        <h1 className="text-[15px] font-medium text-white">{formatTitle(currentPage)}</h1>
+        <h1 className="text-[15px] font-medium theme-text-primary">{formatTitle(currentPage)}</h1>
       </div>
       <div className="flex items-center gap-3">
         {/* You can add top bar pills here like Traces / Env status later */}
         <button
           onClick={toggleTheme}
-          className="flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/[0.015] text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200 transition-colors"
+          className="flex h-8 w-8 items-center justify-center rounded-md border theme-border theme-bg-overlay theme-text-muted hover:theme-bg-overlay-md hover:theme-text transition-colors"
           title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
         >
           {theme === 'dark' ? <Sun className="h-4 w-4" strokeWidth={2} /> : <Moon className="h-4 w-4" strokeWidth={2} />}

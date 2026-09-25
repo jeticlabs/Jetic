@@ -96,15 +96,13 @@ function MaskedValue({ value }: { value: string }) {
     >
       {isHovered ? (
         <p
-          className="text-[12px] break-all transition-colors truncate"
-          style={{ color: 'var(--text-secondary)' }}
+          className="text-[12px] break-all transition-colors truncate theme-text"
         >
           {displayVal}
         </p>
       ) : (
         <p
-          className="text-[12px] font-mono tracking-widest select-none"
-          style={{ color: 'var(--text-faint)' }}
+          className="text-[12px] font-mono tracking-widest select-none theme-text-faint"
         >
           ••••••
         </p>
@@ -153,30 +151,24 @@ function AddEntryModal({
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="relative w-full max-w-md rounded-lg p-6 shadow-2xl shadow-black/60"
-        style={{
-          border: '1px solid var(--border)',
-          backgroundColor: 'var(--sidebar-bg)',
-        }}
+        className="relative w-full max-w-md rounded-lg p-6 shadow-2xl shadow-black/60 border theme-border theme-sidebar"
       >
 
         {/* Modal header */}
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div
-              className="flex h-7 w-7 items-center justify-center rounded-lg"
-              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)' }}
+              className="flex h-7 w-7 items-center justify-center rounded-lg border theme-border theme-bg-overlay"
             >
               <Plus className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
             </div>
-            <h2 className="text-[13.5px] font-medium" style={{ color: 'var(--text-primary)' }}>
+            <h2 className="text-[13.5px] font-medium theme-text-primary">
               Add Memory Entry
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:cursor-pointer hover:bg-[var(--bg-overlay-md)] hover:text-[var(--text-secondary)]"
-            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)', color: 'var(--text-muted)' }}
+            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:cursor-pointer hover:theme-bg-overlay-md hover:theme-text border theme-border theme-bg-overlay theme-text-muted"
           >
             <X className="h-[15px] w-[15px]" strokeWidth={2} />
           </button>
@@ -186,8 +178,7 @@ function AddEntryModal({
           {/* Key field */}
           <div>
             <label
-              className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider"
-              style={{ color: 'var(--text-faint)' }}
+              className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider theme-text-faint"
             >
               Key / Identifier
             </label>
@@ -196,28 +187,24 @@ function AddEntryModal({
               value={key}
               onChange={(e) => setKey(e.target.value)}
               placeholder="global:myKey  or  myKey"
-              className="w-full rounded-lg px-3 py-2 text-[12px] outline-none transition-colors focus:border-blue-500/50 focus:bg-[var(--bg-overlay-md)]"
-              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)', color: 'var(--text-primary)' }}
+              className="w-full rounded-lg px-3 py-2 text-[12px] outline-none transition-colors focus:border-blue-500/50 focus:theme-bg-overlay-md border theme-border theme-bg-overlay theme-text-primary"
             />
-            <p className="mt-1.5 text-[10px]" style={{ color: 'var(--text-faint)' }}>
+            <p className="mt-1.5 text-[10px] theme-text-faint">
               Prefix with{' '}
               <code
-                className="rounded px-1 py-0.5 text-[10px]"
-                style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay-md)', color: 'var(--text-muted)' }}
+                className="rounded px-1 py-0.5 text-[10px] border theme-border theme-bg-overlay-md theme-text-muted"
               >
                 scope:
               </code>{' '}
               to organise by scope (e.g.{' '}
               <code
-                className="rounded px-1 py-0.5 text-[10px]"
-                style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay-md)', color: 'var(--text-muted)' }}
+                className="rounded px-1 py-0.5 text-[10px] border theme-border theme-bg-overlay-md theme-text-muted"
               >
                 user:name
               </code>
               ). Defaults to{' '}
               <code
-                className="rounded px-1 py-0.5 text-[10px]"
-                style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay-md)', color: 'var(--text-muted)' }}
+                className="rounded px-1 py-0.5 text-[10px] border theme-border theme-bg-overlay-md theme-text-muted"
               >
                 global
               </code>
@@ -228,8 +215,7 @@ function AddEntryModal({
           {/* Value field */}
           <div>
             <label
-              className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider"
-              style={{ color: 'var(--text-faint)' }}
+              className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider theme-text-faint"
             >
               Value
             </label>
@@ -238,8 +224,7 @@ function AddEntryModal({
               onChange={(e) => setValue(e.target.value)}
               placeholder="Enter a string value…"
               rows={4}
-              className="w-full resize-none rounded-lg px-3 py-2 text-[12px] outline-none transition-colors focus:border-blue-500/50 focus:bg-[var(--bg-overlay-md)]"
-              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)', color: 'var(--text-primary)' }}
+              className="w-full resize-none rounded-lg px-3 py-2 text-[12px] outline-none transition-colors focus:border-blue-500/50 focus:theme-bg-overlay-md border theme-border theme-bg-overlay theme-text-primary"
             />
           </div>
 
@@ -255,8 +240,7 @@ function AddEntryModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-4 py-2 text-[12px] transition-colors hover:cursor-pointer hover:bg-[var(--bg-overlay-md)] hover:text-[var(--text-secondary)]"
-              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)', color: 'var(--text-muted)' }}
+              className="rounded-lg px-4 py-2 text-[12px] transition-colors hover:cursor-pointer hover:theme-bg-overlay-md hover:theme-text border theme-border theme-bg-overlay theme-text-muted"
             >
               Cancel
             </button>
@@ -304,23 +288,20 @@ function AddScopeModal({
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="relative w-full max-w-sm rounded-lg p-6 shadow-2xl shadow-black/60"
-        style={{ border: '1px solid var(--border)', backgroundColor: 'var(--sidebar-bg)' }}
+        className="relative w-full max-w-sm rounded-lg p-6 shadow-2xl shadow-black/60 border theme-border theme-sidebar"
       >
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div
-              className="flex h-7 w-7 items-center justify-center rounded-lg"
-              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)' }}
+              className="flex h-7 w-7 items-center justify-center rounded-lg border theme-border theme-bg-overlay"
             >
               <Plus className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
             </div>
-            <h2 className="text-[13.5px] font-medium" style={{ color: 'var(--text-primary)' }}>Add Scope</h2>
+            <h2 className="text-[13.5px] font-medium theme-text-primary">Add Scope</h2>
           </div>
           <button
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:cursor-pointer hover:bg-[var(--bg-overlay-md)]"
-            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)', color: 'var(--text-muted)' }}
+            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:cursor-pointer hover:theme-bg-overlay-md border theme-border theme-bg-overlay theme-text-muted"
           >
             <X className="h-[15px] w-[15px]" strokeWidth={2} />
           </button>
@@ -328,7 +309,7 @@ function AddScopeModal({
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider theme-text-faint">
               Scope Name
             </label>
             <input
@@ -336,12 +317,11 @@ function AddScopeModal({
               value={name}
               onChange={(e) => { setName(e.target.value); setError(''); }}
               placeholder="e.g. session, user, cart"
-              className="w-full rounded-lg px-3 py-2 text-[12px] outline-none transition-colors focus:border-blue-500/50"
-              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)', color: 'var(--text-primary)' }}
+              className="w-full rounded-lg px-3 py-2 text-[12px] outline-none transition-colors focus:border-blue-500/50 border theme-border theme-bg-overlay theme-text-primary"
             />
-            <p className="mt-1.5 text-[10px]" style={{ color: 'var(--text-faint)' }}>
+            <p className="mt-1.5 text-[10px] theme-text-faint">
               Memory entries under this scope will be keyed as{' '}
-              <code className="rounded px-1 py-0.5 text-[10px]" style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay-md)', color: 'var(--text-muted)' }}>
+              <code className="rounded px-1 py-0.5 text-[10px] border theme-border theme-bg-overlay-md theme-text-muted">
                 {name.trim() ? name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : 'scope'}:key
               </code>
             </p>
@@ -351,8 +331,7 @@ function AddScopeModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-4 py-2 text-[12px] transition-colors hover:cursor-pointer hover:bg-[var(--bg-overlay-md)]"
-              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)', color: 'var(--text-muted)' }}
+              className="rounded-lg px-4 py-2 text-[12px] transition-colors hover:cursor-pointer hover:theme-bg-overlay-md border theme-border theme-bg-overlay theme-text-muted"
             >
               Cancel
             </button>
@@ -386,8 +365,8 @@ const SCOPE_COLORS: Record<string, { border: string; bg: string; dot: string; te
     text: 'text-emerald-400', activeBg: 'bg-emerald-500/15', activeBorder: 'border-emerald-500/40',
   },
   global: {
-    border: 'border-[var(--border)]', bg: 'bg-[var(--bg-overlay)]', dot: 'bg-[var(--text-faint)]',
-    text: 'text-[var(--text-muted)]', activeBg: 'bg-[var(--bg-overlay-md)]', activeBorder: 'border-[var(--border)]',
+    border: 'theme-border', bg: 'theme-bg-overlay', dot: 'bg-[var(--text-faint)]',
+    text: 'theme-text-muted', activeBg: 'theme-bg-overlay-md', activeBorder: 'theme-border',
   },
 };
 const DEFAULT_COLOR = {
@@ -426,7 +405,7 @@ function ScopeCard({
       className={`group relative flex flex-col gap-2 rounded-lg border p-3.5 text-left transition-all duration-200 hover:cursor-pointer ${active ? `${c.activeBg} ${c.activeBorder}` : `${c.border} ${c.bg} hover:${c.activeBg}`}`}
     >
       <div className="flex items-center justify-between">
-        <div className={`flex h-7 w-7 items-center justify-center rounded-lg border ${c.border} bg-[var(--bg-overlay)]`}>
+        <div className={`flex h-7 w-7 items-center justify-center rounded-lg border ${c.border} theme-bg-overlay`}>
           <Icon className={`h-[14px] w-[14px] ${c.text}`} strokeWidth={2} />
         </div>
         {active && (
@@ -437,7 +416,7 @@ function ScopeCard({
       </div>
       <div>
         <p className={`text-[12px] font-medium ${c.text}`}>{scope.label}</p>
-        <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
+        <p className="text-[10px] theme-text-faint">
           {scope.count} {scope.count === 1 ? 'entry' : 'entries'}
         </p>
       </div>
@@ -558,14 +537,13 @@ export function Memory() {
 
       {/* ── Header ── */}
       <div
-        className="flex items-center justify-between px-6 py-5"
-        style={{ borderBottom: '1px solid var(--border)' }}
+        className="flex items-center justify-between px-6 py-5 border-b theme-border"
       >
         <div>
-          <h1 className="text-[15px] font-medium leading-none" style={{ color: 'var(--text-primary)' }}>
+          <h1 className="text-[15px] font-medium leading-none theme-text-primary">
             Memory
           </h1>
-          <p className="mt-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-0.5 text-[11px] theme-text-muted">
             {loading
               ? 'Loading…'
               : activeScope
@@ -579,8 +557,7 @@ export function Memory() {
             onClick={() => load(true)}
             disabled={refreshing || loading}
             title="Refresh"
-            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:cursor-pointer hover:bg-[var(--bg-overlay-md)] hover:text-[var(--text-secondary)] disabled:opacity-40"
-            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)', color: 'var(--text-muted)' }}
+            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:cursor-pointer hover:theme-bg-overlay-md hover:theme-text disabled:opacity-40 border theme-border theme-bg-overlay theme-text-muted"
           >
             <RefreshCw className={`h-[15px] w-[15px] ${refreshing ? 'animate-spin' : ''}`} strokeWidth={2} />
           </button>
@@ -602,13 +579,12 @@ export function Memory() {
         {!loading && !error && (
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
+              <p className="text-[10px] font-semibold uppercase tracking-wider theme-text-faint">
                 Scopes
               </p>
               <button
                 onClick={() => setShowAddScope(true)}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium transition-colors hover:cursor-pointer hover:bg-[var(--bg-overlay-md)]"
-                style={{ border: '1px solid var(--border)', color: 'var(--text-faint)' }}
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium transition-colors hover:cursor-pointer hover:theme-bg-overlay-md border theme-border theme-text-faint"
               >
                 <Plus className="h-3 w-3" strokeWidth={2} /> Add Scope
               </button>
@@ -627,8 +603,7 @@ export function Memory() {
               <button
                 type="button"
                 onClick={() => setActiveScope(null)}
-                className="mt-2 text-[11px] transition-colors hover:cursor-pointer hover:text-blue-300"
-                style={{ color: 'var(--text-faint)' }}
+                className="mt-2 text-[11px] transition-colors hover:cursor-pointer hover:text-blue-300 theme-text-faint"
               >
                 ← Show all scopes
               </button>
@@ -637,7 +612,7 @@ export function Memory() {
         )}
 
         {/* Divider */}
-        {!loading && !error && <div style={{ borderTop: '1px solid var(--border)' }} />}
+        {!loading && !error && <div className='border-t theme-border' />}
 
         {/* Search bar */}
         {!loading && entries.length > 0 && (
@@ -645,20 +620,18 @@ export function Memory() {
             <Search
               className="absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2"
               strokeWidth={2}
-              style={{ color: 'var(--text-faint)' }}
+              className='theme-text-faint'
             />
             <input
               value={filter}
               onChange={e => setFilter(e.target.value)}
               placeholder={activeScope ? `Filter ${activeScope} entries…` : 'Filter by key or value…'}
-              className="w-full rounded-lg py-2 pl-9 pr-9 text-[12px] outline-none transition-colors focus:border-blue-500/50 focus:bg-[var(--bg-overlay-md)]"
-              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)', color: 'var(--text-secondary)' }}
+              className="w-full rounded-lg py-2 pl-9 pr-9 text-[12px] outline-none transition-colors focus:border-blue-500/50 focus:theme-bg-overlay-md border theme-border theme-bg-overlay theme-text"
             />
             {filter && (
               <button
                 onClick={() => setFilter('')}
-                className="absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-lg transition-colors hover:cursor-pointer hover:text-[var(--text-secondary)]"
-                style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay-md)', color: 'var(--text-faint)' }}
+                className="absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-lg transition-colors hover:cursor-pointer hover:theme-text border theme-border theme-bg-overlay-md theme-text-faint"
               >
                 <X className="h-3 w-3" strokeWidth={2} />
               </button>
@@ -672,10 +645,8 @@ export function Memory() {
             {[1, 2, 3].map(i => (
               <div
                 key={i}
-                className="h-14 animate-pulse rounded-lg"
+                className="h-14 animate-pulse rounded-lg border theme-border theme-bg-overlay"
                 style={{
-                  border: '1px solid var(--border)',
-                  backgroundColor: 'var(--bg-overlay)',
                   opacity: 1 - i * 0.2,
                 }}
               />
@@ -708,21 +679,19 @@ export function Memory() {
             <div className="relative flex h-16 w-16 items-center justify-center">
               <div className="absolute inset-0 rounded-full bg-blue-500/10 blur-xl" />
               <div
-                className="relative flex h-16 w-16 items-center justify-center rounded-lg text-blue-400"
-                style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)' }}
+                className="relative flex h-16 w-16 items-center justify-center rounded-lg text-blue-400 border theme-border theme-bg-overlay"
               >
                 <Brain className="h-7 w-7" strokeWidth={2} />
               </div>
             </div>
             <div>
-              <p className="text-[13.5px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+              <p className="text-[13.5px] font-medium theme-text">
                 Memory is empty
               </p>
-              <p className="mt-1 text-[12px]" style={{ color: 'var(--text-faint)' }}>
+              <p className="mt-1 text-[12px] theme-text-faint">
                 Add your first entry or run{' '}
                 <code
-                  className="rounded px-1.5 py-0.5 text-[11px]"
-                  style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay-md)', color: 'var(--text-muted)' }}
+                  className="rounded px-1.5 py-0.5 text-[11px] border theme-border theme-bg-overlay-md theme-text-muted"
                 >
                   jetic memory add
                 </code>{' '}
@@ -743,12 +712,11 @@ export function Memory() {
         {!loading && !error && entries.length > 0 && activeScope && filteredEntries.length === 0 && !filter && (
           <div className="flex flex-col items-center gap-3 py-12 text-center">
             <div
-              className="flex h-10 w-10 items-center justify-center rounded-lg"
-              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)' }}
+              className="flex h-10 w-10 items-center justify-center rounded-lg border theme-border theme-bg-overlay"
             >
-              <Brain className="h-[15px] w-[15px]" strokeWidth={2} style={{ color: 'var(--text-faint)' }} />
+              <Brain className="h-[15px] w-[15px]" strokeWidth={2} className='theme-text-faint' />
             </div>
-            <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-[13px] theme-text-muted">
               No entries in <code className="text-blue-400">{activeScope}</code> scope
             </p>
             <button
@@ -764,12 +732,11 @@ export function Memory() {
         {!loading && !error && entries.length > 0 && filter && filteredEntries.length === 0 && (
           <div className="flex flex-col items-center gap-3 py-12 text-center">
             <div
-              className="flex h-10 w-10 items-center justify-center rounded-lg"
-              style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)' }}
+              className="flex h-10 w-10 items-center justify-center rounded-lg border theme-border theme-bg-overlay"
             >
-              <Search className="h-[15px] w-[15px]" strokeWidth={2} style={{ color: 'var(--text-faint)' }} />
+              <Search className="h-[15px] w-[15px]" strokeWidth={2} className='theme-text-faint' />
             </div>
-            <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-[13px] theme-text-muted">
               No entries match "{filter}"
             </p>
             <button
@@ -784,37 +751,32 @@ export function Memory() {
         {/* ── Table ── */}
         {!loading && !error && filteredEntries.length > 0 && (
           <div
-            className="overflow-y-auto rounded-lg"
-            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)' }}
+            className="overflow-y-auto rounded-lg border theme-border theme-bg-overlay"
           >
             <table className="w-full text-left whitespace-nowrap">
 
               {/* Table head */}
               <thead
-                style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)' }}
+                className="border-b theme-border theme-bg-overlay"
               >
                 <tr>
                   <th
-                    className="w-32 px-4 py-3 text-[10px] font-semibold uppercase tracking-wider"
-                    style={{ color: 'var(--text-faint)' }}
+                    className="w-32 px-4 py-3 text-[10px] font-semibold uppercase tracking-wider theme-text-faint"
                   >
                     Scope
                   </th>
                   <th
-                    className="w-48 px-4 py-3 text-[10px] font-semibold uppercase tracking-wider"
-                    style={{ color: 'var(--text-faint)' }}
+                    className="w-48 px-4 py-3 text-[10px] font-semibold uppercase tracking-wider theme-text-faint"
                   >
                     Key
                   </th>
                   <th
-                    className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider"
-                    style={{ color: 'var(--text-faint)' }}
+                    className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider theme-text-faint"
                   >
                     Value
                   </th>
                   <th
-                    className="w-16 px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-wider"
-                    style={{ color: 'var(--text-faint)' }}
+                    className="w-16 px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-wider theme-text-faint"
                   >
                     Actions
                   </th>
@@ -833,14 +795,12 @@ export function Memory() {
                   return (
                     <tr
                       key={entry.key}
-                      className="group transition-colors hover:bg-[var(--bg-overlay-md)]"
-                      style={i !== 0 ? { borderTop: '1px solid var(--border)' } : undefined}
+                      className={`group transition-colors hover:theme-bg-overlay-md ${i !== 0 ? 'border-t theme-border' : ''}`}
                     >
                       {/* Scope */}
                       <td className="px-4 py-3">
                         <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider border ${c.border} ${c.text}`}
-                          style={{ backgroundColor: 'var(--bg-overlay-md)' }}
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider border theme-bg-overlay-md ${c.border} ${c.text}`}
                         >
                           {scope}
                         </span>
@@ -849,8 +809,7 @@ export function Memory() {
                       {/* Key */}
                       <td className="px-4 py-3">
                         <span
-                          className="inline-flex items-center rounded-lg px-2.5 py-0.5 font-mono text-[11px]"
-                          style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay-md)', color: 'var(--text-secondary)' }}
+                          className="inline-flex items-center rounded-lg px-2.5 py-0.5 font-mono text-[11px] border theme-border theme-bg-overlay-md theme-text"
                         >
                           {short}
                         </span>
@@ -867,8 +826,7 @@ export function Memory() {
                           onClick={() => handleDelete(entry.key)}
                           disabled={isDeleting}
                           title="Delete entry"
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:cursor-pointer hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
-                          style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)', color: 'var(--text-faint)' }}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:cursor-pointer hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50 border theme-border theme-bg-overlay theme-text-faint"
                         >
                           {isDeleting
                             ? <Loader2 className="h-[15px] w-[15px] animate-spin" strokeWidth={2} />
@@ -885,7 +843,7 @@ export function Memory() {
 
         {/* Filter summary */}
         {!loading && !error && filter && filteredEntries.length > 0 && (
-          <p className="text-center text-[11px]" style={{ color: 'var(--text-faint)' }}>
+          <p className="text-center text-[11px] theme-text-faint">
             Showing {filteredEntries.length} of {scopeFilteredEntries.length} entries
           </p>
         )}
@@ -894,22 +852,19 @@ export function Memory() {
       {/* ── Footer ── */}
       {!loading && !error && entries.length > 0 && (
         <div
-          className="flex items-center gap-1.5 px-6 py-3 text-[11px]"
-          style={{ borderTop: '1px solid var(--border)', color: 'var(--text-faint)' }}
+          className="flex items-center gap-1.5 px-6 py-3 text-[11px] border-t theme-border theme-text-faint"
         >
           <Clock className="h-[15px] w-[15px]" strokeWidth={2} />
           Data read from{' '}
           <code
-            className="rounded px-1.5 py-0.5 text-[10px]"
-            style={{ border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay-md)', color: 'var(--text-muted)' }}
+            className="rounded px-1.5 py-0.5 text-[10px] border theme-border theme-bg-overlay-md theme-text-muted"
           >
             .jetic/memory.json
           </code>
           <span className="ml-auto">
             <button
               onClick={() => load(true)}
-              className="text-[11px] transition-colors hover:cursor-pointer hover:text-blue-400"
-              style={{ color: 'var(--text-faint)' }}
+              className="text-[11px] transition-colors hover:cursor-pointer hover:text-blue-400 theme-text-faint"
             >
               Refresh
             </button>
