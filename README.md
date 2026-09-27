@@ -1,54 +1,38 @@
-<p align="center">
-  <img src="./public/banner.jpg" alt="Jetic Banner" width="full">
-</p>
+<div align="center">
 
-<h1 align="center">Jetic 🚀</h1>
+<img src="./public/banner.jpg" alt="Jetic Banner" width="100%">
 
-<p align="center">
-  <strong>AI-Native API Behavior Testing, Discovery & Observability Platform</strong>
-</p>
+# Jetic
 
-<p align="center">
-  <em>Scan backend source code → Extract behavioral models → Synthesize & run stateful AI workflows → Inspect visual traces</em>
-</p>
+[![Latest NPM Version](https://shieldcn.dev/npm/c15t.svg?variant=outline&size=xs&mode=light)](https://www.npmjs.com/package/jetic-cli)
+[![License](https://shieldcn.dev/github/c15t/c15t/license.svg?variant=outline&size=xs&mode=light)](https://github.com/jeticlabs/Jetic/blob/main/LICENSE.md)
+[![Discord](https://shieldcn.dev/discord/1312171102268690493.svg?variant=outline&size=xs&mode=light)](https://c15t.link/discord)
+[![NPM Version](https://img.shields.io/npm/v/jetic-cli.svg)](https://www.npmjs.com/package/jetic-cli)
+[![Node Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](#prerequisites)
+[![PNPM Workspace](https://img.shields.io/badge/pnpm-%3E%3D9.0.0-orange)](#prerequisites)
+[![React 19](https://img.shields.io/badge/React-19-blue)](#package-details)
+[![ts-morph](https://img.shields.io/badge/AST-ts--morph-blueviolet)](#package-details)
+[![License: ISC](https://img.shields.io/badge/license-ISC-green.svg)](LICENSE)
 
-<p align="center">
-  <a href="#-key-features">Features</a> •
-  <a href="#-how-jetic-works">How It Works</a> •
-  <a href="#-monorepo-architecture">Monorepo Architecture</a> •
-  <a href="#-getting-started">Getting Started</a> •
-  <a href="#-demo">Demo</a> •
-  <a href="#-start-with-your-ai-ide-recommended-no-ai-key">AI IDE Setup</a> •
-  <a href="#-cli-command-reference">CLI Reference</a> •
-  <a href="#-jetic-studio-dashboard">Jetic Studio</a> •
-  <a href="#-artifact--file-schemas">File Schemas</a>
-</p>
+The agentic, code-native platform that understands your API from its source <br>
+No manual scripts. No guessed constraints. No stale docs.
 
-<p align="center">
-  <a href="https://www.npmjs.com/package/jetic-cli"><img src="https://img.shields.io/npm/v/jetic-cli.svg" alt="NPM Version"></a>
-  <img src="https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen" alt="Node Version">
-  <img src="https://img.shields.io/badge/pnpm-%3E%3D9.0.0-orange" alt="PNPM Workspace">
-  <img src="https://img.shields.io/badge/React-19-blue" alt="React 19">
-  <img src="https://img.shields.io/badge/AST-ts--morph-blueviolet" alt="ts-morph">
-  <img src="https://img.shields.io/badge/license-ISC-green.svg" alt="License">
-</p>
-
----
-
-## 🎬 Demo
-
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=YOUR_VIDEO_ID">
-    <img src="screenshots/jetic_overview.JPG" alt="Watch the Jetic demo video" width="720">
-  </a>
-</p>
+<a href="https://www.youtube.com/watch?v=YOUR_VIDEO_ID">
+  <img src="screenshots/jetic_overview.JPG" alt="Watch the Jetic demo video" width="720">
+</a>
 
 <!-- TODO: paste the real demo video ID above (replace YOUR_VIDEO_ID).
      Optionally swap the thumbnail for a dedicated screenshots/demo-thumbnail.png. -->
 
+<br>
+
+[The Problem](#the-problem) · [Solution](#the-jetic-solution) · [Features](#key-features) · [How It Works](#how-jetic-works) · [Getting Started](#getting-started) · [CLI Reference](#cli-command-reference) · [Studio](#jetic-studio-dashboard) · [Roadmap](#roadmap--vision) · [Contributing](CONTRIBUTING.md)
+
+</div>
+
 ---
 
-## ⚡ The Problem
+## The Problem
 
 Traditional API testing tools (Postman, Insomnia, generic test runners) force developers to manually write hundreds of repetitive test scripts, hardcode authorization tokens, guess parameter validation limits, and painstakingly string together sequential operations (*Register User → Login → Save Token → Create Resource → Update Resource → Delete Resource*).
 
@@ -56,15 +40,15 @@ Furthermore, conventional HTTP runners only check if an endpoint returns a `200 
 
 ---
 
-## 💡 The Jetic Solution
+## The Jetic Solution
 
 **Jetic** is an agentic, code-native developer platform that **automatically understands, models, simulates, and traces an application's API behavior directly from its backend source code.**
 
-1. 🔍 **Zero-Execution Source Code Scanning**: Jetic parses your TypeScript/Express Abstract Syntax Tree (AST via `ts-morph`) without running your server. It follows imports across controllers, services, middleware, and type declarations to discover routes, parameters, validation constraints, and auth schemes.
-2. 🧠 **Declarative Behavioral Graph (`model.json`)**: Generates a versioned, strongly-typed behavioral graph mapping paths, HTTP methods, request schemas, response shapes, and exact source code provenance (file + line numbers).
-3. 🤖 **AI-Driven Stateful Workflow Generation**: Uses AI to synthesize multi-step, end-to-end user journeys (`.jetic/workflows/*.json`).
-4. 💾 **Pre/Post State Capture & Dynamic Injection**: Captures input parameters (like faker-generated email/password) before HTTP calls and response fields (like JWT tokens and resource IDs via JSONPath) after HTTP calls into `.jetic/memory.json`, automatically injecting them into subsequent headers (e.g. `Authorization: Bearer {{workflow:accessToken}}`) or body fields.
-5. 📈 **ReactFlow Execution Traces in Jetic Studio**: Visually inspect step-by-step simulation node graphs, HTTP headers, request payloads, response bodies, latencies, and state passing in **Jetic Studio** local IDE.
+1. **Zero-Execution Source Code Scanning**: Jetic parses your TypeScript/Express Abstract Syntax Tree (AST via `ts-morph`) without running your server. It follows imports across controllers, services, middleware, and type declarations to discover routes, parameters, validation constraints, and auth schemes.
+2. **Declarative Behavioral Graph (`model.json`)**: Generates a versioned, strongly-typed behavioral graph mapping paths, HTTP methods, request schemas, response shapes, and exact source code provenance (file + line numbers).
+3. **AI-Driven Stateful Workflow Generation**: Uses AI to synthesize multi-step, end-to-end user journeys (`.jetic/workflows/*.json`).
+4. **Pre/Post State Capture & Dynamic Injection**: Captures input parameters (like faker-generated email/password) before HTTP calls and response fields (like JWT tokens and resource IDs via JSONPath) after HTTP calls into `.jetic/memory.json`, automatically injecting them into subsequent headers (e.g. `Authorization: Bearer {{workflow:accessToken}}`) or body fields.
+5. **ReactFlow Execution Traces in Jetic Studio**: Visually inspect step-by-step simulation node graphs, HTTP headers, request payloads, response bodies, latencies, and state passing in **Jetic Studio** local IDE.
 
 > [!NOTE]
 > **Framework & Language Support**: Automated AST source code scanning currently supports **Node.js & Express (TypeScript)** projects.
@@ -73,23 +57,27 @@ Furthermore, conventional HTTP runners only check if an endpoint returns a `200 
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-- 🔍 **AST Source Discovery**: Deeply inspects Express/TypeScript source code using `ts-morph`. Recursively resolves imported controllers, services, helpers, and types up to configurable depths.
-- 🧩 **Nested Router & Middleware Resolution**: Seamlessly flattens complex nested Express router chains (e.g. `app.use('/api/orders', ordersRouter)` $\rightarrow$ `router.post('/checkout')`).
-- 🧠 **Constraint & Business Logic Extraction**: Extracts validation logic directly from `if` statements (e.g. `if (password.length < 8)` $\rightarrow$ `minLength: 8`) and schema definitions, enabling intelligent data generation rather than blind fuzzing.
-- 🔗 **Stateful Workflow Engine**: Synthesizes and executes multi-step workflows with full variable interpolation, auto-generating dynamic test data via `@faker-js/faker`.
-- 📥 **Input & Output Memory Capture**:
+- **AST Source Discovery**: Deeply inspects Express/TypeScript source code using `ts-morph`. Recursively resolves imported controllers, services, helpers, and types up to configurable depths.
+- **Nested Router & Middleware Resolution**: Seamlessly flattens complex nested Express router chains (e.g. `app.use('/api/orders', ordersRouter)` $\rightarrow$ `router.post('/checkout')`).
+- **Constraint & Business Logic Extraction**: Extracts validation logic directly from `if` statements (e.g. `if (password.length < 8)` $\rightarrow$ `minLength: 8`) and schema definitions, enabling intelligent data generation rather than blind fuzzing.
+- **Stateful Workflow Engine**: Synthesizes and executes multi-step workflows with full variable interpolation, auto-generating dynamic test data via `@faker-js/faker`.
+- **Input & Output Memory Capture**:
   - `captureInput`: Saves generated request body values (e.g. `admin_email`) to `.jetic/memory.json` *before* firing requests so subsequent steps can reuse them.
   - `capture`: Saves response JSONPath fields (e.g. `data.accessToken`, `data.workspace.id`) to `.jetic/memory.json` *after* success.
   - `inject`: Automatically injects memory values into headers (e.g. `header:Authorization = Bearer {{workflow:accessToken}}`) or body fields.
-- 🖥️ **Jetic Studio Dashboard**: Modern React 19 + Vite + TailwindCSS + ReactFlow local developer web IDE (`jetic dev`) for visual API exploration, AST source code viewing, real-time SSE workflow execution, runtime memory editing, live file changes tracking, and node-graph trace debugging.
-- ⚡ **Lightweight Change Scanner & Live File Tracking (`changes.json`)**: Automatic zero-dependency file watcher running in `jetic dev`. Tracks edited source files without Git overhead, streaming updates in real time via SSE to the `/changes` UI and allowing AI (via `jetic_get_changes` MCP tool) to re-index only modified files instead of the entire codebase.
-- 💻 **Feature-Rich CLI**: Lightweight command-line interface bringing API intelligence, scanning, simulation, memory control, and config management straight to your terminal.
+- **Jetic Studio Dashboard**: Modern React 19 + Vite + TailwindCSS + ReactFlow local developer web IDE (`jetic dev`) for visual API exploration, AST source code viewing, real-time SSE workflow execution, runtime memory editing, live file changes tracking, and node-graph trace debugging.
+- **Lightweight Change Scanner & Live File Tracking (`changes.json`)**: Automatic zero-dependency file watcher running in `jetic dev`. Tracks edited source files without Git overhead, streaming updates in real time via SSE to the `/changes` UI and allowing AI (via `jetic_get_changes` MCP tool) to re-index only modified files instead of the entire codebase.
+- **Feature-Rich CLI**: Lightweight command-line interface bringing API intelligence, scanning, simulation, memory control, and config management straight to your terminal.
 
 ---
 
-## ⚙️ How Jetic Works
+<div align="center">
+
+## How Jetic Works
+
+</div>
 
 ```
  ┌────────────────────────┐
@@ -131,7 +119,7 @@ Furthermore, conventional HTTP runners only check if an endpoint returns a `200 
 
 ---
 
-## 🏗️ Monorepo Architecture
+## Monorepo Architecture
 
 Jetic is engineered as a clean TypeScript `pnpm` monorepo:
 
@@ -168,7 +156,11 @@ jetic/
 
 ---
 
-## 🚀 Getting Started
+<div align="center">
+
+## Getting Started
+
+</div>
 
 ### Prerequisites
 
@@ -241,7 +233,7 @@ opencode (`opencode.json` — global or project root):
 
 Restart the editor (or refresh its MCP panel) and confirm the `jetic_*` tools appear.
 
-#### Step 3 — Onboard with copy-paste prompts 💬
+#### Step 3 — Onboard with copy-paste prompts
 
 Paste these into your editor's agent chat, in order:
 
@@ -297,7 +289,7 @@ jetic dev
 
 ---
 
-## 💻 CLI Command Reference
+## CLI Command Reference
 
 ### `jetic init`
 Initializes a `.jetic/` directory in the current working directory with a default `config.json`.
@@ -447,13 +439,13 @@ jetic upgrade
 
 ---
 
-## 🖥️ Jetic Studio Dashboard
+## Jetic Studio Dashboard
 
 **Jetic Studio** (`jetic dev`) is a sleek, dark-mode local web application designed specifically for visual API discovery, source provenance checking, AI workflow debugging, runtime memory control, and visual trace observability.
 
 ---
 
-### 1. 📊 Workspace Overview (`/overview`)
+### 1. Workspace Overview (`/overview`)
 The command center for your API model. Provides high-level metrics, endpoint distribution charts, security posture summaries, and quick links to recently discovered routes and workflow runs.
 
 - **Key Highlights**: Endpoint totals, method breakdown bar, secured route percentages, recent endpoint shortcuts, active workflow list, and top memory keys preview.
@@ -462,7 +454,7 @@ The command center for your API model. Provides high-level metrics, endpoint dis
 
 ---
 
-### 2. 🧩 Behavioral Model (`/model`)
+### 2. Behavioral Model (`/model`)
 Interactive visual explorer for `.jetic/model.json`.
 
 - **Key Highlights**: HTTP method filtering (GET, POST, PUT, DELETE, PATCH), full-text search, request/response schema inspection cards, security badges (JWT, Bearer, API Keys), middleware lists, environment switcher, and instant **Inspect** trigger buttons.
@@ -474,7 +466,7 @@ Interactive visual explorer for `.jetic/model.json`.
 ![Jetic Studio - Add Endpoint Modal Placeholder](screenshots/jetic_add_endpoint.JPG)
 ---
 
-### 3. 🔬 Endpoint Inspect (`/inspect`)
+### 3. Endpoint Inspect (`/inspect`)
 Deep-dive inspection page for any single API endpoint.
 
 - **Key Highlights**:
@@ -487,7 +479,7 @@ Deep-dive inspection page for any single API endpoint.
 
 ---
 
-### 4. 💎 AI Workflow Simulations (`/simulations`)
+### 4. AI Workflow Simulations (`/simulations`)
 Visual AI workflow builder and step-by-step runner.
 
 - **Key Highlights**:
@@ -499,7 +491,7 @@ Visual AI workflow builder and step-by-step runner.
 
 ---
 
-### 5. 🗄️ Memory Inspector (`/memory`)
+### 5. Memory Inspector (`/memory`)
 Real-time state and key-value store inspector for `.jetic/memory.json`.
 
 - **Key Highlights**:
@@ -511,7 +503,7 @@ Real-time state and key-value store inspector for `.jetic/memory.json`.
 
 ---
 
-### 6. 📈 Observability & Execution Traces (`/traces`)
+### 6. Observability & Execution Traces (`/traces`)
 Interactive ReactFlow node-graph visualizer for workflow execution traces.
 
 - **Key Highlights**:
@@ -523,7 +515,7 @@ Interactive ReactFlow node-graph visualizer for workflow execution traces.
 
 ---
 
-### 7. 🔄 Files Changes (`/changes`)
+### 7. Files Changes (`/changes`)
 Real-time source file change observer powered by a zero-dependency file watcher.
 
 - **Key Highlights**:
@@ -535,7 +527,7 @@ Real-time source file change observer powered by a zero-dependency file watcher.
 ---
 
 
-## 📄 Artifact & File Schemas
+## Artifact & File Schemas
 
 ### `.jetic/model.json` (Behavioral Model)
 
@@ -693,7 +685,7 @@ Real-time source file change observer powered by a zero-dependency file watcher.
 
 ---
 
-## 🗺️ Roadmap & Vision
+## Roadmap & Vision
 
 - [x] **Zero-Execution AST Scanner**: Deep TypeScript/Express source parser via `ts-morph` with import resolver.
 - [x] **Declarative Behavioral Modeling**: Versioned `.jetic/model.json` schema with source code line references.
@@ -705,18 +697,18 @@ Real-time source file change observer powered by a zero-dependency file watcher.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) guide for instructions on setting up your local development environment, running tests across monorepo packages, and submitting Pull Requests.
 
 ---
 
-## 📝 License
+## License
 
 This project is licensed under the [ISC License](LICENSE).
 
 ---
 
 <p align="center">
-  <i>Built with ❤️ by the Jetic Team. If you find Jetic useful, please consider giving us a ⭐ on GitHub!</i>
+  <i>Built with care by the Jetic Team. If you find Jetic useful, please consider giving us a star on GitHub.</i>
 </p>
