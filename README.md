@@ -2,23 +2,17 @@
 
 <img src="./public/banner.jpg" alt="Jetic Banner" width="100%">
 
-# Jetic
-
-[![Latest NPM Version](https://shieldcn.dev/npm/c15t.svg?variant=outline&size=xs&mode=light)](https://www.npmjs.com/package/jetic-cli)
-[![License](https://shieldcn.dev/github/c15t/c15t/license.svg?variant=outline&size=xs&mode=light)](https://github.com/jeticlabs/Jetic/blob/main/LICENSE.md)
-[![Discord](https://shieldcn.dev/discord/1312171102268690493.svg?variant=outline&size=xs&mode=light)](https://c15t.link/discord)
-[![NPM Version](https://img.shields.io/npm/v/jetic-cli.svg)](https://www.npmjs.com/package/jetic-cli)
-[![Node Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](#prerequisites)
-[![PNPM Workspace](https://img.shields.io/badge/pnpm-%3E%3D9.0.0-orange)](#prerequisites)
-[![React 19](https://img.shields.io/badge/React-19-blue)](#package-details)
-[![ts-morph](https://img.shields.io/badge/AST-ts--morph-blueviolet)](#package-details)
-[![License: ISC](https://img.shields.io/badge/license-ISC-green.svg)](LICENSE)
+<br/>
+<p align="center">
+  <a href="https://www.npmjs.com/package/jetic-cli"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/npm/c15t.svg?variant=outline&size=xs&mode=dark"><img src="https://shieldcn.dev/npm/c15t.svg?variant=outline&size=xs&mode=light" alt="Latest NPM Version"></picture></a>
+  <a href="https://github.com/jeticlabs/Jetic/blob/main/LICENSE.md"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/github/c15t/c15t/license.svg?variant=outline&size=xs&mode=dark"><img src="https://shieldcn.dev/github/c15t/c15t/license.svg?variant=outline&size=xs&mode=light" alt="License"></picture></a>
+  <a href="https://c15t.link/discord"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/discord/1312171102268690493.svg?variant=outline&size=xs&mode=dark"><img src="https://shieldcn.dev/discord/1312171102268690493.svg?variant=outline&size=xs&mode=light" alt="Discord"></picture></a>
 
 The agentic, code-native platform that understands your API from its source <br>
 No manual scripts. No guessed constraints. No stale docs.
 
 <a href="https://www.youtube.com/watch?v=YOUR_VIDEO_ID">
-  <img src="screenshots/jetic_overview.JPG" alt="Watch the Jetic demo video" width="720">
+  <img src="screenshots/jetic_overview.JPG" alt="Watch the Jetic demo video" width="100%">
 </a>
 
 <!-- TODO: paste the real demo video ID above (replace YOUR_VIDEO_ID).
