@@ -1,6 +1,6 @@
 {
   "name": "jetic-cli",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Code-aware, deterministic API toolkit for Node.js",
   "main": "dist/index.js",
   "bin": {

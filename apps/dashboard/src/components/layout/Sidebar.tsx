@@ -102,7 +102,7 @@ export function Sidebar({ currentPage, onNavigate, onToggleAssistant, isAssistan
         </div>
         <div className="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium border theme-border theme-bg-overlay theme-text-muted">
           <span className="h-1.5 w-1.5 rounded-full theme-bg-brand" />
-          v0.2.4
+          v0.2.5
         </div>
       </div>
 

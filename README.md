@@ -11,9 +11,10 @@
 The agentic, code-native platform that understands your API from its source <br>
 No manual scripts. No guessed constraints. No stale docs.
 
-<a href="https://www.youtube.com/watch?v=YOUR_VIDEO_ID">
-  <img src="screenshots/jetic_overview.JPG" alt="Watch the Jetic demo video" width="100%">
-</a>
+
+<video src="screenshots/demo_video.mp4" autoplay loop muted plays inline width="100%">
+</video>
+
 
 <!-- TODO: paste the real demo video ID above (replace YOUR_VIDEO_ID).
      Optionally swap the thumbnail for a dedicated screenshots/demo-thumbnail.png. -->
