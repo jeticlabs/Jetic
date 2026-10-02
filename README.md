@@ -12,8 +12,7 @@ The agentic, code-native platform that understands your API from its source <br>
 No manual scripts. No guessed constraints. No stale docs.
 
 
-<video src="screenshots/demo_video.mp4" autoplay loop muted plays inline width="100%">
-</video>
+<img src="screenshots/demo_video.gif" alt="Watch the demo video" width="100%" />
 
 
 <!-- TODO: paste the real demo video ID above (replace YOUR_VIDEO_ID).
