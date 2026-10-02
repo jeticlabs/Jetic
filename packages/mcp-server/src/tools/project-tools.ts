@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { loadModel, saveModel, resolveModelPath, projectRootOfModel } from '../types';
 import { BehavioralModel, Endpoint, CURRENT_MODEL_VERSION } from '@jetic/model';
-import type { JeticConfig } from '@jetic/core';
 
 // ── jetic_init ──────────────────────────────────────────────────────────────
 // Step 1 of the structured MCP order: scaffold `.jetic/` for repos that don't
@@ -149,11 +148,8 @@ export async function handleScanProject(args: z.infer<typeof scanProjectSchema>)
 
   // Lazy import keeps server startup fast when scan is never used.
   const { ExpressScanner } = await import('@jetic/scanner');
-  const config: JeticConfig = {
-    projectRoot,
-    jeticDir: path.dirname(filePath),
-    // No `ai` key on purpose: static discovery only, no provider, no keys.
-  };
+  const { loadConfig } = await import('@jetic/core');
+  const config = loadConfig(projectRoot);
 
   let scanned: BehavioralModel;
   try {

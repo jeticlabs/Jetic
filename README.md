@@ -38,9 +38,9 @@ Furthermore, conventional HTTP runners only check if an endpoint returns a `200 
 
 **Jetic** is an agentic, code-native developer platform that **automatically understands, models, simulates, and traces an application's API behavior directly from its backend source code.**
 
-1. **Zero-Execution Source Code Scanning**: Jetic parses your TypeScript/Express Abstract Syntax Tree (AST via `ts-morph`) without running your server. It follows imports across controllers, services, middleware, and type declarations to discover routes, parameters, validation constraints, and auth schemes.
+1. **Static Source Code Scanning**: Jetic parses Express/TypeScript routes with `ts-morph` without running your server. It discovers route paths, source locations, path parameters, and recognizable route middleware; it does not infer request/response schemas or business constraints.
 2. **Declarative Behavioral Graph (`model.json`)**: Generates a versioned, strongly-typed behavioral graph mapping paths, HTTP methods, request schemas, response shapes, and exact source code provenance (file + line numbers).
-3. **AI-Driven Stateful Workflow Generation**: Uses AI to synthesize multi-step, end-to-end user journeys (`.jetic/workflows/*.json`).
+3. **Stateful Workflow Execution**: Runs manually authored multi-step workflows from `.jetic/workflows/*.json`.
 4. **Pre/Post State Capture & Dynamic Injection**: Captures input parameters (like faker-generated email/password) before HTTP calls and response fields (like JWT tokens and resource IDs via JSONPath) after HTTP calls into `.jetic/memory.json`, automatically injecting them into subsequent headers (e.g. `Authorization: Bearer {{workflow:accessToken}}`) or body fields.
 5. **ReactFlow Execution Traces in Jetic Studio**: Visually inspect step-by-step simulation node graphs, HTTP headers, request payloads, response bodies, latencies, and state passing in **Jetic Studio** local IDE.
 
@@ -55,8 +55,8 @@ Furthermore, conventional HTTP runners only check if an endpoint returns a `200 
 
 - **AST Source Discovery**: Deeply inspects Express/TypeScript source code using `ts-morph`. Recursively resolves imported controllers, services, helpers, and types up to configurable depths.
 - **Nested Router & Middleware Resolution**: Seamlessly flattens complex nested Express router chains (e.g. `app.use('/api/orders', ordersRouter)` $\rightarrow$ `router.post('/checkout')`).
-- **Constraint & Business Logic Extraction**: Extracts validation logic directly from `if` statements (e.g. `if (password.length < 8)` $\rightarrow$ `minLength: 8`) and schema definitions, enabling intelligent data generation rather than blind fuzzing.
-- **Stateful Workflow Engine**: Synthesizes and executes multi-step workflows with full variable interpolation, auto-generating dynamic test data via `@faker-js/faker`.
+- **Static Route Discovery**: Finds Express routes, nested router paths, path parameters, source locations, and recognizable authentication middleware without booting the application or calling an AI provider.
+- **Stateful Workflow Engine**: Executes saved multi-step workflows with variable interpolation and Faker-generated values.
 - **Input & Output Memory Capture**:
   - `captureInput`: Saves generated request body values (e.g. `admin_email`) to `.jetic/memory.json` *before* firing requests so subsequent steps can reuse them.
   - `capture`: Saves response JSONPath fields (e.g. `data.accessToken`, `data.workspace.id`) to `.jetic/memory.json` *after* success.
@@ -102,9 +102,9 @@ Furthermore, conventional HTTP runners only check if an endpoint returns a `200 
       └─────────────────────────┘               └────────────────────────┘
 ```
 
-1. **Scan (`jetic scan`)**: `ExpressScanner` and `ImportResolver` inspect your project root and `tsconfig.json`. They extract route paths, parameters, middleware chains, controller logic, and TypeScript types.
-2. **Model (`.jetic/model.json`)**: Normalizes scanner output into a strongly typed `BehavioralModel` containing endpoint metadata, discovered constraints, expected request/response schemas, security schemes, and source references (`routes/auth.ts:42`).
-3. **Synthesize Workflows (`jetic simulate workflow`)**: AI analyzes `model.json` to create end-to-end integration workflows. Step dependencies, input/output captures, and header injections are configured automatically.
+1. **Scan (`jetic scan`)**: `ExpressScanner` reads the project `tsconfig.json` and discovers routes, nested prefixes, path parameters, middleware names, and source locations.
+2. **Model (`.jetic/model.json`)**: Stores discovered route metadata. Request/response schemas and business constraints are not guessed; add them explicitly when needed.
+3. **Author Workflows**: Create JSON workflow files in `.jetic/workflows/` or author them through MCP tools; Jetic does not generate workflows through a configured AI provider.
 4. **Run & Capture / Inject**: The simulator engine executes requests step-by-step. `captureInput` saves faker credentials pre-flight, `capture` reads response JSONPath fields post-flight, and `inject` dynamically constructs request headers/bodies for downstream steps.
 5. **Trace & Observe**: Results are persisted as execution trace records and rendered in **Jetic Studio** (`/traces`) as an interactive ReactFlow node graph.
 
@@ -126,7 +126,7 @@ jetic/
 │   ├── core/            # @jetic/core — Config management (.jetic/config.json), filesystem sync, logger & errors
 │   ├── memory/          # @jetic/memory — Scoped runtime key-value store (.jetic/memory.json)
 │   ├── model/           # @jetic/model — BehavioralModel schema types, Zod validators, interfaces
-│   ├── scanner/         # @jetic/scanner — ts-morph AST parser, ExpressScanner, ImportResolver, AIAnalyzer
+│   ├── scanner/         # @jetic/scanner — ts-morph static Express route analyzer
 │   └── simulator/       # @jetic/simulator — Data generator (Faker), ResponseValidator, EndpointSimulator
 ├── examples/
 │   └── express-shop/    # Complex Express fixture application for testing
@@ -142,11 +142,16 @@ jetic/
 | :--- | :--- | :--- |
 | **`apps/cli`** | `jetic-cli` | Commander-based CLI executable (`jetic`). Runs scanner, single endpoint simulations, AI workflows, memory CLI, config wizard, and embedded express server for Jetic Studio (`jetic dev`). |
 | **`apps/dashboard`** | `@jetic/dashboard` | **Jetic Studio** local web app. Features Overview, Model Explorer, Endpoint Inspect with AST source viewer, AI Workflow Builder/Runner with SSE streaming, Memory Inspector, and ReactFlow Trace Graph Observability. |
-| **`packages/scanner`** | `@jetic/scanner` | Static AST analysis engine built on `ts-morph`. Features `ExpressScanner` (route discovery), `ImportResolver` (deep file resolution across controllers/types), `PathResolver`, `AIAnalyzer`, and `Normalizer`. |
+| **`packages/scanner`** | `@jetic/scanner` | Static Express route analysis with `ExpressScanner`, `PathResolver`, and deterministic endpoint normalization. |
 | **`packages/model`** | `@jetic/model` | Canonical schema definitions for `BehavioralModel`, `Endpoint`, `Parameter`, `Constraint`, `SecurityScheme`, `Workflow`, `StateMachine`, `Environment`, and `SourceReference`. |
 | **`packages/simulator`** | `@jetic/simulator` | Execution engine. Generates fake data adhering to discovered constraints (`DataGenerator`), validates HTTP status and JSON response shapes (`ResponseValidator`), and manages endpoint testing (`EndpointSimulator`). |
 | **`packages/memory`** | `@jetic/memory` | Persistence engine for `.jetic/memory.json`. Handles scoped state storage (`workflow`, `global`), atomic reads/writes, clearing, and variable string template resolution. |
-| **`packages/core`** | `@jetic/core` | Core framework abstractions, `.jetic` workspace initialization, `.jetic/config.json` reader/writer, and file utility helpers. |
+| **`packages/core`** | `@jetic/core` | Core framework abstractions, `jetic.config.json` + `.jetic` workspace initialization, and file utility helpers. |
+| **`packages/scanner-sdk`** | `@jetic/scanner-sdk` | Framework-agnostic adapter contract (`defineAdapter`, `AdapterRegistry`) that scanner adapters implement. |
+| **`packages/adapter-express`** | `@jetic/adapter-express` | Express adapter implementing the scanner-sdk contract on top of `@jetic/scanner`. |
+| **`packages/adapter-fastify`** | `@jetic/adapter-fastify` | Fastify adapter: ts-morph scan of `instance.get/post/put/patch/delete(path, handler)` call sites (route-prefix resolution via `fastify.register` is not yet implemented). |
+| **`packages/agent-sdk`** | `@jetic/agent-sdk` | Deterministic agent contract (`defineAgent`, `AgentRegistry`) used by `jetic agent`. |
+| **`packages/agents`** | `@jetic/agents` | Built-in agents: `model-watcher` (endpoint added/removed diffing) and `workflow-impact` (changed-file → affected workflow mapping). |
 
 ---
 
@@ -253,29 +258,19 @@ Behind the scenes the agent follows the structured order — `jetic_init` (first
 
 ### 3. Quickstart with Included Example (Terminal Flow — Needs an AI Key)
 
-Prefer the terminal, or want Express auto-discovery? This flow uses `jetic scan` plus AI workflow generation, which requires your own AI provider key (`jetic config ai`). The [AI IDE path above](#-start-with-your-ai-ide-recommended-no-ai-key) needs no key.
+Prefer the terminal, or want Express auto-discovery? This flow uses Jetic's static route analyzer and requires no provider account or API key.
 
 ```bash
 cd examples/express-shop
 
-# Configure AI credentials for workflow generation (OpenRouter or OpenAI)
-# Windows PowerShell: $env:OPENROUTER_API_KEY="your-key"
-# Linux/macOS: export OPENROUTER_API_KEY="your-key"
-
 # Initialize Jetic workspace directory (.jetic/)
 jetic init
 
-# Configure AI provider
-jetic config ai --provider openrouter --model anthropic/claude-3.5-sonnet --key-env OPENROUTER_API_KEY
-
-# Scan source code and generate .jetic/model.json
+# Statically scan Express routes and write .jetic/model.json
 jetic scan
 
 # Inspect discovered API model
 jetic inspect
-
-# Run AI workflow simulation against live local backend
-jetic simulate workflow --goal "Admin registers workspace, logs in, creates class and logs out"
 
 # Launch Jetic Studio local web dashboard
 jetic dev
@@ -286,7 +281,7 @@ jetic dev
 ## CLI Command Reference
 
 ### `jetic init`
-Initializes a `.jetic/` directory in the current working directory with a default `config.json`.
+Initializes a `.jetic/` directory. No provider or API key setup is required.
 
 ```bash
 jetic init
@@ -316,6 +311,66 @@ jetic inspect endpoint GET /api/orders/:id
 
 ---
 
+### `jetic model`
+Inspects the behavioral model and exports it to the split YAML layout described in `jetic.config.json` (`model.directory`, default `.jetic/model/`). `model.json` remains the primary read/write format for the scanner, MCP server, and Jetic Studio; YAML export is opt-in.
+
+```bash
+# List endpoints from the model (YAML layout if present, else model.json)
+jetic model list
+
+# Export model.json into api.yaml + paths/*.yaml + security/*.yaml
+jetic model export --yaml
+```
+
+---
+
+### `jetic adapter`
+Lists and inspects framework scanner adapters implementing the `@jetic/scanner-sdk` contract (currently: Express).
+
+```bash
+# List registered adapters and whether they're detected in this project
+jetic adapter list
+
+# Show detection result and a scan summary for one adapter
+jetic adapter inspect express
+```
+
+---
+
+### `jetic agent`
+Runs deterministic Jetic agents (no LLM) that reason over the model, change log, and workflows. Reports are written to `.jetic/runs/<runId>/agent-report.json`.
+
+```bash
+# List available agents
+jetic agent list
+
+# Detect endpoints added/removed since the last snapshot
+jetic agent run model-watcher
+
+# List workflows affected by recently changed source files
+jetic agent run workflow-impact
+```
+
+---
+
+### `jetic doctor`
+Diagnoses common setup problems: Node version, `jetic.config.json` presence, adapter detection, model validity, workflow validity, and `jetic dev` port availability.
+
+```bash
+jetic doctor
+```
+
+---
+
+### `jetic activity`
+Lists the activity stream of endpoint additions/removals detected by `jetic scan` (written to `.jetic/activity/activity.ndjson`).
+
+```bash
+jetic activity list
+```
+
+---
+
 ### `jetic simulate endpoint`
 Simulates single endpoints or the entire API model against a target environment server using generated data.
 
@@ -333,20 +388,14 @@ jetic simulate endpoint --all --env staging
 ---
 
 ### `jetic simulate workflow`
-Generates and executes multi-step AI-driven workflow integration tests with automatic state capture and header injection.
+Executes a saved multi-step workflow with automatic state capture and header injection.
 
 ```bash
-# Generate and run an AI workflow for a custom natural-language goal
-jetic simulate workflow --goal "User signs up, verifies email, creates project, and invites member"
-
 # List all saved workflows in .jetic/workflows/
 jetic simulate workflow --list
 
 # Execute an existing workflow JSON file
 jetic simulate workflow --workflow .jetic/workflows/user-onboarding.json
-
-# Generate workflow JSON without running HTTP requests
-jetic simulate workflow --goal "Create order and pay" --generate-only
 
 # Clear runtime memory before executing
 jetic simulate workflow --workflow .jetic/workflows/user-onboarding.json --clear-memory
@@ -412,12 +461,9 @@ jetic mcp --project C:/path/to/your-backend
 ---
 
 ### `jetic config`
-Configures AI providers, API key environment variables, and project settings.
+Displays the current project root and Jetic directory. Provider and API-key configuration is not supported.
 
 ```bash
-# Interactively or explicitly configure AI provider settings
-jetic config ai --provider openrouter --model anthropic/claude-3.5-sonnet --key-env OPENROUTER_API_KEY
-
 # View current configuration
 jetic config list
 ```
@@ -435,7 +481,7 @@ jetic upgrade
 
 ## Jetic Studio Dashboard
 
-**Jetic Studio** (`jetic dev`) is a sleek, dark-mode local web application designed specifically for visual API discovery, source provenance checking, AI workflow debugging, runtime memory control, and visual trace observability.
+**Jetic Studio** (`jetic dev`) is a local web application for visual API discovery, source provenance checking, saved workflow execution, runtime memory control, and trace inspection.
 
 ---
 
@@ -474,7 +520,7 @@ Deep-dive inspection page for any single API endpoint.
 ---
 
 ### 4. AI Workflow Simulations (`/simulations`)
-Visual AI workflow builder and step-by-step runner.
+Saved workflow editor and step-by-step runner.
 
 - **Key Highlights**:
   - **Goal-Based Generation**: Type any prompt (e.g. *"Admin creates workspace, invites teacher, creates class, logs out"*) to synthesize full workflow graphs.
@@ -683,7 +729,7 @@ Real-time source file change observer powered by a zero-dependency file watcher.
 
 - [x] **Zero-Execution AST Scanner**: Deep TypeScript/Express source parser via `ts-morph` with import resolver.
 - [x] **Declarative Behavioral Modeling**: Versioned `.jetic/model.json` schema with source code line references.
-- [x] **Stateful AI Workflow Engine**: Multi-step simulation generation with `captureInput`, `capture`, and `inject`.
+- [x] **Stateful Workflow Engine**: Multi-step execution with `captureInput`, `capture`, and `inject`.
 - [x] **Jetic Studio Local Dashboard**: React 19 IDE with REST simulator, AI builder, memory editor, and ReactFlow trace visualizer.
 - [ ] **State-Machine Transition Testing**: Automatic state transition verification (e.g. `payment.capture()` valid when `authorized`, invalid when `refunded`).
 - [ ] **Security & Authorization Vulnerability Auditor**: Automatic IDOR (Insecure Direct Object Reference) and privilege escalation scenario synthesizer.

@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import { randomUUID } from 'crypto';
 import { loadModel, saveModel } from '../types';
 import {
+  createEndpointId,
   Endpoint,
+  normalizeEndpointPath,
   Parameter,
   RequestBody,
   ResponseDefinition,
@@ -164,15 +165,17 @@ export const addEndpointSchema = z.object({
 export function handleAddEndpoint(args: z.infer<typeof addEndpointSchema>) {
   const { model, filePath } = loadModel(args.projectPath);
 
-  const normalizedPath = args.path.startsWith('/') ? args.path : `/${args.path}`;
+  const normalizedPath = normalizeEndpointPath(args.path);
   const methodUpper = args.method.toUpperCase() as Endpoint['method'];
+  const endpointId = createEndpointId(methodUpper, normalizedPath);
   // NOTE: zod `.default(true)` only applies through schema validation (MCP
   // transport). Direct library callers may omit it, so anything but explicit
   // `false` counts as true.
   const overwriteIfExists = args.overwriteIfExists !== false;
 
-  const existingIndex = model.endpoints.findIndex(
-    (e) => e.method.toUpperCase() === methodUpper && e.path === normalizedPath
+  const existingIndex = model.endpoints.findIndex((e) =>
+    e.id === endpointId ||
+    (e.method.toUpperCase() === methodUpper && normalizeEndpointPath(e.path) === normalizedPath)
   );
 
   if (existingIndex >= 0 && !overwriteIfExists) {
@@ -212,7 +215,7 @@ export function handleAddEndpoint(args: z.infer<typeof addEndpointSchema>) {
   const previous = existingIndex >= 0 ? model.endpoints[existingIndex] : undefined;
 
   const newEndpoint: Endpoint = {
-    id: previous?.id || randomUUID(),
+    id: endpointId,
     method: methodUpper,
     path: normalizedPath,
     name: args.name || `${methodUpper} ${normalizedPath}`,

@@ -3,6 +3,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { loadConfig } from '@jetic/core';
+import { hasYamlModel, loadModelFromDir } from '@jetic/model';
 import { JeticMemory } from '@jetic/memory';
 
 // ─── Change Scanner ───────────────────────────────────────────────────────────
@@ -217,8 +218,11 @@ export const devCommand = new Command('dev')
 
     // ─── Model API ───────────────────────────────────────────────────────
     app.get('/api/model', (_req, res) => {
-      const modelPath = path.join(process.cwd(), '.jetic', 'model.json');
+      const jeticDir = path.join(process.cwd(), '.jetic');
+      const modelDir = path.join(jeticDir, 'model');
       try {
+        if (hasYamlModel(modelDir)) return res.json(loadModelFromDir(modelDir));
+        const modelPath = path.join(jeticDir, 'model.json');
         if (!fs.existsSync(modelPath)) return res.json(null);
         res.json(JSON.parse(fs.readFileSync(modelPath, 'utf8')));
       } catch (err: any) {
@@ -607,166 +611,6 @@ export const devCommand = new Command('dev')
       try {
         fs.unlinkSync(filePath);
         res.json({ ok: true });
-      } catch (err: any) {
-        res.status(500).json({ error: err.message });
-      }
-    });
-
-    // ─── AI-generate workflow ─────────────────────────────────────────────────
-    app.post('/api/workflows/generate', async (req, res) => {
-      const { goal, name } = req.body as { goal?: string; name?: string };
-      const workflowGoal = goal || name || 'Full user journey';
-
-      const jeticDir   = path.join(process.cwd(), '.jetic');
-      const config     = loadConfig();
-
-      if (!config.ai) {
-        return res.status(400).json({ error: 'AI is not configured. Run `jetic config ai` first.' });
-      }
-
-      // Load model.json
-      const modelPath = path.join(jeticDir, 'model.json');
-      if (!fs.existsSync(modelPath)) {
-        return res.status(400).json({ error: 'No model.json found. Run `jetic scan` first.' });
-      }
-
-      let model: any;
-      try { model = JSON.parse(fs.readFileSync(modelPath, 'utf8')); }
-      catch { return res.status(500).json({ error: 'Failed to read model.json' }); }
-
-      const { provider, model: aiModel, apiKeyEnvVar } = config.ai;
-      const apiKey = process.env[apiKeyEnvVar];
-      if (!apiKey) return res.status(400).json({ error: `Missing API key in env var: ${apiKeyEnvVar}` });
-
-      // Build endpoint catalogue
-      const endpointSummary = (model.endpoints ?? []).map((ep: any) => {
-        const mw       = (ep.middleware ?? []).map((m: any) => m.name).join(', ');
-        const auth     = mw ? ` [requiresAuth: ${mw}]` : ' [public]';
-        const bodyFields = ep.requestBody?.fields
-          ? Object.entries(ep.requestBody.fields)
-              .map(([k, v]: [string, any]) => `${k}:${(v as any).type ?? 'string'}`).join(', ')
-          : '';
-        const bodyStr = bodyFields ? ` body={${bodyFields}}` : '';
-        const respParts: string[] = [];
-        for (const [status, def] of Object.entries(ep.responses ?? {})) {
-          const schema = (def as any).schema;
-          if (schema) respParts.push(`${status}:{${Object.keys(schema).slice(0, 8).join(', ')}}`);
-        }
-        const respStr = respParts.length ? ` response=[${respParts.join(' | ')}]` : '';
-        return `${ep.method} ${ep.path}${auth}${bodyStr}${respStr}`;
-      }).join('\n');
-
-      const canonicalExample = `{
-  "name": "Admin creates workspace, invites teacher, creates class and logs out",
-  "steps": [
-    { "name": "Admin creates a workspace", "method": "POST", "path": "/api/workspaces/setup",
-      "description": "Register a new workspace",
-      "body": { "workspace_name": "{{faker.company.name}}", "admin_email": "{{faker.internet.email}}", "admin_password": "{{faker.internet.password}}" },
-      "captureInput": { "workflow:adminEmail": "admin_email", "workflow:adminPassword": "admin_password" },
-      "capture": { "workflow:workspaceID": "data.workspace.id" }, "expectStatus": 201 },
-    { "name": "Admin logs in", "method": "POST", "path": "/api/auth/login",
-      "description": "Authenticate with created credentials",
-      "body": { "user_email": "{{workflow:adminEmail}}", "user_password": "{{workflow:adminPassword}}" },
-      "capture": { "workflow:accessToken": "data.accessToken" }, "expectStatus": 200 },
-    { "name": "Admin creates a class", "method": "POST", "path": "/api/classes",
-      "description": "Create a class inside the workspace",
-      "inject": { "header:Authorization": "Bearer {{workflow:accessToken}}" },
-      "body": { "name": "{{faker.word.noun}} Class", "workspaceId": "{{workflow:workspaceID}}" },
-      "capture": { "workflow:classID": "data.id" }, "expectStatus": 201 },
-    { "name": "Admin logs out", "method": "POST", "path": "/api/auth/logout",
-      "description": "Invalidate the session",
-      "inject": { "header:Authorization": "Bearer {{workflow:accessToken}}" },
-      "body": {}, "expectStatus": 200 }
-  ]
-}`;
-
-      const prompt = `You are an expert API integration test designer.
-Generate a workflow JSON for the API below.
-
-━━━ PROJECT ━━━
-Name: ${model.project?.name ?? 'API'}
-Framework: ${model.project?.framework ?? 'unknown'}
-Workflow goal: "${workflowGoal}"
-
-━━━ ENDPOINTS ━━━
-${endpointSummary}
-
-━━━ TEMPLATE SYNTAX ━━━
-{{faker.internet.email}}, {{faker.internet.password}}, {{faker.internet.username}},
-{{faker.company.name}}, {{faker.word.noun}}, {{faker.word.adjective}},
-{{faker.string.uuid}}, {{faker.commerce.productName}}, {{faker.phone.number}},
-{{workflow:KEY}} → value captured from a previous step
-
-━━━ FIELD RULES ━━━
-body         — request body; use {{faker.*}} for generated fields, {{workflow:KEY}} for captured values
-captureInput — save resolved BODY fields to memory BEFORE the HTTP call: { "workflow:KEY": "bodyFieldName" }
-capture      — save RESPONSE fields to memory AFTER success: { "workflow:KEY": "dot.path" }
-inject       — inject memory into headers/body; Bearer auth: { "header:Authorization": "Bearer {{workflow:accessToken}}" }
-expectStatus — 201 for creates, 200 for others, 204 for deletes
-⚠ EVERY [requiresAuth] endpoint MUST inject the Authorization header.
-
-━━━ EXAMPLE ━━━
-${canonicalExample}
-
-━━━ GENERATE ━━━
-Using ONLY the endpoints above (exact paths and methods), generate a complete workflow for: "${workflowGoal}".
-5-12 steps. Every step must have name, method, path, description, body (even {}), expectStatus.
-Wire captures/injects so every step gets the data it needs from previous steps.
-Output valid JSON only.
-`;
-
-      try {
-        const importDynamic = new Function('modulePath', 'return import(modulePath)');
-        const { generateObject } = await importDynamic('ai');
-        const { z }             = await importDynamic('zod');
-
-        let aiModelObj: any;
-        if (provider === 'openai') {
-          const { createOpenAI }    = await importDynamic('@ai-sdk/openai');
-          aiModelObj = createOpenAI({ apiKey })(aiModel);
-        } else {
-          const { createOpenRouter } = await importDynamic('@openrouter/ai-sdk-provider');
-          aiModelObj = createOpenRouter({ apiKey })(aiModel);
-        }
-
-        const StepSchema = z.object({
-          name:         z.string(),
-          method:       z.string(),
-          path:         z.string(),
-          description:  z.string().optional(),
-          body:         z.record(z.string(), z.any()).optional(),
-          captureInput: z.record(z.string(), z.string()).optional(),
-          capture:      z.record(z.string(), z.string()).optional(),
-          inject:       z.record(z.string(), z.string()).optional(),
-          expectStatus: z.number().int().min(100).max(599),
-        });
-        const WorkflowSchema = z.object({
-          name:  z.string(),
-          steps: z.array(StepSchema).min(3).max(15),
-        });
-
-        const { object } = await generateObject({
-          model:     aiModelObj,
-          mode:      'json',
-          maxTokens: 4000,
-          schema:    WorkflowSchema,
-          prompt,
-        });
-
-        const workflow = {
-          name:        object.name as string,
-          generatedAt: new Date().toISOString(),
-          steps:       object.steps,
-        };
-
-        // Save to .jetic/workflows/<slug>.json
-        const workflowsDir = path.join(jeticDir, 'workflows');
-        const slug         = (object.name as string).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workflow';
-        const filePath     = path.join(workflowsDir, `${slug}.json`);
-        fs.mkdirSync(workflowsDir, { recursive: true });
-        fs.writeFileSync(filePath, JSON.stringify(workflow, null, 2), 'utf8');
-
-        res.json({ ok: true, _file: `workflows/${slug}.json`, slug, ...workflow });
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }

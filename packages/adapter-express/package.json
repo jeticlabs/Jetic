@@ -1,0 +1,16 @@
+{
+  "name": "@jetic/adapter-express",
+  "version": "0.1.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@jetic/core": "workspace:*",
+    "@jetic/model": "workspace:*",
+    "@jetic/scanner": "workspace:*",
+    "@jetic/scanner-sdk": "workspace:*"
+  }
+}

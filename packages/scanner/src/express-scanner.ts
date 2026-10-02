@@ -1,16 +1,11 @@
 import { Project } from 'ts-morph';
-import { BehavioralModel, CURRENT_MODEL_VERSION, Environment, Parameter, FieldDefinition } from '@jetic/model';
+import { BehavioralModel, CURRENT_MODEL_VERSION, Environment, Parameter } from '@jetic/model';
 import { normalizeDiscoveries } from './normalizer';
 import { discoverRoutes } from './route-discovery';
-import { AiAnalyzer, isAuthMiddleware } from './ai-analyzer';
-import { resolveRouteContext } from './import-resolver';
+import { isAuthMiddleware } from './security';
 import { JeticConfig } from '@jetic/core';
 import * as fs from 'fs';
 import * as path from 'path';
-
-// ─── HTTP methods that MUST NOT have a request body ──────────────────────────
-
-const NO_BODY_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 // ─── Extract path parameters from an Express route path ──────────────────────
 
@@ -68,7 +63,7 @@ class ProgressReporter {
   start() {
     this.startTime = Date.now();
     this.writeLine('');
-    this.writeLine('  \x1b[46m\x1b[30m\x1b[1m JETIC \x1b[0m  \x1b[36m\x1b[1mAI Scanner\x1b[0m');
+    this.writeLine('  \x1b[46m\x1b[30m\x1b[1m JETIC \x1b[0m  \x1b[36m\x1b[1mStatic Scanner\x1b[0m');
     this.writeLine('');
   }
 
@@ -160,10 +155,7 @@ class ProgressReporter {
 // ─── Express Scanner ──────────────────────────────────────────────────────────
 
 export class ExpressScanner {
-  private aiAnalyzer: AiAnalyzer;
-
   constructor(private config: JeticConfig) {
-    this.aiAnalyzer = new AiAnalyzer(config);
   }
 
   public async scan(): Promise<BehavioralModel> {
@@ -183,216 +175,34 @@ export class ExpressScanner {
     const uniqueRouteFiles = new Set(endpoints.map((ep) => ep.source.file));
     progress.discoveryResult(endpoints.length, uniqueRouteFiles.size);
 
-    // ── Phase 2: Import Resolution ──────────────────────────────────────────
-    const routeContextCache = new Map<string, ReturnType<typeof resolveRouteContext>>();
-    let totalContextFiles = 0;
-
-    if (this.config.ai) {
-      progress.phaseImportResolution();
-
-      for (const routeFile of uniqueRouteFiles) {
-        try {
-          const ctx = resolveRouteContext(routeFile);
-          routeContextCache.set(routeFile, ctx);
-          totalContextFiles += ctx.contextFiles.size;
-        } catch {
-          // fallback: route file only
-        }
+    // ── Phase 2: Static parameter and middleware analysis ───────────────────
+    for (const ep of endpoints) {
+      const pathParamNames = extractPathParams(ep.path);
+      if (pathParamNames.length > 0) {
+        ep.parameters = pathParamNames.map((name): Parameter => ({
+          name,
+          in: 'path',
+          type: 'string',
+          required: true,
+        }));
       }
 
-      progress.importResolutionResult(uniqueRouteFiles.size, totalContextFiles);
-
-      // ── Phase 3: AI Analysis ─────────────────────────────────────────────
-      progress.phaseAiAnalysis(endpoints.length);
-
-      let requestParamCount = 0;
-      let responseFieldCount = 0;
-      let middlewareRefCount = 0;
-
-      for (let i = 0; i < endpoints.length; i++) {
-        const ep = endpoints[i];
-        const isNoBodyMethod = NO_BODY_METHODS.has(ep.method.toUpperCase());
-
-        progress.endpointAnalyzing(i, endpoints.length, ep.method, ep.path);
-
-        try {
-          const routeCtx = routeContextCache.get(ep.source.file);
-          const routeFileContent = routeCtx?.routeFile || '';
-          const contextFiles = routeCtx?.contextFiles || new Map<string, string>();
-
-          const aiData = await this.aiAnalyzer.analyzeEndpoint({
-            method: ep.method,
-            path: ep.path,
-            handlerName: ep.handlerName,
-            routeFileContent,
-            contextFiles,
-            staticMiddleware: ep.middleware.map((m) => m.name),
-          });
-
-          // ── 1. Separate body params from non-body params ──────────────────
-          const bodyParams = isNoBodyMethod
-            ? []
-            : aiData.parameters.filter((p) => p.in === 'body');
-
-          const nonBodyParams = aiData.parameters.filter((p) => p.in !== 'body');
-
-          // ── 2. Path parameter injection ───────────────────────────────────
-          // Ensure every :param in the path has a corresponding path parameter.
-          const pathParamNames = extractPathParams(ep.path);
-          const existingPathParamNames = new Set(
-            nonBodyParams.filter((p) => p.in === 'path').map((p) => p.name)
-          );
-          for (const paramName of pathParamNames) {
-            if (!existingPathParamNames.has(paramName)) {
-              nonBodyParams.push({ name: paramName, in: 'path', type: 'string', required: true });
-            }
-          }
-
-          // ── 3. Build requestBody (only for body-capable methods) ──────────
-          if (!isNoBodyMethod && bodyParams.length > 0) {
-            const fields: Record<string, FieldDefinition> = {};
-            for (const p of bodyParams) {
-              fields[p.name] = {
-                type: p.type,
-                required: p.required,
-                ...(p.format ? { format: p.format } : {}),
-                ...(p.description ? { description: p.description } : {}),
-                
-              };
-            }
-
-            // Detect content type
-            let contentType = aiData.requestBodyContentType ?? 'application/json';
-            if (ep.handlerName) {
-              const hn = ep.handlerName.toLowerCase();
-              if (hn.includes('upload') || hn.includes('file') || hn.includes('avatar') || hn.includes('image')) {
-                contentType = 'multipart/form-data';
-              }
-            }
-
-            ep.requestBody = {
-              contentType,
-              required: aiData.requestBodyRequired,
-              fields,
-              constraints: [],
-            };
-          } else {
-            // Explicitly clear any requestBody that may have been set by static analysis
-            delete (ep as any).requestBody;
-          }
-
-          // ── 4. Store non-body parameters ──────────────────────────────────
-          if (nonBodyParams.length > 0) {
-            ep.parameters = nonBodyParams.map((p) => {
-              const param: Parameter = {
-                name: p.name,
-                in: p.in as Parameter['in'],
-                type: p.type,
-                required: p.required,
-              };
-              
-              if (p.format) param.format = p.format;
-              if (p.description) param.description = p.description;
-              if (p.example) param.example = p.example;
-              return param;
-            });
-          } else if (pathParamNames.length > 0) {
-            // Even if AI returned nothing, ensure path params are recorded
-            ep.parameters = pathParamNames.map((name) => ({
-              name,
-              in: 'path' as const,
-              type: 'string',
-              required: true,
-            }));
-          }
-
-          // ── 5. Multi-status responses ─────────────────────────────────────
-          if (aiData.responses.length > 0) {
-            const responses: Record<string, any> = {};
-            for (const r of aiData.responses) {
-              const schema: Record<string, string> = {};
-              for (const field of r.fields) {
-                schema[field.name] = field.type;
-              }
-              responses[String(r.status)] = {
-                contentType: 'application/json',
-                description: r.description,
-                ...(Object.keys(schema).length > 0 ? { schema } : {}),
-              };
-              responseFieldCount += r.fields.length;
-            }
-            ep.responses = responses;
-          }
-
-          // ── 6. Middleware ──────────────────────────────────────────────────
-          if (aiData.middleware.length > 0) {
-            ep.middleware = aiData.middleware;
-          }
-
-          // ── 7. Security wiring ─────────────────────────────────────────────
-          // Use AI-detected schemes first, fall back to inspecting middleware names.
-          const authSchemes: string[] = [...aiData.securitySchemes];
-          if (authSchemes.length === 0) {
-            for (const mw of ep.middleware) {
-              if (isAuthMiddleware(mw.name)) authSchemes.push(mw.name);
-            }
-          }
-          if (authSchemes.length > 0) {
-            ep.security = authSchemes.map((scheme) => ({ scheme, required: true }));
-          }
-
-          requestParamCount += aiData.parameters.length;
-          middlewareRefCount += ep.middleware.length;
-
-          progress.endpointDone(i, endpoints.length, ep.method, ep.path);
-        } catch {
-          // On any error, still ensure path params are injected from the route pattern
-          const pathParamNames = extractPathParams(ep.path);
-          if (pathParamNames.length > 0 && !ep.parameters?.some((p) => p.in === 'path')) {
-            ep.parameters = [
-              ...(ep.parameters ?? []),
-              ...pathParamNames.map((name) => ({
-                name,
-                in: 'path' as const,
-                type: 'string',
-                required: true,
-              })),
-            ];
-          }
-          // Ensure GET/HEAD/OPTIONS never have requestBody even on error
-          if (isNoBodyMethod) delete (ep as any).requestBody;
-
-          progress.endpointSkipped(i, endpoints.length, ep.method, ep.path, 'analysis failed');
-        }
-      }
-
-      progress.summary({
-        endpoints: endpoints.length,
-        requestParams: requestParamCount,
-        responseFields: responseFieldCount,
-        middlewareRefs: middlewareRefCount,
-        routeFiles: uniqueRouteFiles.size,
-        contextFiles: totalContextFiles,
-      });
-    } else {
-      // No AI — still inject path params from route patterns (free, no AI needed)
-      for (const ep of endpoints) {
-        const pathParamNames = extractPathParams(ep.path);
-        if (pathParamNames.length > 0) {
-          ep.parameters = pathParamNames.map((name) => ({
-            name,
-            in: 'path' as const,
-            type: 'string',
-            required: true,
-          }));
-        }
-        // Wire security from static middleware
-        const authSchemes = ep.middleware.filter((m) => isAuthMiddleware(m.name)).map((m) => m.name);
-        if (authSchemes.length > 0) {
-          ep.security = authSchemes.map((scheme) => ({ scheme, required: true }));
-        }
+      const authSchemes = ep.middleware
+        .filter((middleware) => isAuthMiddleware(middleware.name))
+        .map((middleware) => middleware.name);
+      if (authSchemes.length > 0) {
+        ep.security = authSchemes.map((scheme) => ({ scheme, required: true }));
       }
     }
+
+    progress.summary({
+      endpoints: endpoints.length,
+      requestParams: endpoints.reduce((total, endpoint) => total + (endpoint.parameters?.length ?? 0), 0),
+      responseFields: 0,
+      middlewareRefs: endpoints.reduce((total, endpoint) => total + endpoint.middleware.length, 0),
+      routeFiles: uniqueRouteFiles.size,
+      contextFiles: 0,
+    });
 
     return {
       version: CURRENT_MODEL_VERSION,

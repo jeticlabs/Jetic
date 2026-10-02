@@ -2,6 +2,7 @@ import { z } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadModel } from '../types';
+import { listWorkflowFiles, readWorkflowDefinitionFile } from '@jetic/model';
 import { WorkflowSimulator, WorkflowDef } from '@jetic/simulator';
 
 export const listWorkflowsSchema = z.object({
@@ -25,14 +26,14 @@ export function handleListWorkflows(args: z.infer<typeof listWorkflowsSchema>) {
 
   const workflows: WorkflowSummaryItem[] = [];
 
-  // 1. Check .jetic/workflows/*.json
+  // 1. Check .jetic/workflows/*.json|*.yaml|*.yml
   if (fs.existsSync(workflowsDir)) {
-    const files = fs.readdirSync(workflowsDir).filter((f) => f.endsWith('.json'));
+    const files = listWorkflowFiles(workflowsDir);
     for (const file of files) {
-      const slug = file.replace(/\.json$/, '');
+      const slug = file.replace(/\.(json|ya?ml)$/, '');
       const wfPath = path.join(workflowsDir, file);
       try {
-        const data: WorkflowDef = JSON.parse(fs.readFileSync(wfPath, 'utf-8'));
+        const data: WorkflowDef = readWorkflowDefinitionFile(wfPath);
         workflows.push({
           id: slug,
           name: data.name || slug,
@@ -143,13 +144,13 @@ export async function handleSimulateWorkflow(args: z.infer<typeof simulateWorkfl
     if (!selectedItem) {
       if (fs.existsSync(args.workflow)) {
         try {
-          const fileWf: WorkflowDef = JSON.parse(fs.readFileSync(args.workflow, 'utf-8'));
+          const fileWf: WorkflowDef = readWorkflowDefinitionFile(args.workflow);
           if (!Array.isArray((fileWf as any).steps)) {
             throw new Error(`Workflow file at ${args.workflow} is invalid: missing "steps" array.`);
           }
           selectedItem = {
-            id: path.basename(args.workflow, '.json'),
-            name: fileWf.name || path.basename(args.workflow, '.json'),
+            id: path.basename(args.workflow).replace(/\.(json|ya?ml)$/, ''),
+            name: fileWf.name || path.basename(args.workflow).replace(/\.(json|ya?ml)$/, ''),
             description: fileWf.description,
             source: 'workflows_dir',
             filePath: path.resolve(args.workflow),
@@ -203,7 +204,7 @@ export async function handleSimulateWorkflow(args: z.infer<typeof simulateWorkfl
       throw new Error(`Workflow "${selectedItem.name}" has no backing file to load.`);
     }
     try {
-      workflowDef = JSON.parse(fs.readFileSync(selectedItem.filePath, 'utf-8'));
+      workflowDef = readWorkflowDefinitionFile(selectedItem.filePath);
     } catch (err: any) {
       throw new Error(`Failed to load workflow file at ${selectedItem.filePath}: ${err?.message || err}`);
     }

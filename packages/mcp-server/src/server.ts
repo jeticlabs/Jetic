@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import { SerializedTransport } from './serial-transport';
+import { toErrorResult, toTextResult } from './response-envelope';
 import {
   readModelSchema,
   handleReadModel,
@@ -57,6 +58,12 @@ import {
   scaffoldWorkflowSchema,
   handleScaffoldWorkflow,
 } from './tools/workflow-designer-tools';
+import {
+  listAgentsSchema,
+  handleListAgents,
+  runAgentSchema,
+  handleRunAgent,
+} from './tools/agent-tools';
 
 export const JETIC_MCP_SERVER_NAME = 'jetic-mcp-server';
 
@@ -192,15 +199,6 @@ const DESTRUCTIVE: ToolAnnotations = {
 };
 
 type Handler = (args: any) => unknown | Promise<unknown>;
-
-function toTextResult(result: unknown) {
-  return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-}
-
-function toErrorResult(err: unknown) {
-  const message = err instanceof Error ? err.message : String(err);
-  return { isError: true as const, content: [{ type: 'text' as const, text: message }] };
-}
 
 /**
  * Creates (but does not connect) the Jetic MCP server.
@@ -440,6 +438,25 @@ export function createJeticMcpServer(): McpServer {
     deleteWorkflowSchema.shape,
     DESTRUCTIVE,
     handleDeleteWorkflow
+  );
+
+  // ── Agents (deterministic, no LLM) ──────────────────────────────────────
+  register(
+    'jetic_list_agents',
+    'List agents',
+    'Lists registered deterministic agents (model-watcher, workflow-impact) available to jetic_run_agent.',
+    listAgentsSchema.shape,
+    READ_ONLY,
+    handleListAgents
+  );
+
+  register(
+    'jetic_run_agent',
+    'Run agent',
+    'Runs a deterministic agent synchronously and returns its result (summary, findings). Writes a report to .jetic/runs/<runId>/agent-report.json.',
+    runAgentSchema.shape,
+    WRITES_MODEL,
+    handleRunAgent
   );
 
   return server;

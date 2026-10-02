@@ -2,9 +2,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { Command } from 'commander';
 import { loadConfig, readJsonSync } from '@jetic/core';
-import { BehavioralModel, Endpoint, Environment } from '@jetic/model';
+import { BehavioralModel, Environment } from '@jetic/model';
 import { JeticMemory } from '@jetic/memory';
-import { z } from 'zod';
 import { faker } from '@faker-js/faker';
 
 // ─── ANSI Helpers ──────────────────────────────────────────────────────────────
@@ -137,246 +136,6 @@ export interface WorkflowDef {
   generatedAt: string;
   environment?: string;
   steps: WorkflowStepDef[];
-}
-
-// ─── AI workflow generator ────────────────────────────────────────────────────
-
-async function generateWorkflow(
-  model: BehavioralModel,
-  config: { ai?: { provider: string; model: string; apiKeyEnvVar: string } },
-  workflowName: string,
-): Promise<WorkflowDef> {
-  if (!config.ai) {
-    throw new Error('AI is not configured. Run `jetic config ai` first.');
-  }
-
-  const { provider, model: aiModel, apiKeyEnvVar } = config.ai;
-  const apiKey = process.env[apiKeyEnvVar];
-  if (!apiKey) throw new Error(`Missing API key in env var: ${apiKeyEnvVar}`);
-  if (provider !== 'openai' && provider !== 'openrouter') {
-    throw new Error(`Unsupported AI provider: ${provider}`);
-  }
-
-  // ── Rich endpoint catalogue ──────────────────────────────────────────────
-  const endpointSummary = model.endpoints.map((ep) => {
-    const mw   = ep.middleware.map((m) => m.name).join(', ');
-    const auth = mw ? ` [requiresAuth: ${mw}]` : ' [public]';
-
-    // Full body field list with types
-    const bodyFields = ep.requestBody?.fields
-      ? Object.entries(ep.requestBody.fields)
-          .map(([k, v]: [string, any]) => `${k}:${(v as any).type ?? 'string'}`)
-          .join(', ')
-      : '';
-    const bodyStr = bodyFields ? ` body={${bodyFields}}` : '';
-
-    // All response schemas (every status code)
-    const respParts: string[] = [];
-    for (const [status, def] of Object.entries(ep.responses ?? {})) {
-      const schema = (def as any).schema;
-      if (schema) {
-        const keys = Object.keys(schema).slice(0, 10).join(', ');
-        respParts.push(`${status}:{${keys}}`);
-      }
-    }
-    const respStr = respParts.length ? ` response=[${respParts.join(' | ')}]` : '';
-
-    return `${ep.method} ${ep.path}${auth}${bodyStr}${respStr}`;
-  }).join('\n');
-
-  const canonicalExample = `
-CANONICAL WORKFLOW FORMAT — follow this EXACTLY:
-{
-  "name": "Admin creates workspace, invites teacher, creates class and logs out",
-  "steps": [
-    {
-      "name": "Admin creates a workspace",
-      "method": "POST",
-      "path": "/api/workspaces/setup",
-      "description": "Register a new workspace with an admin account",
-      "body": {
-        "workspace_name": "{{faker.company.name}}",
-        "admin_name": "{{faker.internet.username}}",
-        "admin_email": "{{faker.internet.email}}",
-        "admin_password": "{{faker.internet.password}}"
-      },
-      "captureInput": {
-        "workflow:adminEmail": "admin_email",
-        "workflow:adminPassword": "admin_password",
-        "workflow:adminName": "admin_name",
-        "workflow:workspaceName": "workspace_name"
-      },
-      "capture": {
-        "workflow:workspaceID": "data.workspace.id",
-        "workflow:adminID": "data.admin.id"
-      },
-      "expectStatus": 201
-    },
-    {
-      "name": "Admin logs in",
-      "method": "POST",
-      "path": "/api/auth/login",
-      "description": "Authenticate with the created admin credentials",
-      "body": {
-        "user_email": "{{workflow:adminEmail}}",
-        "user_password": "{{workflow:adminPassword}}",
-        "deviceId": "{{faker.string.uuid}}",
-        "deviceName": "{{faker.commerce.productName}}"
-      },
-      "capture": {
-        "workflow:accessToken": "data.accessToken",
-        "workflow:refreshToken": "data.refreshToken"
-      },
-      "expectStatus": 200
-    },
-    {
-      "name": "Admin creates a class",
-      "method": "POST",
-      "path": "/api/classes",
-      "description": "Create a class inside the workspace using the access token",
-      "inject": {
-        "header:Authorization": "Bearer {{workflow:accessToken}}"
-      },
-      "body": {
-        "name": "{{faker.word.noun}} Class",
-        "workspaceId": "{{workflow:workspaceID}}"
-      },
-      "capture": {
-        "workflow:classID": "data.id"
-      },
-      "expectStatus": 201
-    },
-    {
-      "name": "Admin logs out",
-      "method": "POST",
-      "path": "/api/auth/logout",
-      "description": "Invalidate the admin session",
-      "inject": {
-        "header:Authorization": "Bearer {{workflow:accessToken}}"
-      },
-      "body": {},
-      "expectStatus": 200
-    }
-  ]
-}`;
-
-  const prompt = `You are an expert API integration test designer.
-Output a workflow JSON that exercises a real end-to-end user journey for the API below.
-
-━━━ PROJECT ━━━
-Name: ${model.project.name}
-Framework: ${model.project.framework}
-Workflow goal: "${workflowName}"
-
-━━━ API ENDPOINTS ━━━
-${endpointSummary}
-
-━━━ TEMPLATE SYNTAX ━━━
-Use EXACTLY these placeholders in body/inject values:
-  {{faker.internet.email}}         random email
-  {{faker.internet.password}}      random password
-  {{faker.internet.username}}      random username
-  {{faker.company.name}}           random company name
-  {{faker.person.fullName}}        random full name
-  {{faker.word.noun}}              random noun
-  {{faker.word.adjective}}         random adjective
-  {{faker.string.uuid}}            UUID v4
-  {{faker.commerce.productName}}   product name
-  {{faker.phone.number}}           phone number
-  {{workflow:KEY}}                 value captured from a previous step
-  {{human:KEY}}                    ask the human at runtime (interactive prompt, waits for input).
-                                   Use ONLY for values unknowable beforehand (OTP/2FA codes,
-                                   CAPTCHAs, real personal secrets). First entry is saved to
-                                   human:KEY memory; JETIC_HUMAN_KEY env var skips the prompt.
-
- ━━━ FIELD RULES ━━━
-"body"         — request body. Use {{faker.*}} for generated fields, {{workflow:KEY}} for previously captured values.
-                 Use {{human:KEY}} SPARINGLY and only when no other source exists (OTP codes, real secrets) —
-                 it pauses execution waiting for a person to type a value.
-
-"captureInput" — save RESOLVED body field values to memory BEFORE the HTTP call.
-               Only for faker-generated fields you need to re-use in later steps.
-               Format: { "workflow:KEY": "bodyFieldName" }
-               Example: { "workflow:adminEmail": "admin_email" }
-               ⚠ Only capture fields present in THIS step's body.
-
-"capture"      — save RESPONSE body field values to memory AFTER success.
-               Format: { "workflow:KEY": "dot.notation.path" }
-               Example: { "workflow:accessToken": "data.accessToken" }
-               ⚠ Use exact dot-notation paths from the response schema shown above.
-               ⚠ Only capture values that subsequent steps actually need.
-
-"inject"       — inject memory values into headers/body before this step runs.
-               Bearer auth: { "header:Authorization": "Bearer {{workflow:accessToken}}" }
-               Body inject: { "body:fieldName": "{{workflow:KEY}}" }
-               ⚠ EVERY endpoint marked [requiresAuth] MUST inject the Authorization header.
-
-"expectStatus" — 201 for resource creation, 200 for login/logout/GET, 204 for DELETE.
-
-━━━ ORDERING ━━━
-1. Registration / setup  (public, faker body, captureInput for credentials)
-2. Authentication        (login with captured creds, capture tokens)
-3. CRUD operations       (inject auth, reference captured IDs in body)
-4. Cleanup / logout      (inject auth)
-
-━━━ EXAMPLE ━━━
-${canonicalExample}
-
-━━━ GENERATE ━━━
-Using ONLY the endpoints listed above (exact methods and paths), generate a complete
-workflow JSON for: "${workflowName}".
-Requirements: 5-12 steps, every step has name/method/path/description/body/expectStatus,
-all [requiresAuth] endpoints inject Authorization, captures wired correctly between steps.
-`;
-
-  const importDynamic = new Function('modulePath', 'return import(modulePath)');
-  const { generateObject } = await importDynamic('ai');
-
-  let aiModelObj: any;
-  if (provider === 'openai') {
-    const { createOpenAI } = await importDynamic('@ai-sdk/openai');
-    aiModelObj = createOpenAI({ apiKey })(aiModel);
-  } else {
-    const { createOpenRouter } = await importDynamic('@openrouter/ai-sdk-provider');
-    aiModelObj = createOpenRouter({ apiKey })(aiModel);
-  }
-
-  // ── Strict Zod schema — matches canonical format exactly ──────────────────
-  const StepSchema = z.object({
-    name:         z.string().describe('Short label for this step, e.g. "Admin logs in"'),
-    method:       z.string().describe('HTTP method in uppercase: GET, POST, PUT, PATCH, DELETE'),
-    path:         z.string().describe('Exact endpoint path, e.g. /api/auth/login'),
-    description:  z.string().optional().describe('One sentence describing what this step does'),
-    body:         z.record(z.string(), z.any()).optional()
-                    .describe('Request body. Use {{faker.X}} for generated values, {{workflow:KEY}} for captured values, {{human:KEY}} only for OTP/secret values a person must type at runtime'),
-    captureInput: z.record(z.string(), z.string()).optional()
-                    .describe('Save resolved request body fields to memory BEFORE the HTTP call. Format: { "workflow:KEY": "bodyFieldName" }'),
-    capture:      z.record(z.string(), z.string()).optional()
-                    .describe('Save response body fields to memory AFTER success. Format: { "workflow:KEY": "dot.path" }'),
-    inject:       z.record(z.string(), z.string()).optional()
-                    .describe('Inject memory values into headers/body. Use "header:Authorization" for Bearer auth'),
-    expectStatus: z.number().int().min(100).max(599)
-                    .describe('Expected HTTP status: 201 for creates, 200 for others, 204 for deletes'),
-  });
-
-  const WorkflowSchema = z.object({
-    name:  z.string().describe('Descriptive workflow name summarising the journey tested'),
-    steps: z.array(StepSchema).min(3).max(15),
-  });
-
-  const { object } = await generateObject({
-    model:     aiModelObj,
-    mode:      'json',
-    maxTokens: 4000,
-    schema:    WorkflowSchema,
-    prompt,
-  });
-
-  return {
-    name:        object.name as string,
-    generatedAt: new Date().toISOString(),
-    steps:       object.steps as WorkflowStepDef[],
-  };
 }
 
 // ─── Deep-get value from object using dot-notation ────────────────────────────
@@ -976,18 +735,14 @@ async function pickEnvironment(model: BehavioralModel): Promise<string> {
 // ─── Command: jetic simulate workflow ────────────────────────────────────────
 
 export const simulateWorkflowCommand = new Command('workflow')
-  .description('Generate and execute a full end-to-end workflow test from model.json')
-  .option('--goal <text>', 'Describe the workflow goal', 'Full user journey')
+  .description('Execute a saved multi-step workflow against the API')
   .option('--env <name>', 'Environment name to use from model.json')
-  .option('--workflow <value>', 'Workflow name/slug or file path to use instead of generating')
-  .option('--generate-only', 'Only generate the workflow file without executing')
+  .option('--workflow <value>', 'Workflow slug or file path to execute')
   .option('--clear-memory', 'Clear Jetic memory before running', false)
   .option('--list', 'List all available workflows in .jetic/workflows/')
   .action(async (options: {
-    goal: string;
     env?: string;
     workflow?: string;
-    generateOnly?: boolean;
     clearMemory?: boolean;
     list?: boolean;
   }) => {
@@ -1013,7 +768,7 @@ export const simulateWorkflowCommand = new Command('workflow')
 
       if (slugs.length === 0 && !hasLegacy) {
         console.log(`  ${c.yellow}No workflows found.${c.reset}`);
-        console.log(`  ${c.dim}Run \`jetic simulate workflow --goal "<description>"\` to generate one.${c.reset}\n`);
+        console.log(`  ${c.dim}Create a workflow file in ${workflowsDir}, then run it with --workflow <slug>.${c.reset}\n`);
         process.exit(0);
       }
 
@@ -1038,6 +793,12 @@ export const simulateWorkflowCommand = new Command('workflow')
 
       console.log('');
       process.exit(0);
+    }
+
+    if (!options.workflow) {
+      console.error(`  ${c.red}Specify --workflow <slug|path> to execute a saved workflow, or use --list.${c.reset}\n`);
+      process.exitCode = 2;
+      return;
     }
 
     // ── Banner ────────────────────────────────────────────────────────────────
@@ -1100,33 +861,8 @@ export const simulateWorkflowCommand = new Command('workflow')
         process.exit(1);
       }
     } else {
-      // Generate with AI — save to .jetic/workflows/<slug>.json
-      const slug = options.goal.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workflow';
-      workflowPath = path.join(workflowsDir, `${slug}.json`);
-
-      const spinner = new Spinner();
-      spinner.start(`${c.magenta}🤖 AI generating workflow for: "${options.goal}"...${c.reset}`);
-
-      try {
-        workflow = await generateWorkflow(model, config, options.goal);
-        spinner.stop(`  ${TICK} Workflow generated: ${c.bold}${workflow.name}${c.reset}  ${c.dim}(${workflow.steps.length} steps)${c.reset}`);
-
-        fs.mkdirSync(workflowsDir, { recursive: true });
-        fs.writeFileSync(workflowPath, JSON.stringify(workflow, null, 2), 'utf-8');
-        console.log(`  ${c.dim}   Saved to ${workflowPath}${c.reset}\n`);
-      } catch (err: any) {
-        spinner.stop(`  ${c.red}✗${c.reset} Failed to generate workflow`);
-        console.error(`\n  ${c.red}${err.message}${c.reset}\n`);
-        console.error(`  ${c.dim}Make sure AI is configured: jetic config ai${c.reset}\n`);
-        process.exit(1);
-      }
-    }
-
-    // ── Generate-only mode ────────────────────────────────────────────────────
-    if (options.generateOnly) {
-      renderWorkflowHeader(workflow);
-      console.log(`  ${c.green}✓${c.reset} Workflow saved. Run without ${c.bold}--generate-only${c.reset} to execute.\n`);
-      process.exit(0);
+      process.exitCode = 2;
+      return;
     }
 
     // ── Pick environment ──────────────────────────────────────────────────────

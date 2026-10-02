@@ -8,6 +8,26 @@ export interface SourceReference {
   column?: number;
 }
 
+export type FactStatus = 'verified' | 'inferred' | 'unknown';
+
+export interface Evidence {
+  kind: 'static' | 'runtime' | 'spec' | 'test';
+  file?: string;
+  line?: number;
+  symbol?: string;
+  runId?: string;
+  note: string;
+}
+
+export interface Fact<T = unknown> {
+  value: T | null;
+  status: FactStatus;
+  confidence: number;
+  evidence: Evidence[];
+}
+
+export type JsonSchema = Record<string, unknown>;
+
 // ─── Environments ───────────────────────────────────────────────────────────
 
 export interface EnvironmentVariable {
@@ -82,7 +102,7 @@ export interface ConstraintThen {
   type: string;
 }
 
-export interface Constraint {
+export interface LegacyConstraint {
   field?: string;
   rule?: string;
   value?: any;
@@ -94,13 +114,23 @@ export interface Constraint {
   then?: ConstraintThen;
 }
 
+export type Constraint =
+  | { kind: 'min' | 'max'; field: string; value: number; inclusive: boolean }
+  | { kind: 'minLength' | 'maxLength'; field: string; value: number }
+  | { kind: 'enum'; field: string; values: (string | number)[] }
+  | { kind: 'required'; field: string }
+  | { kind: 'pattern'; field: string; regex: string }
+  | { kind: 'role'; roles: string[] }
+  | { kind: 'state'; entity: string; allowedStates: string[] }
+  | { kind: 'unparsed'; source: string };
+
 // ─── Request / Response ─────────────────────────────────────────────────────
 
 export interface RequestBody {
   contentType: string | null;
   required?: boolean;
   fields: Record<string, FieldDefinition>;
-  constraints?: Constraint[];
+  constraints?: LegacyConstraint[];
 }
 
 export interface ResponseDefinition {
@@ -195,6 +225,13 @@ export interface Endpoint {
   id: string;
   method: HttpMethod;
   path: string;
+
+  /** Evidence-backed contract fields. */
+  auth?: Fact<EndpointSecurity[]>;
+  authorization?: Fact<OwnershipConfig>;
+  requestSchema?: Fact<JsonSchema>;
+  responseSchemas?: Record<string, Fact<JsonSchema>>;
+  constraints?: Fact<Constraint[]>;
 
   /** Human-readable name, e.g. "Create User" */
   name?: string;

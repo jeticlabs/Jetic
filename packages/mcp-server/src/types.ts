@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { BehavioralModel, CURRENT_MODEL_VERSION } from '@jetic/model';
+import { BehavioralModel, CURRENT_MODEL_VERSION, hasYamlModel, loadModelFromDir } from '@jetic/model';
 
 /** Name of the environment variable that pins the server to a project root. */
 export const JETIC_PROJECT_PATH_ENV = 'JETIC_PROJECT_PATH';
@@ -101,6 +101,16 @@ function createDefaultModel(projectRoot: string): BehavioralModel {
  */
 export function loadModel(targetPath?: string): LoadedModel {
   const filePath = resolveModelPath(targetPath);
+  const jeticDir = path.dirname(filePath);
+  const modelDir = path.join(jeticDir, 'model');
+
+  // Prefer the split-YAML layout (project.md §16) when it exists; model.json stays the write target.
+  if (hasYamlModel(modelDir)) {
+    const model = loadModelFromDir(modelDir);
+    if (!Array.isArray(model.endpoints)) model.endpoints = [];
+    if (!Array.isArray(model.environments)) model.environments = [];
+    return { model, filePath, exists: true };
+  }
 
   if (!fs.existsSync(filePath)) {
     const projectRoot = path.basename(path.dirname(filePath)) === '.jetic'

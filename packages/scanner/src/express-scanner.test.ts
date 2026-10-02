@@ -4,7 +4,7 @@ import * as path from 'path';
 describe('ExpressScanner', () => {
   it('discovers routes accurately from the fixture', async () => {
     const fixturePath = path.resolve(__dirname, '../../../examples/express-shop');
-    const scanner = new ExpressScanner({ projectRoot: fixturePath, jeticDir: path.join(fixturePath, '.jetic') });
+    const scanner = new ExpressScanner({ projectRoot: fixturePath, jeticDir: path.join(fixturePath, '.jetic') } as any);
     const model = await scanner.scan();
 
     expect(model.endpoints.length).toBeGreaterThan(0);

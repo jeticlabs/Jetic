@@ -32,18 +32,9 @@ importers:
 
   apps/cli:
     dependencies:
-      '@ai-sdk/openai':
-        specifier: ^4.0.41
-        version: 4.0.41(zod@3.25.76)
       '@faker-js/faker':
         specifier: ^9.0.0
         version: 9.9.0
-      '@openrouter/ai-sdk-provider':
-        specifier: ^3.0.0
-        version: 3.0.0(ai@7.0.65(zod@3.25.76))(zod@3.25.76)
-      ai:
-        specifier: ^7.0.65
-        version: 7.0.65(zod@3.25.76)
       commander:
         specifier: ^12.0.0
         version: 12.1.0
@@ -54,6 +45,27 @@ importers:
         specifier: ^3.23.8
         version: 3.25.76
     devDependencies:
+      '@jetic/adapter-express':
+        specifier: workspace:*
+        version: link:../../packages/adapter-express
+      '@jetic/adapter-fastify':
+        specifier: workspace:*
+        version: link:../../packages/adapter-fastify
+      '@jetic/adapter-hono':
+        specifier: workspace:*
+        version: link:../../packages/adapter-hono
+      '@jetic/adapter-nestjs':
+        specifier: workspace:*
+        version: link:../../packages/adapter-nestjs
+      '@jetic/adapter-nextjs':
+        specifier: workspace:*
+        version: link:../../packages/adapter-nextjs
+      '@jetic/agent-sdk':
+        specifier: workspace:*
+        version: link:../../packages/agent-sdk
+      '@jetic/agents':
+        specifier: workspace:*
+        version: link:../../packages/agents
       '@jetic/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -72,6 +84,12 @@ importers:
       '@jetic/scanner':
         specifier: workspace:*
         version: link:../../packages/scanner
+      '@jetic/scanner-sdk':
+        specifier: workspace:*
+        version: link:../../packages/scanner-sdk
+      '@jetic/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       '@jetic/simulator':
         specifier: workspace:*
         version: link:../../packages/simulator
@@ -189,6 +207,90 @@ importers:
         specifier: 7.1.4
         version: 7.1.4(@types/node@20.19.43)(jiti@2.7.0)(lightningcss@1.30.1)
 
+  packages/adapter-express:
+    dependencies:
+      '@jetic/core':
+        specifier: workspace:*
+        version: link:../core
+      '@jetic/model':
+        specifier: workspace:*
+        version: link:../model
+      '@jetic/scanner':
+        specifier: workspace:*
+        version: link:../scanner
+      '@jetic/scanner-sdk':
+        specifier: workspace:*
+        version: link:../scanner-sdk
+
+  packages/adapter-fastify:
+    dependencies:
+      '@jetic/model':
+        specifier: workspace:*
+        version: link:../model
+      '@jetic/scanner-sdk':
+        specifier: workspace:*
+        version: link:../scanner-sdk
+      ts-morph:
+        specifier: ^21.0.1
+        version: 21.0.1
+
+  packages/adapter-hono:
+    dependencies:
+      '@jetic/model':
+        specifier: workspace:*
+        version: link:../model
+      '@jetic/scanner-sdk':
+        specifier: workspace:*
+        version: link:../scanner-sdk
+      ts-morph:
+        specifier: ^21.0.1
+        version: 21.0.1
+
+  packages/adapter-nestjs:
+    dependencies:
+      '@jetic/model':
+        specifier: workspace:*
+        version: link:../model
+      '@jetic/scanner-sdk':
+        specifier: workspace:*
+        version: link:../scanner-sdk
+      ts-morph:
+        specifier: ^21.0.1
+        version: 21.0.1
+
+  packages/adapter-nextjs:
+    dependencies:
+      '@jetic/model':
+        specifier: workspace:*
+        version: link:../model
+      '@jetic/scanner-sdk':
+        specifier: workspace:*
+        version: link:../scanner-sdk
+      ts-morph:
+        specifier: ^21.0.1
+        version: 21.0.1
+
+  packages/agent-sdk:
+    dependencies:
+      '@jetic/core':
+        specifier: workspace:*
+        version: link:../core
+      '@jetic/model':
+        specifier: workspace:*
+        version: link:../model
+
+  packages/agents:
+    dependencies:
+      '@jetic/agent-sdk':
+        specifier: workspace:*
+        version: link:../agent-sdk
+      '@jetic/core':
+        specifier: workspace:*
+        version: link:../core
+      '@jetic/model':
+        specifier: workspace:*
+        version: link:../model
+
   packages/core: {}
 
   packages/mcp-server:
@@ -196,6 +298,12 @@ importers:
       '@faker-js/faker':
         specifier: ^9.0.0
         version: 9.9.0
+      '@jetic/agent-sdk':
+        specifier: workspace:*
+        version: link:../agent-sdk
+      '@jetic/agents':
+        specifier: workspace:*
+        version: link:../agents
       '@jetic/core':
         specifier: workspace:*
         version: link:../core
@@ -227,34 +335,42 @@ importers:
 
   packages/memory: {}
 
-  packages/model: {}
+  packages/model:
+    dependencies:
+      js-yaml:
+        specifier: ^4.1.0
+        version: 4.3.1
+    devDependencies:
+      '@types/js-yaml':
+        specifier: ^4.0.9
+        version: 4.0.9
 
   packages/scanner:
     dependencies:
-      '@ai-sdk/openai':
-        specifier: ^4.0.41
-        version: 4.0.41(zod@4.4.3)
       '@jetic/core':
         specifier: workspace:*
         version: link:../core
       '@jetic/model':
         specifier: workspace:*
         version: link:../model
-      '@openrouter/ai-sdk-provider':
-        specifier: ^3.0.0
-        version: 3.0.0(ai@7.0.65(zod@4.4.3))(zod@4.4.3)
-      ai:
-        specifier: ^7.0.65
-        version: 7.0.65(zod@4.4.3)
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
       ts-morph:
         specifier: ^21.0.1
         version: 21.0.1
       zod:
         specifier: ^4.4.3
         version: 4.4.3
+
+  packages/scanner-sdk:
+    dependencies:
+      '@jetic/model':
+        specifier: workspace:*
+        version: link:../model
+
+  packages/sdk:
+    dependencies:
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
 
   packages/simulator:
     dependencies:
@@ -272,28 +388,6 @@ importers:
         version: link:../model
 
 packages:
-
-  '@ai-sdk/gateway@4.0.52':
-    resolution: {integrity: sha512-SXUM8jzzuTUJRq+EOgPd5to6DSx0EKslVn+IVZHbUEX6k/3vCPNrvjckbK26HnNxHU/STxm+zTSJteqrO+7Z0w==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/openai@4.0.41':
-    resolution: {integrity: sha512-+WoY0JyF/uV2z+rye7I+hYaVg+hTanG4rYIgsWKvJFDXaAdu9yg07x+BRa2vTgUqzLIBXEBp5d1T7DwMI9ZGlw==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/provider-utils@5.0.27':
-    resolution: {integrity: sha512-EzAn4pdgG5g0xXtH6lE2zyNmfjDQIDjATkfqzuidEI35g++hh4+07vnjzkT/RmGmIClPZiRj/Q2GMPV2V7mkHw==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/provider@4.0.7':
-    resolution: {integrity: sha512-6or44XprPzKbr8zkmzosowSE0pxkvJcoojBL+mCZvPUt3kvXp3XSNqeVun9golb1acEfSo6yaEBRT18h2VU+1Q==}
-    engines: {node: '>=22'}
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -970,13 +1064,6 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@openrouter/ai-sdk-provider@3.0.0':
-    resolution: {integrity: sha512-m9XTSWoODH2RM5OsZpaGiN7QRR8cdP5paBWq699Tu3JVmGPBKT8xF8XwV0ZBVVsjikD/JgWfak4VSsTR4wAVbg==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      ai: ^7.0.0
-      zod: ^3.25.76 || ^4.1.8
-
   '@oxfmt/binding-android-arm-eabi@0.59.0':
     resolution: {integrity: sha512-bNTnfbuG7sAwb2PakMNaDukx5kXeW9duXOBeWtTOiLz3fXz3q2DlWguufPZ+c2IHEVrRXHD+M4aUgEWm841LDA==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1437,9 +1524,6 @@ packages:
   '@sinonjs/fake-timers@10.3.0':
     resolution: {integrity: sha512-V4BG07kuYSUkTCSBHG8G8TNhM+F19jXFWnQtzj+we8DrkpSBCee9Z3Ms8yiGer/dlmhe35/Xdgyo3/0rQKg7YA==}
 
-  '@standard-schema/spec@1.1.0':
-    resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
-
   '@swc/core-darwin-arm64@1.16.1':
     resolution: {integrity: sha512-zlJblJ8ncErD43lKdxjbUaUskJQf+LxiPXYcWXD8/8ZMV+7uuAT+CwjciLXpyZBd5Pq/S726bMpeeAwSeL1hhg==}
     engines: {node: '>=10'}
@@ -1792,6 +1876,9 @@ packages:
   '@types/jest@29.5.14':
     resolution: {integrity: sha512-ZN+4sdnLUbo8EVvVc2ao0GFW6oVrQRPn4K2lglySj7APvSrgzxHiNNK99us4WDMi57xxA2yggblIAMNhXOotLQ==}
 
+  '@types/js-yaml@4.0.9':
+    resolution: {integrity: sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg==}
+
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
 
@@ -1845,18 +1932,11 @@ packages:
   '@ungap/structured-clone@1.4.0':
     resolution: {integrity: sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ==}
 
-  '@vercel/oidc@3.2.0':
-    resolution: {integrity: sha512-UycprH3T6n3jH0k44NHMa7pnFHGu/N05MjojYr+Mc6I7obkoLIJujSWwin1pCvdy/eOxrI/l3uDLQsmcrOb4ug==}
-    engines: {node: '>= 20'}
-
   '@vitejs/plugin-react-swc@4.0.1':
     resolution: {integrity: sha512-NQhPjysi5duItyrMd5JWZFf2vNOuSMyw+EoZyTBDzk+DkfYD8WNrsUs09sELV2cr1P15nufsN25hsUBt4CKF9Q==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       vite: ^4 || ^5 || ^6 || ^7
-
-  '@workflow/serde@4.1.0':
-    resolution: {integrity: sha512-pav4F2BoirECWR7Nf1TKt+2eETcBj7jj4cBefQ8VXQCA6NPkaKeLfj/zMgi+3zYV5ZIBT4GuUiphsj0/b9hPQQ==}
 
   accepts@1.3.8:
     resolution: {integrity: sha512-PYAthTa2m2VKxuvSD3DPC/Gy+U+sOA1LAuT8mkmRuvw+NACSaeXEQ+NHcVF7rONl6qcaxV3Uuemwawk+7+SJLw==}
@@ -1879,12 +1959,6 @@ packages:
     resolution: {integrity: sha512-lGq+9yr1/GuAWaVYIHRjvvySG5/4VfKIvC8EWxStPdcDh/Ka7FG3twP6v4d5BkravUilhIAsG4Qj83t02LWUPQ==}
     engines: {node: '>=0.4.0'}
     hasBin: true
-
-  ai@7.0.65:
-    resolution: {integrity: sha512-Uzom971mOHETL9tbeCWDEgbAA/Banj0KnR2obNEWPEUlGnAv2NJjFIxrUZ6F0XxHFDgGVVpnz86BB2CPOZZ83g==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
 
   ajv-formats@3.0.1:
     resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
@@ -2276,10 +2350,6 @@ packages:
   diff@4.0.4:
     resolution: {integrity: sha512-X07nttJQkwkfKfvTPG/KSnE2OMdcUCao6+eXF3wmnIQRn2aPAHH3VxDbDOdegkd6JbPsXqShpvEOHfAT+nCNwQ==}
     engines: {node: '>=0.3.1'}
-
-  dotenv@17.4.2:
-    resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
-    engines: {node: '>=12'}
 
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
@@ -2911,9 +2981,6 @@ packages:
 
   json-schema-typed@8.0.2:
     resolution: {integrity: sha512-fQhoXdcvc3V28x7C7BMs4P5+kNlgUURe2jmUT1T//oBRMDrqy1QPelJimwZGo7Hg9VPV3EQV5Bnq4hbFy2vetA==}
-
-  json-schema@0.4.0:
-    resolution: {integrity: sha512-es94M3nTIfsEPisRafak+HDLfHXnKBhV3vU5eqPcS3flIWqcxJWgXHXiey3YrpaNsanY5ei1VoYEbOzijuq9BA==}
 
   json-stable-stringify-without-jsonify@1.0.1:
     resolution: {integrity: sha512-Bdboy+l7tA3OGW6FjyFHWkP5LuByj1Tk33Ljyq0axyzdk9//JSi2u3fP1QSmd1KNwq6VOKYGlAu87CisVir6Pw==}
@@ -3931,10 +3998,6 @@ packages:
   undici-types@8.3.0:
     resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
 
-  undici@7.29.0:
-    resolution: {integrity: sha512-IDxfleLmmbSskfWSUATiN1nfn2rDuvnMOqb5CWR92iIfojA0Ud+ulOAAEQ57LPr9rWmsreUyf5lwyao+7GNNVw==}
-    engines: {node: '>=20.18.1'}
-
   unified@11.0.5:
     resolution: {integrity: sha512-xKvGhPWw3k84Qjh8bI3ZeJjqnyadK+GEFtazSfZv/rKeTkTjOJho6mFqh2SM96iIcZokxiOpg78GazTSg8+KHA==}
 
@@ -4115,54 +4178,6 @@ packages:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
 snapshots:
-
-  '@ai-sdk/gateway@4.0.52(zod@3.25.76)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.27(zod@3.25.76)
-      '@vercel/oidc': 3.2.0
-      zod: 3.25.76
-
-  '@ai-sdk/gateway@4.0.52(zod@4.4.3)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.27(zod@4.4.3)
-      '@vercel/oidc': 3.2.0
-      zod: 4.4.3
-
-  '@ai-sdk/openai@4.0.41(zod@3.25.76)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.27(zod@3.25.76)
-      zod: 3.25.76
-
-  '@ai-sdk/openai@4.0.41(zod@4.4.3)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.27(zod@4.4.3)
-      zod: 4.4.3
-
-  '@ai-sdk/provider-utils@5.0.27(zod@3.25.76)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.7
-      '@standard-schema/spec': 1.1.0
-      '@workflow/serde': 4.1.0
-      eventsource-parser: 3.1.1
-      undici: 7.29.0
-      zod: 3.25.76
-
-  '@ai-sdk/provider-utils@5.0.27(zod@4.4.3)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.7
-      '@standard-schema/spec': 1.1.0
-      '@workflow/serde': 4.1.0
-      eventsource-parser: 3.1.1
-      undici: 7.29.0
-      zod: 4.4.3
-
-  '@ai-sdk/provider@4.0.7':
-    dependencies:
-      json-schema: 0.4.0
 
   '@babel/code-frame@7.29.7':
     dependencies:
@@ -4820,16 +4835,6 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@openrouter/ai-sdk-provider@3.0.0(ai@7.0.65(zod@3.25.76))(zod@3.25.76)':
-    dependencies:
-      ai: 7.0.65(zod@3.25.76)
-      zod: 3.25.76
-
-  '@openrouter/ai-sdk-provider@3.0.0(ai@7.0.65(zod@4.4.3))(zod@4.4.3)':
-    dependencies:
-      ai: 7.0.65(zod@4.4.3)
-      zod: 4.4.3
-
   '@oxfmt/binding-android-arm-eabi@0.59.0':
     optional: true
 
@@ -5126,8 +5131,6 @@ snapshots:
   '@sinonjs/fake-timers@10.3.0':
     dependencies:
       '@sinonjs/commons': 3.0.1
-
-  '@standard-schema/spec@1.1.0': {}
 
   '@swc/core-darwin-arm64@1.16.1':
     optional: true
@@ -5476,6 +5479,8 @@ snapshots:
       expect: 29.7.0
       pretty-format: 29.7.0
 
+  '@types/js-yaml@4.0.9': {}
+
   '@types/json-schema@7.0.15': {}
 
   '@types/mdast@4.0.4':
@@ -5527,8 +5532,6 @@ snapshots:
 
   '@ungap/structured-clone@1.4.0': {}
 
-  '@vercel/oidc@3.2.0': {}
-
   '@vitejs/plugin-react-swc@4.0.1(vite@7.1.4(@types/node@20.19.43)(jiti@2.7.0)(lightningcss@1.30.1))':
     dependencies:
       '@rolldown/pluginutils': 1.0.0-beta.32
@@ -5536,8 +5539,6 @@ snapshots:
       vite: 7.1.4(@types/node@20.19.43)(jiti@2.7.0)(lightningcss@1.30.1)
     transitivePeerDependencies:
       - '@swc/helpers'
-
-  '@workflow/serde@4.1.0': {}
 
   accepts@1.3.8:
     dependencies:
@@ -5559,20 +5560,6 @@ snapshots:
     optional: true
 
   acorn@8.18.0: {}
-
-  ai@7.0.65(zod@3.25.76):
-    dependencies:
-      '@ai-sdk/gateway': 4.0.52(zod@3.25.76)
-      '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.27(zod@3.25.76)
-      zod: 3.25.76
-
-  ai@7.0.65(zod@4.4.3):
-    dependencies:
-      '@ai-sdk/gateway': 4.0.52(zod@4.4.3)
-      '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.27(zod@4.4.3)
-      zod: 4.4.3
 
   ajv-formats@3.0.1(ajv@8.20.0):
     optionalDependencies:
@@ -5952,8 +5939,6 @@ snapshots:
 
   diff@4.0.4:
     optional: true
-
-  dotenv@17.4.2: {}
 
   dunder-proto@1.0.1:
     dependencies:
@@ -6921,8 +6906,6 @@ snapshots:
   json-schema-traverse@1.0.0: {}
 
   json-schema-typed@8.0.2: {}
-
-  json-schema@0.4.0: {}
 
   json-stable-stringify-without-jsonify@1.0.1: {}
 
@@ -8172,8 +8155,6 @@ snapshots:
   undici-types@6.21.0: {}
 
   undici-types@8.3.0: {}
-
-  undici@7.29.0: {}
 
   unified@11.0.5:
     dependencies:

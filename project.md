@@ -1,974 +1,2632 @@
-<div align="center">
+# Jetic CLI — Full Product Description
 
-# jcode
+**Jetic is a code-aware, agentic API behavior testing toolkit for Node.js and modern application frameworks.**
 
-[![Latest Release](https://badgen.net/github/release/1jehuang/jcode?icon=github)](https://github.com/1jehuang/jcode/releases)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
-[![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue?style=flat-square)](https://github.com/1jehuang/jcode/releases)
-[![Last Commit](https://badgen.net/github/last-commit/1jehuang/jcode/master?icon=github)](https://github.com/1jehuang/jcode/commits/master)
-[![GitHub Stars](https://badgen.net/github/stars/1jehuang/jcode?icon=github)](https://github.com/1jehuang/jcode/stargazers)
-[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/nBe9vGyK9a)
-
-The most RAM efficient harness <br>
-The most intelligent harness
-
-<a href="https://trendshift.io/repositories/25042?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-25042" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/25042" alt="1jehuang/jcode | Trendshift" width="250" height="55"></a>
-
-<a href="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-yc-launch.mp4">
-  <img src="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-yc-launch.webp" alt="jcode YC launch video" width="800">
-</a>
-
-<br>
-
-[Website](https://jcode.sh) · [Docs](https://jcode.sh/docs) · [SDK](https://jcode.sh/sdk) · [Benchmarks](https://jcode.sh/bench) · [Features](#features) · [Install](#installation) · [Quick Start](#quick-start) · [Further Reading](#further-reading) · [Contributing](CONTRIBUTING.md)
-
-</div>
-
----
-
-<div align="center">
-
-## Installation
-
-</div>
-
-```bash
-# macOS & Linux
-curl -fsSL https://jcode.sh/install | bash
-```
-
-```powershell
-# Windows 11 (PowerShell 5.1+)
-irm https://jcode.sh/install.ps1 | iex
-```
-
-Need Homebrew, source builds, provider setup, or want an agent to set it up for you?
-[Jump to detailed installation](#detailed-installation).
-
-### Updating
-
-Run `/update` in the TUI to download the latest stable release in the background
-and reload with your session preserved. From a terminal, use `jcode update`, then
-restart the client. Both commands use the same update policy, including for dev builds.
-
-Older or equal release versions are skipped. For a development build, Jcode also
-compares the running binary's Git commit with the release tag. Builds ahead of,
-identical to, or diverged from the release are preserved. If ancestry cannot be
-verified locally or through GitHub, the update stops rather than risking a downgrade.
-The displayed dev patch includes a commit-count offset, so it is not used as a
-release version comparison.
-
-This is the default `features.update_channel = "stable"` behavior. An explicit
-`"main"` channel still opts into source-branch updates. Use `/rebuild` or the
-self-dev build workflow to rebuild your own checkout.
-
----
-
-
-<div align="center">
-
-## Performance & Resource Efficiency
-
-</div>
-
-jcode is built to be as performant and resource efficient as possible. Every metric is optimized to the bone, which is important for scaling multi-session workflows. Here we sample a few metrics to show the difference: RAM usage and boot up.
-
-### RAM comparison
-
-<div align="center">
-
-<table>
-  <tr>
-    <td valign="top" align="center" width="50%">
-      <strong>1 active session</strong>
-      <table>
-        <thead>
-          <tr>
-            <th>Tool</th>
-            <th>PSS</th>
-            <th>Comparison</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>jcode (local embedding off)</strong></td>
-            <td align="right"><strong>27.8 MB</strong></td>
-            <td align="right">baseline</td>
-          </tr>
-          <tr>
-            <td><strong>jcode</strong></td>
-            <td align="right"><strong>167.1 MB</strong></td>
-            <td align="right"><strong>6.0× more RAM</strong></td>
-          </tr>
-          <tr>
-            <td><strong>pi</strong></td>
-            <td align="right"><strong>144.4 MB</strong></td>
-            <td align="right"><strong>5.2× more RAM</strong></td>
-          </tr>
-          <tr>
-            <td><strong>Codex CLI</strong></td>
-            <td align="right"><strong>140.0 MB</strong></td>
-            <td align="right"><strong>5.0× more RAM</strong></td>
-          </tr>
-          <tr>
-            <td><strong>OpenCode</strong></td>
-            <td align="right"><strong>371.5 MB</strong></td>
-            <td align="right"><strong>13.4× more RAM</strong></td>
-          </tr>
-          <tr>
-            <td><strong>GitHub Copilot CLI</strong></td>
-            <td align="right"><strong>333.3 MB</strong></td>
-            <td align="right"><strong>12.0× more RAM</strong></td>
-          </tr>
-          <tr>
-            <td><strong>Cursor Agent</strong></td>
-            <td align="right"><strong>214.9 MB</strong></td>
-            <td align="right"><strong>7.7× more RAM</strong></td>
-          </tr>
-          <tr>
-            <td><strong>Claude Code</strong></td>
-            <td align="right"><strong>386.6 MB</strong></td>
-            <td align="right"><strong>13.9× more RAM</strong></td>
-          </tr>
-          <tr>
-            <td><strong>Antigravity CLI</strong></td>
-            <td align="right"><strong>243.7 MB</strong></td>
-            <td align="right"><strong>8.8× more RAM</strong></td>
-          </tr>
-        </tbody>
-      </table>
-    </td>
-    <td width="24"></td>
-    <td valign="top" align="center" width="50%">
-      <strong>10 active sessions</strong>
-      <table>
-        <thead>
-          <tr>
-            <th>Tool</th>
-            <th>PSS</th>
-            <th>Comparison</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>jcode (local embedding off)</strong></td>
-            <td align="right"><strong>117.0 MB</strong></td>
-            <td align="right">baseline</td>
-          </tr>
-          <tr>
-            <td><strong>jcode</strong></td>
-            <td align="right"><strong>260.8 MB</strong></td>
-            <td align="right"><strong>2.2× more RAM</strong></td>
-          </tr>
-          <tr>
-            <td><strong>pi</strong></td>
-            <td align="right"><strong>833.0 MB</strong></td>
-            <td align="right"><strong>7.1× more RAM</strong></td>
-          </tr>
-          <tr>
-            <td><strong>Codex CLI</strong></td>
-            <td align="right"><strong>334.8 MB</strong></td>
-            <td align="right"><strong>2.9× more RAM</strong></td>
-          </tr>
-          <tr>
-            <td><strong>OpenCode</strong></td>
-            <td align="right"><strong>3237.2 MB</strong></td>
-            <td align="right"><strong>27.7× more RAM</strong></td>
-          </tr>
-          <tr>
-            <td><strong>GitHub Copilot CLI</strong></td>
-            <td align="right"><strong>1756.5 MB</strong></td>
-            <td align="right"><strong>15.0× more RAM</strong></td>
-          </tr>
-          <tr>
-            <td><strong>Cursor Agent</strong></td>
-            <td align="right"><strong>1632.4 MB</strong></td>
-            <td align="right"><strong>14.0× more RAM</strong></td>
-          </tr>
-          <tr>
-            <td><strong>Claude Code</strong></td>
-            <td align="right"><strong>2300.6 MB</strong></td>
-            <td align="right"><strong>19.7× more RAM</strong></td>
-          </tr>
-          <tr>
-            <td><strong>Antigravity CLI</strong></td>
-            <td align="right"><strong>1021.2 MB</strong></td>
-            <td align="right"><strong>8.7× more RAM</strong></td>
-          </tr>
-        </tbody>
-      </table>
-    </td>
-  </tr>
-</table>
-
-</div>
-
-### Time to first frame
-
-<div align="center">
-
-| Tool | Time to first frame | Range | Comparison |
-|---|---:|---:|---:|
-| **jcode** | **14.0 ms** | 10.1–19.3 ms | baseline |
-| **Antigravity CLI** | **383.5 ms** | 363.1–415.4 ms | **27.4× slower** |
-| **pi** | **590.7 ms** | 369.6–934.8 ms | **42.2× slower** |
-| **Codex CLI** | **882.8 ms** | 742.3–1640.9 ms | **63.1× slower** |
-| **OpenCode** | **1035.9 ms** | 922.5–1104.4 ms | **74.0× slower** |
-| **GitHub Copilot CLI** | **1518.6 ms** | 1357.4–1826.8 ms | **108.5× slower** |
-| **Cursor Agent** | **1949.7 ms** | 1711.0–2104.8 ms | **139.3× slower** |
-| **Claude Code** | **3436.9 ms** | 2032.7–8927.2 ms | **245.5× slower** |
-
-</div>
-
-Measured on this Linux machine across 10 interactive PTY launches.
-
-### Time to first input
-(time until typed probe text appears on the rendered screen; Antigravity uses its internal input-ready log marker because the sign-in screen suppresses probe echo.)
-<div align="center">
-
-| Tool | Time to first input | Range | Comparison |
-|---|---:|---:|---:|
-| **jcode** | **48.7 ms** | 30.3–62.7 ms | baseline |
-| **Antigravity CLI** | **383.7 ms** | 363.4–415.7 ms | **7.9× slower** |
-| **pi** | **596.4 ms** | 373.9–955.2 ms | **12.2× slower** |
-| **Codex CLI** | **905.8 ms** | 760.1–1675.7 ms | **18.6× slower** |
-| **OpenCode** | **1047.9 ms** | 931.1–1116.9 ms | **21.5× slower** |
-| **GitHub Copilot CLI** | **1583.4 ms** | 1422.8–1880.0 ms | **32.5× slower** |
-| **Cursor Agent** | **1978.7 ms** | 1727.3–2130.0 ms | **40.6× slower** |
-| **Claude Code** | **3512.8 ms** | 2137.4–9002.0 ms | **72.2× slower** |
-
-</div>
-
-Measured on this Linux machine across 10 interactive PTY launches. Antigravity CLI was unauthenticated for this run; its sign-in screen rendered normally and emitted an internal `CLI ready for user input` marker, but did not echo the typed probe.
-
-### Additional clients / memory scaling
-
-<div align="center">
-
-| Tool | Extra PSS per added session | Comparison |
-|---|---:|---:|
-| **jcode (local embedding off)** | **~9.9 MB** | baseline |
-| **jcode** | **~10.4 MB** | **1.1× more RAM** |
-| **pi** | **~76.5 MB** | **7.7× more RAM** |
-| **Codex CLI** | **~21.6 MB** | **2.2× more RAM** |
-| **OpenCode** | **~318.4 MB** | **32.2× more RAM** |
-| **GitHub Copilot CLI** | **~158.1 MB** | **16.0× more RAM** |
-| **Cursor Agent** | **~157.5 MB** | **15.9× more RAM** |
-| **Claude Code** | **~212.7 MB** | **21.5× more RAM** |
-| **Antigravity CLI** | **~86.4 MB** | **8.7× more RAM** |
-
-</div>
-versions tested for this corrected memory rerun:
-
-- `jcode v0.9.1888-dev (be386f2)`
-- `pi 0.62.0`
-- `codex-cli 0.120.0`
-- `opencode 1.0.203`
-- `GitHub Copilot CLI 1.0.24` for the 1-session rerun, `GitHub Copilot CLI 1.0.27` for the 10-session rerun
-- `Cursor Agent 2026.04.08-a41fba1`
-- `Claude Code 2.1.86 (Claude Code)`
-- `Antigravity CLI 1.0.0`
-
-<div align="center">
-
-  <a href="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-performance-demo.mp4">
-    <img src="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-performance-demo.webp" alt="jcode performance demonstration" width="900">
-  </a>
-
-  <p><em>jcode performance demonstration</em></p>
-
-</div>
-
-
----
-
-## Memory (Agent memory)
-
-Jcode embeds each turn/response as a semantic vector. Every turn does queries a graph of memories to efficiently find related memory entries via a cosine similarity check. The embedding hits are fed into the conversation, or optionally uses a memory sideagent which verifies the memories are relevant, and potentially does more work for information retrieval before injecting into the conversation. This results in a human like memory system which allows the agent to automatically recall relevant information to the conversation without actively calling memory tools or being a token burner.
-ot 
-To have memories which are retrieved, they must also be extracted and stored. Every so often (semantic drift, K turns since last extraction, session end, etc), memories are extracted via a memory sideagent, and put into the memory graph. 
-
-The harness also provides explicit memory tools to allow the agent to actively search or store the memory without relying on a passive background process. The harness also provides session search for traditional RAG on previous sessions. 
-
-Memories are automatically consolidated every so often via the ambient mode. This reorganizes, checks for staleness and conflicts, etc
-
-<div align="center">
-
-  <a href="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-memory-demo.mp4">
-    <img src="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-memory-demo.webp" alt="jcode memory demonstration" width="900">
-  </a>
-
-  <p><em>jcode memory demonstration</em></p>
-
-</div>
-
-<!-- Memory demo media is hosted in the readme-assets release. -->
-
----
-
-## UI: Side panels, Diagrams, Info Widgets, rendering, scrolling, alignment
-
-The `panel` tool opens a new desktop panel from Markdown content or a linked Markdown/PDF file, and supports update, focus, close, and list actions. See [Desktop panels](docs/PANELS.md) for the API, PDF limits, and compatibility details.
-
-The side panel is a place for auxiliary information. Tell your jcode agent to load a file into the side panel and see it update in real time, or tell your agent to write directly to the side panel, or use it as a diff viewer. The side panel (and chat) is able to render mermaid diagrams inline. 
-<img width="2877" height="1762" alt="image" src="https://github.com/user-attachments/assets/6c7bec81-ef3f-434d-8a7b-d55f8a54e5cf" />
-
-To make this possible, I created a new mermaid rendering library to render diagrams 1800x faster. It has no browser or Typescript dependency. See https://github.com/1jehuang/mermaid-rs-renderer
-
-To show you important information without taking space away from the screen that could be used for responses, I developed info widgets. Info widgets will only ever take up the negative space on the screen to show you information, and will get out of the way if there isn't any. 
-
-Jcode can render at over a thousand fps. Your monitor will not have the refresh rate to show you, but this means you will not have silly flicker problems. 
-
-The custom scrollback implementation of jcode allows it to do much more than a native scrollback. However, it is a terminal-level limitation that I cannot have smooth, partial line scrolling with a custom scrollback. To fix this, I made my own terminal. Handterm https://github.com/1jehuang/handterm implements a native scroll api, and also happens to be very efficient. This is a work in progress. Scrolling is still well implemented for normal terminals.
-
-Jcode is left-aligned by default. You can switch to centered mode with the `Alt+C` hotkey, with the `/alignment` command, or in the config.
-
-To disable emoji globally in TUI and CLI output, set `emoji = false` under `[display]` in `~/.jcode/config.toml`, or launch with `JCODE_NO_EMOJI=1`. Jcode replaces emoji with compact ASCII markers while preserving other Unicode text.
-
----
-
-## Swarm
-
-Spawn two or more agents in the same repo, and they will automatically be managed by the server to allow native collaboration. When agent A edits a file that agent B has read (code shifting under its feet), the server notifies agent B. Agent B can ignore it if it is not relevant, or it can check the diff to make sure that it doesn't conflict. Each agent has messaging abilities, capable of DMing just one agent, broadcasting to all other agents hosted by the server, or just agents working in that repo. This allows you to spawn multiple sessions in the same repo, and have all conflicts automatically resolved.
-
-<div align="center">
-
-  <a href="https://github.com/1jehuang/jcode/releases/download/readme-assets/swarm-demo.mp4">
-    <img src="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-swarm-demonstration.webp" alt="jcode swarm demonstration" width="900">
-  </a>
-
-  <p><em>jcode swarm demonstration</em></p>
-
-</div>
-
-Agents are also able to spawn their own swarms autonomously. They have a swarm tool which allows them to spawn in their own teamates to accomplish tasks in parallel. Doing so turns the main agent into a coordinator and the spawned agents into workers. Groups of agents, their messaging channels, their completion statuses, etc are all automatically managed. This can be done headlessly or headed.
-
----
-
-Swarm modes keep root reasoning separate from worker effort. Configure each mode
-in `~/.jcode/config.toml`:
-
-```toml
-[agents]
-swarm_root_effort = "low"        # /effort swarm
-swarm_deep_root_effort = "high"  # /effort swarm-deep
-```
-
-Both default to `max`. Accepted levels are `none`, `minimal`, `low`, `medium`,
-`high`, `xhigh`, and `max`, mapped to the provider's supported range. The effort
-switcher shows the configured root level. These settings do not change worker
-`swarm_effort`. Environment overrides are `JCODE_SWARM_ROOT_EFFORT` and
-`JCODE_SWARM_DEEP_ROOT_EFFORT`.
-
-## OAuth and Providers
-
-jcode works with subscription-backed OAuth flows and many provider integrations, so you can use the models you already pay for and still fall back to direct API providers when needed.
-
-### Supported built-in login flows
-
-- **Claude** (`jcode login --provider claude`)
-- **OpenAI / ChatGPT / Codex** (`jcode login --provider openai`)
-- **Google Gemini** (`jcode login --provider gemini`)
-- **GitHub Copilot** (`jcode login --provider copilot`)
-- **Azure OpenAI** (`jcode login --provider azure`)
-- **Alibaba Cloud Coding Plan** (`jcode login --provider alibaba-coding-plan`)
-- **Fireworks** (`jcode login --provider fireworks`)
-- **Novita AI** (`jcode login --provider novita`, API key)
-- **MiniMax** (`jcode login --provider minimax`)
-- **Meta Model API / Muse** (`jcode login --provider meta-muse`)
-- **LM Studio** (`jcode login --provider lmstudio`)
-- **Ollama** (`jcode login --provider ollama`)
-- **Custom OpenAI-compatible endpoint** (`jcode login --provider openai-compatible`)
-
-For custom OpenAI-compatible endpoints, jcode now prompts for the API base and supports local localhost servers without requiring an API key.
-
-The native OpenAI providers use Responses WebSocket v2 with opportunistic
-background prewarming and HTTPS fallback. See [OpenAI WebSocket transport](docs/OPENAI_WEBSOCKET.md)
-for behavior, controls, and verification.
-
-### Config-file setup for self-hosted endpoints and MCP
-
-If you prefer to configure things by editing files instead of using the login UI, jcode supports both a custom OpenAI-compatible endpoint config and MCP config files.
-
-#### OpenAI-compatible providers
-
-Many hosted services speak the standard OpenAI `/v1/chat/completions` API. jcode talks to them through one shared OpenAI-compatible provider, so you can use almost any such endpoint without waiting for a dedicated integration.
-
-There are two ways to set one up:
-
-- **Built-in named profiles** — jcode ships ready-made profiles for several popular OpenAI-compatible services. Log in by id and jcode fills in the base URL and key environment variable for you:
-
-  ```bash
-  jcode login --provider <profile-id>
-  # for example:
-  jcode login --provider openrouter
-  jcode login --provider orcarouter
-  jcode login --provider deepseek
-  jcode login --provider opencode      # OpenCode Zen
-  jcode login --provider moonshotai
-  jcode login --provider meta-muse     # Meta Model API / Muse Spark
-  jcode login --provider yolo-auto     # Yolo-Auto
-  ```
-
-  Built-in OpenAI-compatible profile ids include: `openrouter`, `orcarouter`, `deepseek`, `zai`, `kimi`, `moonshotai`, `meta-muse` (Meta Model API / Muse Spark), `yolo-auto` (Yolo-Auto), `opencode` (OpenCode Zen), `opencode-go`, `302ai`, `baseten`, `cortecs`, `huggingface`, `nebius`, `scaleway`, `stackit`, and `firmware`. Each profile only sets the endpoint and key variable; you still pick the model with `/model` (or `--model`). Run `jcode login` with no provider to see the interactive list.
-
-- **Any other endpoint** — point jcode at an arbitrary OpenAI-compatible API (hosted or local) with `jcode login --provider openai-compatible` or the scriptable `jcode provider add` command described below.
-
-Useful environment overrides for these endpoints:
-
-- `JCODE_STREAM_IDLE_TIMEOUT_SECS` — raise the base streaming idle timeout (default 180s) for slow reasoning models that think silently before emitting tokens. High reasoning efforts scale this automatically (high 2x, xhigh 3x, max 4x). Also settable as `[provider] stream_idle_timeout_secs` in `config.toml`.
-- Per-model `context_window` (alias `context_limit`) in a `[[providers.<name>.models]]` entry — set the context window when the endpoint has no usable `/v1/models` response, so jcode does not fall back to the generic 200k default.
-- `extra_body` — inject non-standard top-level fields into every chat/completions request body for backends that require them. See [Extra request-body fields](#extra-request-body-fields-extra_body) below.
-
-For details on self-hosting, local runtimes, and the exact config file shape, see below.
-
-#### Self-hosted OpenAI-compatible endpoints, including vLLM
-
-For agents and scripts, the preferred path is the one-shot provider profile command. It writes a named profile to `~/.jcode/config.toml`, stores secrets in jcode's private app config directory when requested, and prints exact run/validation commands:
-
-```bash
-# Secret-safe setup for a hosted OpenAI-compatible API.
-printf '%s' "$MY_API_KEY" | jcode provider add my-api \
-  --base-url https://llm.example.com/v1 \
-  --model my-model-id \
-  --api-key-stdin \
-  --set-default \
-  --json
-
-# Smoke test the profile.
-jcode --provider-profile my-api auth-test --prompt 'Reply exactly JCODE_PROVIDER_SETUP_OK'
-
-# Use it directly.
-jcode --provider-profile my-api run 'hello'
-```
-
-For local servers that do not require auth:
-
-```bash
-jcode provider add local-vllm \
-  --base-url http://localhost:8000/v1 \
-  --model Qwen/Qwen3-Coder-30B-A3B-Instruct \
-  --no-api-key \
-  --set-default
-```
-
-Built-in local profiles are available for the common desktop/local runtimes:
-
-```bash
-# Ollama: start the local server and install a model first.
-ollama pull llama3.2
-jcode login --provider ollama
-jcode --provider ollama --model llama3.2 run 'hello'
-
-# LM Studio: start the Local Server, load a chat model, then use the exact
-# model identifier shown by LM Studio or by curl http://localhost:1234/v1/models.
-jcode login --provider lmstudio
-jcode --provider lmstudio --model '<model-id>' run 'hello'
-```
-
-Ollama and LM Studio both expose OpenAI-compatible `/v1/models` and `/v1/chat/completions` endpoints. jcode uses streaming chat completions, function/tool calling, and OpenAI-style image content for vision-capable local models. If a local server requires a token, enter it during `jcode login` or create a named profile with `--api-key-stdin`.
-
-Useful flags:
-
-- `--api-key-env NAME`: reference an existing environment variable instead of storing a key.
-- `--api-key-stdin`: read and store a key without putting it in shell history.
-- `--context-window TOKENS`: persist the model context window for model selection and routing.
-- `--overwrite`: replace an existing profile of the same name.
-- `--model-catalog`: use the endpoint's `/models` response in addition to configured models.
-
-The generated profile can also be edited manually in `~/.jcode/config.toml`:
-
-```toml
-[provider]
-default_provider = "my-api"
-default_model = "my-model-id"
-
-[providers.my-api]
-type = "openai-compatible"
-base_url = "https://llm.example.com/v1"
-api_key_env = "JCODE_PROVIDER_MY_API_API_KEY"
-env_file = "provider-my-api.env"
-default_model = "my-model-id"
-# Optional: prevent model names such as `gpt-5-*` from automatically enabling
-# `reasoning_effort` on gateways that reject it.
-disable_reasoning_heuristics = true
-
-[[providers.my-api.models]]
-id = "my-model-id"
-context_window = 128000
-# Explicitly enable `/effort` and select this model's initial effort. Set
-# `reasoning = false` on an individual model to disable it instead.
-reasoning = true
-reasoning_effort = "high"
-```
-
-Anthropic Messages-compatible gateways use the same named-profile surface with
-`type = "anthropic-compatible"`. The profile can select bearer, custom-header,
-or no authentication and attach gateway-specific headers to every request:
-
-```toml
-[provider]
-default_provider = "corp-claude"
-default_model = "claude-sonnet-4-6"
-
-[providers.corp-claude]
-type = "anthropic-compatible"
-base_url = "https://gateway.example.com/anthropic/v1"
-auth = "bearer"
-api_key_env = "CORP_CLAUDE_TOKEN"
-default_model = "claude-sonnet-4-6"
-
-[providers.corp-claude.headers]
-x-tenant-id = "tenant-42"
-
-[[providers.corp-claude.models]]
-id = "claude-sonnet-4-6"
-context_window = 200000
-```
-
-For direct environment-based configuration, `ANTHROPIC_BASE_URL` overrides the
-non-OAuth Messages endpoint and `ANTHROPIC_AUTH_TOKEN` is sent as a bearer token.
-Claude OAuth traffic always continues to use Anthropic's official endpoints.
-
-##### Extra request-body fields (`extra_body`)
-
-Some OpenAI-compatible backends require non-standard top-level request fields. For example, NVIDIA NIM DeepSeek-V4 reasoning models (`deepseek-ai/deepseek-v4-flash`, `deepseek-ai/deepseek-v4-pro`) only enable thinking when the request includes `chat_template_kwargs`; without it they reply without reasoning (or, for some deployments, hang). jcode lets you inject arbitrary top-level fields two ways.
-
-1. Per named profile, via `extra_body` in `config.toml` (a TOML table merged verbatim into the JSON body):
-
-   ```toml
-   [providers.my-nim]
-   type = "openai-compatible"
-   base_url = "https://integrate.api.nvidia.com/v1"
-   api_key_env = "NVIDIA_API_KEY"
-   default_model = "deepseek-ai/deepseek-v4-flash"
-
-   [providers.my-nim.extra_body.chat_template_kwargs]
-   thinking = true
-   reasoning_effort = "high"
-   ```
-
-2. For built-in profiles (e.g. `nvidia-nim`) or any endpoint, via the `JCODE_OPENAI_EXTRA_BODY` environment variable (a JSON object string). It can live in the provider's env file (`~/.config/jcode/nvidia-nim.env`) next to the API key:
-
-   ```bash
-   JCODE_OPENAI_EXTRA_BODY={"chat_template_kwargs":{"thinking":true,"reasoning_effort":"high"}}
-   ```
-
-Keys from `extra_body` are merged last and override any jcode-generated body field with the same name (`JCODE_OPENAI_EXTRA_BODY` wins over the config `extra_body` on key collisions). Invalid values are logged and ignored rather than failing the request.
-
-The custom OpenAI-compatible provider reads overrides from environment variables or from an env file in jcode's app config directory. On Linux this is usually `~/.config/jcode/`, so the default file is usually:
+At its core, Jetic gives a developer a local runtime that can:
 
 ```text
-~/.config/jcode/openai-compatible.env
+understand the application
+        ↓
+discover the API
+        ↓
+build an API model
+        ↓
+define realistic workflows
+        ↓
+execute those workflows
+        ↓
+observe traces and behavior
+        ↓
+detect changes
+        ↓
+run specialized agents
+        ↓
+report behavioral regressions
 ```
 
-Example for a local or LAN vLLM server:
+The important distinction is that Jetic is **not just an API client**, **not just an OpenAPI generator**, and **not just an AI testing agent**.
+
+Its architecture is:
+
+```text
+Jetic CLI
+   │
+   ├── Scanner
+   │     └── Framework adapters
+   │
+   ├── Model
+   │
+   ├── Workflows
+   │
+   ├── Tools
+   │
+   ├── Agents
+   │
+   ├── Simulation engine
+   │
+   ├── Runtime
+   │
+   ├── MCP server
+   │
+   └── Dashboard
+```
+
+---
+
+# 1. The main idea
+
+A traditional API testing tool thinks like this:
+
+```text
+POST /login
+GET /profile
+POST /users
+```
+
+Jetic thinks like this:
+
+```text
+User registration
+    ↓
+Email verification
+    ↓
+Login
+    ↓
+Token captured
+    ↓
+Create project
+    ↓
+Invite another user
+    ↓
+Invitation email
+    ↓
+Accept invitation
+    ↓
+Access project
+    ↓
+Logout
+```
+
+So Jetic models **application behavior**, not just individual HTTP requests.
+
+Its core promise is:
+
+> **Test the behavior of your API as an application, not just individual requests.**
+
+---
+
+# 2. What gets installed
+
+A developer can install the CLI:
 
 ```bash
-JCODE_OPENAI_COMPAT_API_BASE=http://192.168.1.50:8000/v1
-JCODE_OPENAI_COMPAT_DEFAULT_MODEL=Qwen/Qwen3-Coder-30B-A3B-Instruct
-# Optional if your server expects auth
-OPENAI_COMPAT_API_KEY=your-token-here
+npm install -D @jetic/cli
 ```
 
-Notes:
+Then:
 
-- `jcode login --provider openai-compatible` can create or update this for you.
-- Plain `http://` is accepted for `localhost` and private LAN IPs. Public remote HTTP is still rejected.
-- HTTPS endpoints work as usual.
+```bash
+npx jetic init
+```
 
-#### MCP config files
+or, once globally installed:
 
-MCP config is separate from `config.toml`.
+```bash
+jetic init
+```
 
-Primary config files:
+The CLI is the user's entry point into the entire Jetic runtime.
 
-- `~/.jcode/mcp.json` for global MCP servers
-- `.jcode/mcp.json` for project-local MCP servers
+---
 
-Claude Code compatibility:
+# 3. What `jetic init` creates
 
-- `~/.claude.json` (Claude Code's user config): top-level `mcpServers`, plus per-project servers under `projects.<abs_path>.mcpServers` for the current directory
-- `.mcp.json` at the repo root (Claude Code's project config)
-- `.claude/mcp.json` (legacy fallback)
+A newly initialized project can look like:
 
-Claude Code config is read live on every load rather than copied into jcode's
-global config. Additions, edits, and deletions therefore take effect without
-leaving a stale snapshot (and inline environment values are not duplicated).
-For migration from Codex CLI, jcode still performs a one-time import from
-`~/.codex/config.toml` into `~/.jcode/mcp.json` when the latter does not exist.
-That imported file is then jcode-owned; later Codex changes are not synced
-automatically. Imported environment values are copied too and may contain
-secrets.
+```text
+my-api/
+│
+├── src/
+│   ├── routes/
+│   ├── controllers/
+│   ├── services/
+│   ├── middleware/
+│   └── schemas/
+│
+├── package.json
+├── tsconfig.json
+├── .env
+├── .gitignore
+│
+├── jetic.config.json
+├── jetic.tools.ts
+│
+└── .jetic/
+    │
+    ├── model/
+    │   ├── api.yaml
+    │   ├── paths/
+    │   ├── schemas/
+    │   └── security/
+    │
+    ├── workflows/
+    │
+    ├── agents/
+    │
+    ├── environments/
+    │
+    ├── activity/
+    │
+    ├── index/
+    │
+    ├── runs/
+    │
+    ├── reports/
+    │
+    └── cache/
+```
 
-Both the canonical `mcpServers` key and jcode's historical `servers` key are accepted. jcode currently supports stdio (command-based) servers only; HTTP/SSE entries (`"type": "http"`/`"sse"`) are recognized and skipped with a log line.
+The important design rule is:
 
-Example MCP config:
+```text
+Human/source configuration
+    ↓
+jetic.config.json
+jetic.tools.ts
+.jetic/model/
+.jetic/workflows/
+.jetic/agents/
+.jetic/environments/
+
+Generated state
+    ↓
+.jetic/cache/
+.jetic/index/
+.jetic/runs/
+.jetic/reports/
+.jetic/activity/
+```
+
+The source-oriented Jetic files are Git-native.
+
+Generated state is disposable.
+
+---
+
+# 4. `jetic.config.json`
+
+This is the root configuration file.
+
+Example:
 
 ```json
 {
-  "mcpServers": {
-    "filesystem": {
-      "command": "/path/to/mcp-server",
-      "args": ["--root", "/workspace"],
-      "env": {},
-      "shared": true
-    },
-    "websearch": {
-      "command": "/path/to/slow-mcp-server",
-      "timeout_secs": 120
-    }
+  "$schema": "https://jetic.dev/schema/config.json",
+
+  "project": {
+    "name": "my-api"
+  },
+
+  "source": {
+    "root": ".",
+    "include": [
+      "src/**/*.{ts,tsx,js,jsx}"
+    ],
+    "exclude": [
+      "node_modules/**",
+      "dist/**",
+      "build/**",
+      ".next/**",
+      "coverage/**"
+    ]
+  },
+
+  "scanner": {
+    "adapter": "auto",
+    "incremental": true,
+    "watch": true
+  },
+
+  "model": {
+    "directory": ".jetic/model"
+  },
+
+  "workflows": {
+    "directory": ".jetic/workflows"
+  },
+
+  "agents": {
+    "directory": ".jetic/agents"
+  },
+
+  "tools": {
+    "entry": "./jetic.tools.ts"
+  },
+
+  "environments": {
+    "directory": ".jetic/environments",
+    "default": "local"
+  },
+
+  "runtime": {
+    "baseUrl": "http://localhost:3000"
   }
 }
 ```
 
-Each request to an MCP server (`tools/call`, `tools/list`, `initialize`) times out after 30 seconds by default. Set `timeout_secs` on a server whose tools legitimately run longer.
+A user should be able to start with almost nothing:
 
-For headless or SSH sessions, OAuth-style providers support `jcode login --provider <provider> --no-browser` (alias: `--headless`) so jcode prints the auth URL/QR and falls back to manual code or callback paste instead of trying to launch a local browser.
-
-For more scriptable remote flows, `claude`, `openai`, `gemini`, and `antigravity` also support a two-step pattern:
-
-```bash
-# Step 1: print a resumable auth URL
-jcode login --provider openai --print-auth-url --json
-
-# Step 2: complete later with the callback URL or auth code
-jcode login --provider openai --callback-url 'http://localhost:1455/auth/callback?...'
-jcode login --provider gemini --auth-code '...'
+```json
+{
+  "$schema": "https://jetic.dev/schema/config.json",
+  "project": {
+    "name": "my-api"
+  }
+}
 ```
 
-Additional scriptable cases:
-
-```bash
-# Copilot device flow: print URL + user code, then complete later
-jcode login --provider copilot --print-auth-url --json
-jcode login --provider copilot --complete
-
-# Gmail/Google OAuth after credentials are already configured
-jcode login --provider google --print-auth-url --google-access-tier readonly
-jcode login --provider google --callback-url 'http://127.0.0.1:8456?...'
-```
-
-Pending scriptable login state is stored under `~/.jcode/pending-login/`, automatically expires, and stale entries are cleaned up when new scriptable logins start or resume.
-
-For the built-in OpenAI login flow, jcode opens a local callback on
-`http://localhost:1455/auth/callback` by default.
-
-<img width="2877" height="1762" alt="Screenshot from 2026-04-02 14-28-51" src="https://github.com/user-attachments/assets/530684c0-9d12-4363-aa0e-1b39a0d4e1be" />
-The above image is the first page of provider logins
-
-### Supported provider
-
-- **Native / first-party style providers:** `claude`, `openai`, `copilot`, `gemini`, `azure`, `alibaba-coding-plan`
-- **Aggregator / compatibility providers:** `openrouter`, `orcarouter`, `yolo-auto`, `openai-compatible`
-- **Additional provider integrations:** `opencode`, `opencode-go`, `zai` / `kimi`, `302ai`, `baseten`, `cortecs`, `deepseek`, `firmware`, `huggingface`, `moonshotai`, `nebius`, `scaleway`, `stackit`, `groq`, `mistral`, `perplexity`, `togetherai`, `deepinfra`, `fireworks`, `novita`, `minimax`, `xai`, `lmstudio`, `ollama`, `chutes`, `cerebras`, `cursor`, `antigravity`, `google`
-
-Jcode also supports easy multi-account switching. Ran out of tokens on your first ChatGPT Pro subscription? /account and quickly switch to your second. 
+Jetic auto-detects the framework, package manager, source tree, routes, schemas, middleware, and other information.
 
 ---
 
-## Customizability / Self-Dev
+# 5. The CLI command hierarchy
 
-Jcode is inventing a new form of customizability. One that doesn't limit you to what a plugin or extension can do. Tell your jcode agent to enter self dev mode, and it will start modifying its own source code. Jcode is optimized to iterate on itself. There is significant infrastructure around self development, which allows it to edit, build, and test its own source code, then reload its own binary and continue work in your (potentially many) sessions, fully automatically.
-
-It is recommended that you use a frontier model for this. The jcode codebase is not a simple one, and weaker models can make subtle, breaking changes. GPT 5.5 or the latest available frontier model works well.
-
-<!-- Add self-dev demo thumbnail/video and fuller writeup here. -->
-
----
-
-## Misc.
-
-The devil is in the details. There are many undocumented optimizations and niceties that jcode implements. Some examples: 
-
-Anthropic's Claude cache goes cold after 5 minutes. If you initiate Claude after these 5 minutes, you have a cache miss, potentially costing you lots of tokens. The ui warns you when the cache went cold, and notfies you if there was an unexpected cache miss. 
-
-jcode comes with instructions on how to set up Firefox Agent Bridge. Ask you agent to set it up, and then you will have browser automation in jcode as well. 
-
-Agent grep is a grep tool I made for the jcode agent. It adds file structure information (ie the list of functions, their displacement, etc) to the grep return, so that the agent can infer more of what the file doesn without actually reading the file. It also implements a harness-level integration that adaptively truncates returns based on what the agent has already seen. This saves on context a lot.
-
-Inputs are by default interleaved with the working agent. It sends the input as soon as it safely can without breaking the KV cache. Submit with shift enter instead, and it will send a queue send, and wait for the agent to fully finish its turn before sending.
-
-Resume sessions from different harnesses. Claude code broke on you? Resume the session from jcode and continue where you left off. Session resume is supported for codex, claude code, opencode, and pi. 
-
-<img width="2877" height="1762" alt="Screenshot from 2026-04-11 16-28-52" src="https://github.com/user-attachments/assets/c2b383cf-2531-4217-85ae-6a863354dc97" />
-image of /Resume for codex sessions
-
-
-Skills are not all loaded on startup. The conversation is embedded as a semantic vector, and will automatically inject a skill if there is an embedding hit similar to memories. The agent has a skill tool for you to manually activate a skill at anytime. You may also activate via slash commands. 
-
----
-
-## iOS Application / Native OpenClaw
-
-A native iOS application version of jcode is coming soon. This will allow you to work with jcode on your personal machine's environment from your phone, via Tailscale. Openclaw like features will be bundled with this iOS application. 
-
----
-
-## Other planned features
-
-Agents dont like to commit in dirty git state with active changes. Git was clearly not built for multi-agent workflows, and git worktrees is not a good solution. Given this, I believe that is an opporunity for a new git like primitive to be born. 
-
-Build speed improvements: An incremental debug cargo build with cache enabled takes about 1 minute on my machine. The goal is 5-20 seconds. Refactors and crates seams should be able to make this happen. 
-
-<!-- Add iOS / native OpenClaw preview and fuller writeup here. -->
-
----
-
-<div align="center">
-
-## Quick Start
-
-</div>
-
-```bash
-# Launch the TUI
-jcode
-
-# Run a single command non-interactively
-jcode run "say hello"
-
-# Resume a previous session by memorable name
-jcode --resume fox
-
-# Run as a persistent background server, then attach more clients
-jcode serve
-jcode connect
-
-# Send voice input from your configured STT command
-jcode dictate
-```
-
-jcode supports interactive TUI use, non-interactive runs, persistent server/client workflows,
-and hotkey-friendly dictation without requiring a bundled speech-to-text stack.
-
-<div align="center">
-
-  <a href="https://github.com/1jehuang/jcode/releases/download/readme-assets/workflow.mp4">
-    <img src="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-workflow-demonstration.webp" alt="jcode workflow demonstration" width="900">
-  </a>
-
-  <p><em>jcode workflow demonstration</em></p>
-
-</div>
-
----
-
-## Browser Automation
-
-jcode includes a first-class built-in `browser` tool for browser control inside agent sessions.
-
-Current built-in backend:
-- Firefox via Firefox Agent Bridge
-
-Current built-in tool actions include:
-- `status`
-- `setup`
-- `open`
-- `snapshot`
-- `get_content`
-- `interactables`
-- `click`
-- `type`
-- `fill_form`
-- `select`
-- `wait`
-- `screenshot`
-- `eval`
-- `scroll`
-- `upload`
-- `press`
-
-Quick setup:
-
-```bash
-jcode browser status
-jcode browser setup
-```
-
-Once setup is complete, the model can use the built-in `browser` tool directly. The UI also summarizes browser tool calls compactly, for example opening a URL, clicking a selector, or typing into a field without echoing sensitive typed text.
-
-Notes:
-- the provider/tool architecture is in place for additional backends
-- Firefox is the wired built-in backend today
-- Chrome bridge / remote debugging style providers can be added on top of the same browser tool later
-
----
-
-## Further Reading
-
-- [jcode.sh/docs](https://jcode.sh/docs) — install, providers, configuration, keybindings
-- [jcode.sh/swarm](https://jcode.sh/swarm) — many coding agents in one repository
-- [jcode.sh/sdk](https://jcode.sh/sdk) — TypeScript SDK: drive jcode sessions from your own program
-- [jcode.sh/bench](https://jcode.sh/bench) — benchmark methodology and results
-- [Ambient Mode / OpenClaw](docs/AMBIENT_MODE.md)
-- [Browser Provider Protocol](docs/BROWSER_PROVIDER_PROTOCOL.md)
-- [Memory Architecture](docs/MEMORY_ARCHITECTURE.md)
-- [Swarm Architecture](docs/SWARM_ARCHITECTURE.md)
-- [Server Architecture](docs/SERVER_ARCHITECTURE.md)
-- [Safety System](docs/SAFETY_SYSTEM.md)
-- [Sponsored Discovery Sponsor Onboarding](docs/SPONSORED_DISCOVERY_SPONSOR_ONBOARDING.md)
-- [Windows Notes](docs/WINDOWS.md)
-- [Wrappers and Shell Integration](docs/WRAPPERS.md)
-- [Refactoring Notes](docs/REFACTORING.md)
-
----
-
-## Detailed Installation
-
-### Setup
-
-If you want another agent to set up jcode for you, give it this prompt:
+The CLI should be designed around a small set of major concepts.
 
 ```text
-Set up jcode on this machine for me.
-
-1. Detect the operating system, available package managers, and shell environment, then install jcode using the best matching command below instead of referring me somewhere else:
-
-   - macOS with Homebrew available:
-     brew tap 1jehuang/jcode
-     brew install jcode
-
-   - macOS or Linux via install script:
-     curl -fsSL https://jcode.sh/install | bash
-
-   - Windows PowerShell:
-     irm https://jcode.sh/install.ps1 | iex
-
-   - From source if the above paths are not appropriate:
-     git clone https://github.com/1jehuang/jcode.git
-     cd jcode
-     cargo build --release
-     scripts/install_release.sh
-
-   - For local self-dev / refactor work on Linux x86_64, prefer:
-     scripts/dev_cargo.sh build --release -p jcode --bin jcode
-     scripts/dev_cargo.sh --print-setup
-     scripts/install_release.sh
-
-2. Verify that `jcode` is on my `PATH`.
-3. Launch `jcode` once in a new terminal window/session to confirm it starts successfully.
-4. Before attempting any interactive login flow, assess which providers are already available non-interactively and prefer those first. Check existing local credentials, config files, CLI sessions, and environment variables such as:
-   - Claude: `~/.jcode/auth.json`, `~/.claude/.credentials.json`, `~/.local/share/opencode/auth.json`, `ANTHROPIC_API_KEY`
-   - OpenAI: `~/.jcode/openai-auth.json`, `~/.codex/auth.json`, `OPENAI_API_KEY`
-   - Gemini: `~/.jcode/gemini_oauth.json`, `~/.gemini/oauth_creds.json`
-   - GitHub Copilot: existing auth under `~/.config/github-copilot/`
-   - Azure OpenAI: `~/.config/jcode/azure-openai.env`, `AZURE_OPENAI_*`, or an existing `az login`
-   - OpenRouter: `OPENROUTER_API_KEY`
-   - Fireworks: `~/.config/jcode/fireworks.env`, `FIREWORKS_API_KEY`
-   - Novita AI: `~/.config/jcode/novita.env`, `NOVITA_API_KEY`
-   - MiniMax: `~/.config/jcode/minimax.env`, `MINIMAX_API_KEY`
-   - NVIDIA NIM: `~/.config/jcode/nvidia-nim.env`, `NVIDIA_API_KEY`
-   - Alibaba Cloud Coding Plan: existing jcode config/env if present
-5. Prefer whichever provider is already configured and verify it with `jcode auth-test --all-configured` or a provider-specific auth test when appropriate.
-6. Only if no usable provider is already configured, guide me through the minimal manual step needed:
-   - Claude: `jcode login --provider claude`
-   - GitHub Copilot: `jcode login --provider copilot`
-   - OpenAI: `jcode login --provider openai`
-   - Gemini: `jcode login --provider gemini`
-   - Azure OpenAI: `jcode login --provider azure`
-   - Fireworks: `jcode login --provider fireworks`
-   - MiniMax: `jcode login --provider minimax`
-   - NVIDIA NIM: `jcode login --provider nvidia-nim`
-   - Alibaba Cloud Coding Plan: `jcode login --provider alibaba-coding-plan`
-   - OpenRouter: help me set `OPENROUTER_API_KEY`
-   - Anthropic direct API: help me set `ANTHROPIC_API_KEY`
-7. After setup, run a simple smoke test with `jcode run "say hello"` and confirm it works.
-8. If I want browser automation, also check `jcode browser status`. If browser automation is not ready, run `jcode browser setup`, verify the built-in `browser` tool works, and explain any remaining manual step.
-9. Explain any manual step that still needs me, especially browser OAuth, device login, API key entry, or browser extension approval.
+jetic
+├── init
+├── dev
+├── scan
+├── model
+├── workflow
+├── test
+├── simulate
+├── agent
+├── tool
+├── adapter
+├── run
+├── activity
+├── report
+├── mcp
+├── config
+└── doctor
 ```
 
-This is intended to be a copy-paste bootstrap prompt for jcode itself or any other coding agent.
+---
 
-### Quick Install
+# 6. `jetic init`
+
+Initializes Jetic in an existing project.
 
 ```bash
-# macOS & Linux
-curl -fsSL https://jcode.sh/install | bash
+jetic init
 ```
 
-On Termux, install the glibc runtime and `patchelf` first so the installer can
-patch the downloaded Linux binary to Termux's glibc dynamic linker and create a
-launcher that avoids Termux's `LD_PRELOAD` shim:
+It should:
+
+```text
+✓ detect package.json
+✓ detect TypeScript
+✓ detect framework
+✓ detect source directory
+✓ detect package manager
+✓ detect existing API specification
+✓ create jetic.config.json
+✓ create .jetic/
+✓ register detected adapter
+```
+
+For example:
+
+```text
+Jetic
+
+Detecting project...
+
+✓ Node.js
+✓ TypeScript
+✓ Express
+✓ package.json
+✓ src/
+✓ 24 route definitions detected
+
+Jetic project initialized.
+
+Next:
+
+  jetic scan
+  jetic dev
+```
+
+---
+
+# 7. `jetic scan`
+
+This is the deterministic project analysis command.
 
 ```bash
-pkg install glibc patchelf
-curl -fsSL https://jcode.sh/install | bash
+jetic scan
 ```
 
-```powershell
-# Windows 11 x64 or ARM64 (PowerShell 5.1+)
-irm https://jcode.sh/install.ps1 | iex
+Conceptually:
+
+```text
+Project
+   ↓
+File discovery
+   ↓
+Framework detection
+   ↓
+Adapter
+   ↓
+AST analysis
+   ↓
+Symbol resolution
+   ↓
+Dependency graph
+   ↓
+Route discovery
+   ↓
+Schema discovery
+   ↓
+Middleware/auth discovery
+   ↓
+Jetic IR
+   ↓
+Model
 ```
 
-The Windows installer selects the correct architecture and verifies the download
-against the release's `SHA256SUMS`. Alacritty and the optional global launch
-hotkey require explicit consent and are not installed by default. See
-[Windows support, security, Defender, and SmartScreen notes](docs/WINDOWS.md).
+Example output:
 
-If a release does not contain a matching Windows asset, the installer stops
-instead of unexpectedly starting a long compilation. An explicit source build
-is available with `-BuildFromSource` and requires Git, Rust, and Visual Studio
-2022 Build Tools with the **Desktop development with C++** workload.
+```text
+JETIC SCAN
 
-### macOS via Homebrew
+Project       my-api
+Framework     Express
+Adapter       @jetic/adapter-express
+
+Analyzing...
+
+✓ 318 source files
+✓ 27 endpoints
+✓ 14 schemas
+✓ 8 middleware
+✓ 3 authentication mechanisms
+✓ 11 services
+✓ 42 dependencies
+
+Model generated.
+
+27 endpoints
+14 schemas
+3 security boundaries
+
+Scan completed in 4.2s
+```
+
+The scanner should primarily be **static analysis**, not an LLM.
+
+AI only becomes involved when static analysis cannot confidently determine something.
+
+---
+
+# 8. Scanner architecture
+
+Jetic itself provides the scanner engine.
+
+```text
+@jetic/scanner-core
+        │
+        ├── AST engine
+        ├── symbol graph
+        ├── dependency graph
+        ├── module resolution
+        ├── incremental cache
+        ├── Jetic IR
+        └── validation
+                 │
+                 ▼
+          @jetic/scanner-sdk
+                 │
+                 ▼
+        Framework adapters
+```
+
+The adapter teaches Jetic how a framework works.
+
+For example:
+
+```text
+@jetic/adapter-express
+@jetic/adapter-nextjs
+@jetic/adapter-fastify
+@jetic/adapter-nestjs
+@jetic/adapter-hono
+```
+
+---
+
+# 9. Adapter model
+
+An adapter is a real TypeScript project.
+
+Example:
+
+```text
+adapter-fastify/
+├── src/
+│   ├── index.ts
+│   ├── detector.ts
+│   ├── routes.ts
+│   ├── schemas.ts
+│   ├── middleware.ts
+│   ├── auth.ts
+│   └── analyzer.ts
+│
+├── fixtures/
+│   ├── basic/
+│   ├── nested-routes/
+│   └── complex/
+│
+├── tests/
+├── examples/
+├── jetic.adapter.yaml
+├── package.json
+└── README.md
+```
+
+The developer uses:
+
+```ts
+import { defineAdapter } from "@jetic/scanner-sdk";
+
+export default defineAdapter({
+  id: "fastify",
+
+  name: "Fastify",
+
+  detect(ctx) {
+    return ctx.dependencies.has("fastify");
+  },
+
+  scan(ctx) {
+    // framework-specific static analysis
+
+    return {
+      endpoints: [],
+      schemas: [],
+      middleware: []
+    };
+  }
+});
+```
+
+---
+
+# 10. Jetic IR
+
+Adapters should **not** invent their own output format.
+
+Every adapter produces the same intermediate representation:
+
+```text
+Express
+Next.js
+Fastify
+Nest
+Hono
+custom framework
+      ↓
+   Jetic IR
+```
+
+An endpoint might conceptually look like:
+
+```ts
+type JeticEndpoint = {
+  id: string;
+
+  method: HttpMethod;
+
+  path: string;
+
+  operationId?: string;
+
+  source: {
+    file: string;
+    line?: number;
+    symbol?: string;
+  };
+
+  request?: {
+    params?: Schema;
+    query?: Schema;
+    headers?: Schema;
+    body?: Schema;
+  };
+
+  responses?: ResponseDefinition[];
+
+  middleware?: string[];
+
+  authentication?: AuthenticationInfo;
+
+  authorization?: AuthorizationInfo;
+
+  confidence: number;
+
+  evidence: Evidence[];
+};
+```
+
+The IR is the canonical internal representation.
+
+YAML is simply one human-facing representation of that information.
+
+---
+
+# 11. Why evidence matters
+
+Jetic should not pretend to know something that static analysis doesn't prove.
+
+Instead of:
+
+```text
+GET /users/:id is secure
+```
+
+Jetic can say:
+
+```text
+authentication:
+  detected: true
+
+evidence:
+  file: src/middleware/auth.ts
+  symbol: authenticate
+  reason: JWT verification middleware
+```
+
+And:
+
+```text
+authorization:
+  status: unknown
+```
+
+That uncertainty can later be investigated by an AI agent.
+
+---
+
+# 12. Incremental scanning
+
+Jetic should not rescan the entire project after every edit.
+
+It maintains hashes and dependency relationships.
+
+```text
+User changes:
+
+src/middleware/auth.ts
+       ↓
+file hash changed
+       ↓
+affected symbols
+       ↓
+affected routes
+       ↓
+affected workflows
+       ↓
+only relevant analysis runs
+```
+
+So `jetic dev` can continuously update the model.
+
+---
+
+# 13. `jetic dev`
+
+This is the primary development mode.
 
 ```bash
-brew tap 1jehuang/jcode
-brew install jcode
+jetic dev
 ```
 
-### From Source (all platforms)
+It starts the local Jetic runtime.
+
+Conceptually:
+
+```text
+JETIC RUNTIME
+│
+├── File watcher
+├── Scanner
+├── Adapter runtime
+├── Model engine
+├── Workflow engine
+├── Tool runtime
+├── Agent runtime
+├── Event bus
+├── MCP server
+└── Dashboard
+```
+
+For example:
+
+```text
+Jetic
+
+✓ Scanner ready
+✓ Express adapter loaded
+✓ Model loaded
+✓ 27 endpoints
+✓ 8 workflows
+✓ 3 agents
+✓ 6 tools
+
+Dashboard:
+http://localhost:8877
+
+MCP:
+ready
+```
+
+---
+
+# 14. The dashboard
+
+The CLI runs the local runtime, while the dashboard provides a visual interface.
+
+Conceptually:
+
+```text
+JETIC
+
+Overview
+Models
+Workflows
+Simulations
+Tools
+Agents
+
+────────────
+
+Activity
+Runs
+Reports
+
+────────────
+
+Settings
+```
+
+The dashboard is not the core product.
+
+It is the visual interface to the Jetic runtime.
+
+The CLI remains the fundamental developer interface.
+
+---
+
+# 15. Live model synchronization
+
+While `jetic dev` runs:
+
+```text
+Developer edits source
+        ↓
+File watcher
+        ↓
+Incremental scanner
+        ↓
+Adapter
+        ↓
+Jetic IR
+        ↓
+Model diff
+```
+
+Jetic might detect:
+
+```text
+NEW ENDPOINT
+
+POST /payments/refund
+
+Source:
+src/routes/payments.ts:84
+
+[Review]
+[Add to Model]
+[Ignore]
+```
+
+Or:
+
+```text
+API MODEL CHANGE
+
+POST /login
+
+Added:
+twoFactorCode: string
+
+Affected workflows:
+3
+```
+
+---
+
+# 16. `.jetic/model`
+
+The model represents **what the application exposes**.
+
+Example:
+
+```text
+.jetic/model/
+├── api.yaml
+├── paths/
+│   ├── auth.yaml
+│   ├── users.yaml
+│   ├── projects.yaml
+│   └── payments.yaml
+├── schemas/
+│   ├── User.yaml
+│   ├── UserCreate.yaml
+│   ├── Project.yaml
+│   └── Error.yaml
+└── security/
+    ├── authentication.yaml
+    └── authorization.yaml
+```
+
+`api.yaml` acts as the root index:
+
+```yaml
+version: "1"
+
+name: My API
+
+paths:
+  - ./paths/auth.yaml
+  - ./paths/users.yaml
+  - ./paths/projects.yaml
+
+schemas:
+  - ./schemas/User.yaml
+  - ./schemas/Project.yaml
+```
+
+---
+
+# 17. Model vs workflow
+
+This distinction is fundamental.
+
+### Model
+
+Answers:
+
+> What exists?
+
+For example:
+
+```text
+POST /login
+GET /profile
+POST /projects
+```
+
+### Workflow
+
+Answers:
+
+> What happens?
+
+For example:
+
+```text
+login
+ ↓
+capture token
+ ↓
+create project
+ ↓
+invite user
+ ↓
+wait for email
+ ↓
+verify invitation
+ ↓
+access project
+```
+
+Jetic therefore keeps these separate.
+
+---
+
+# 18. `jetic model`
+
+Useful commands:
 
 ```bash
-git clone https://github.com/1jehuang/jcode.git
-cd jcode
-cargo build --release
+jetic model
+jetic model list
+jetic model inspect
+jetic model sync
+jetic model diff
+jetic model validate
 ```
 
-For local self-dev / refactor work on Linux x86_64, prefer:
+Examples:
 
 ```bash
-scripts/dev_cargo.sh build --release -p jcode --bin jcode
-scripts/dev_cargo.sh --print-setup
+jetic model list
 ```
 
-That wrapper automatically uses `sccache` when available, prefers a fast
-working local linker setup (`clang + lld`) instead of assuming every machine's
-`mold` configuration is valid, and can print the active linker/cache setup via
-`--print-setup` so slow-path builds are easier to diagnose.
+could output:
 
-Then symlink to your PATH:
+```text
+27 endpoints
+14 schemas
+8 middleware
+3 auth mechanisms
+```
+
+And:
 
 ```bash
-scripts/install_release.sh
+jetic model diff
 ```
 
-### Uninstall
+might show:
 
-Removes installed binaries and the launcher but keeps your config, auth, and
-sessions so a clean reinstall picks up where you left off:
+```diff
+POST /login
++ body.twoFactorCode: string
+
+POST /users
+~ response User → UserWithProfile
+```
+
+---
+
+# 19. AI IDE mutation of the model
+
+This is where Jetic's MCP becomes important.
+
+An AI IDE should not have to manually understand your YAML structure.
+
+It can call:
+
+```text
+jetic_add_endpoint
+jetic_update_endpoint
+jetic_remove_endpoint
+```
+
+For example:
+
+```json
+{
+  "method": "POST",
+  "path": "/payments/refund",
+  "operationId": "refundPayment"
+}
+```
+
+Jetic handles:
+
+```text
+correct YAML file
+references
+schema connections
+validation
+formatting
+duplicate detection
+model updates
+```
+
+The IDE gets a diff back.
+
+The YAML remains the Git-native source of truth.
+
+---
+
+# 20. Workflows
+
+Workflows describe behavior.
+
+Example:
+
+```yaml
+version: "1"
+
+id: user-login
+
+name: User Login
+
+steps:
+
+  - id: login
+
+    request:
+      endpoint: auth.login
+
+      body:
+        email: "{{user.email}}"
+        password: "{{user.password}}"
+
+    capture:
+      token:
+        from: response.body.accessToken
+
+  - id: profile
+
+    request:
+      endpoint: users.profile
+
+      headers:
+        Authorization: "Bearer {{token}}"
+
+    assert:
+      status:
+        equals: 200
+```
+
+---
+
+# 21. Workflow capabilities
+
+A workflow can eventually contain:
+
+```text
+ACTION
+REQUEST
+CAPTURE
+MEMORY
+CONDITION
+ASSERT
+WAIT
+LOOP
+PARALLEL
+RETRY
+EVENT
+ERROR HANDLER
+```
+
+For example:
+
+```text
+POST /login
+   ↓
+capture token
+   ↓
+MEMORY[token]
+   ↓
+WAIT FOR EMAIL
+   ↓
+capture OTP
+   ↓
+GENERATE TOTP
+   ↓
+GET /profile
+   ↓
+ASSERT status = 200
+```
+
+This is one of the biggest differences between Jetic and a collection of isolated API requests.
+
+---
+
+# 22. `jetic workflow`
+
+Commands:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/1jehuang/jcode/master/scripts/uninstall.sh | bash -s -- --yes
+jetic workflow list
+jetic workflow validate
+jetic workflow run <id>
+jetic workflow inspect <id>
 ```
 
-For a full wipe of everything including config, auth, sessions, logs, and
-memory (useful for recovering from a broken install):
+Example:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/1jehuang/jcode/master/scripts/uninstall.sh | bash -s -- --purge --yes
+jetic workflow run user-login
 ```
 
-Add `--dry-run` to preview what would be removed without deleting anything.
+Output:
 
-### Platform Support
+```text
+WORKFLOW: user-login
 
-| Platform | Status |
-|---|---|
-| **Linux** x86_64 / aarch64 | Fully supported |
-| **macOS** Apple Silicon & Intel | Supported |
-| **Windows** x86_64 | Supported (native + WSL2) |
-| **Termux** aarch64 / x86_64 | Supported with `pkg install glibc patchelf` |
+✓ POST /login
+  200 OK
+  token captured
 
-</div>
+✓ WAIT FOR EMAIL
+  OTP received
+
+✓ GENERATE TOTP
+  generated
+
+✓ GET /profile
+  200 OK
+
+Workflow passed.
+Duration: 1.82s
+```
+
+---
+
+# 23. Tools
+
+Tools are executable capabilities.
+
+Example project:
+
+```text
+tools/
+├── create-test-user.ts
+├── seed-user.ts
+├── send-test-email.ts
+└── create-wallet.ts
+```
+
+Registered through:
+
+```text
+jetic.tools.ts
+```
+
+Example:
+
+```ts
+import { defineTool } from "@jetic/sdk";
+import { z } from "zod";
+
+const createTestUser = defineTool({
+  name: "create_test_user",
+
+  description: "Create a test user",
+
+  input: z.object({
+    email: z.string().email()
+  }),
+
+  output: z.object({
+    id: z.string(),
+    email: z.string()
+  }),
+
+  async execute(input, ctx) {
+    // application-specific logic
+  }
+});
+
+export const tools = [
+  createTestUser
+];
+```
+
+---
+
+# 24. Tool vs workflow vs agent
+
+These three should remain separate.
+
+```text
+Tool
+= capability
+
+Workflow
+= predefined behavior
+
+Agent
+= reasoning / decision-making actor
+```
+
+Example:
+
+```text
+Tool:
+create_test_user()
+
+Workflow:
+login → create project → invite user
+
+Agent:
+decide which workflows to run
+and investigate what failed
+```
+
+---
+
+# 25. Agents
+
+Agents are specialized Jetic workers.
+
+They can be:
+
+```text
+deterministic
+hybrid
+LLM-powered
+```
+
+Some do not need AI.
+
+For example:
+
+```text
+Model Watcher
+Dependency Analyzer
+Workflow Impact Analyzer
+Regression Runner
+```
+
+can be deterministic.
+
+More reasoning-heavy agents:
+
+```text
+Security Agent
+Scenario Agent
+Investigator
+Fix Agent
+Report Agent
+```
+
+can use an LLM.
+
+---
+
+# 26. Agent definitions
+
+Example:
+
+```yaml
+version: "1"
+
+id: regression
+
+name: Regression Agent
+
+description: >
+  Identify behavioral regressions caused by
+  source or API changes.
+
+triggers:
+  - manual
+  - model.changed
+  - pull_request.opened
+
+tools:
+  - get_model
+  - get_changed_endpoints
+  - list_workflows
+  - run_workflow
+  - get_trace
+
+permissions:
+  model: read
+  workflows: read
+  execution: execute
+  source: read
+```
+
+---
+
+# 27. Agent runtime
+
+Jetic provides its own agent runtime.
+
+Conceptually:
+
+```text
+Agent definition
+      ↓
+Agent context
+      ↓
+LLM
+      ↓
+tool call
+      ↓
+Jetic tool
+      ↓
+result
+      ↓
+LLM
+      ↓
+tool call
+      ↓
+...
+      ↓
+final result
+```
+
+You do not need to make the AI IDE instantiate the agent itself.
+
+---
+
+# 28. Agent SDK
+
+Eventually:
+
+```text
+@jetic/agent-sdk
+```
+
+can allow developers to create custom agents.
+
+For example:
+
+```ts
+import { defineAgent } from "@jetic/agent-sdk";
+
+export default defineAgent({
+  id: "api-security",
+
+  description: "Analyze API authorization behavior",
+
+  tools: [
+    "get_model",
+    "get_source",
+    "run_workflow",
+    "get_trace"
+  ],
+
+  async run(ctx) {
+    // agent logic
+  }
+});
+```
+
+---
+
+# 29. AI IDE integration
+
+Jetic should expose an MCP server.
+
+```bash
+jetic mcp
+```
+
+Or:
+
+```bash
+jetic dev
+```
+
+can automatically start it.
+
+The AI IDE then connects to Jetic.
+
+The IDE can access:
+
+```text
+model
+workflows
+agents
+runs
+reports
+activity
+traces
+```
+
+and actions:
+
+```text
+scan
+add endpoint
+update model
+run workflow
+run simulation
+run agent
+```
+
+---
+
+# 30. MCP tools
+
+A sensible MCP surface is:
+
+```text
+READ
+
+jetic_get_model
+jetic_list_endpoints
+jetic_get_endpoint
+jetic_list_workflows
+jetic_get_workflow
+jetic_list_agents
+jetic_get_report
+jetic_get_activity
+jetic_get_trace
+```
+
+Mutation:
+
+```text
+jetic_add_endpoint
+jetic_update_endpoint
+jetic_remove_endpoint
+
+jetic_add_workflow
+jetic_update_workflow
+jetic_remove_workflow
+
+jetic_apply
+```
+
+Execution:
+
+```text
+jetic_scan
+jetic_sync_model
+jetic_run_workflow
+jetic_run_simulation
+jetic_run_agent
+```
+
+Results:
+
+```text
+jetic_get_run
+jetic_get_agent_run
+jetic_get_report
+```
+
+---
+
+# 31. Why semantic MCP tools are better than YAML generation
+
+You want the AI IDE to say:
+
+```text
+jetic_add_endpoint({
+  method: "POST",
+  path: "/payments/refund"
+})
+```
+
+rather than:
+
+```text
+"Generate this YAML."
+```
+
+Jetic then owns:
+
+```text
+file placement
+format
+references
+validation
+IDs
+schema connections
+consistency
+```
+
+So the architecture becomes:
+
+```text
+AI IDE
+   ↓
+MCP
+   ↓
+Jetic semantic API
+   ↓
+Jetic model engine
+   ↓
+YAML
+```
+
+YAML remains editable by humans.
+
+---
+
+# 32. Agents through MCP
+
+An AI IDE can call:
+
+```text
+jetic_run_agent
+```
+
+with:
+
+```json
+{
+  "agent": "regression",
+  "input": {
+    "reason": "Authentication middleware changed"
+  }
+}
+```
+
+Jetic returns a run ID:
+
+```json
+{
+  "status": "queued",
+  "runId": "agent_run_123"
+}
+```
+
+The IDE can then inspect:
+
+```text
+jetic_get_agent_run
+```
+
+Eventually:
+
+```json
+{
+  "status": "completed",
+  "summary": "1 behavioral regression detected"
+}
+```
+
+This lets the IDE use Jetic's specialized intelligence without implementing the Jetic agent itself.
+
+---
+
+# 33. Simulation
+
+Simulation is where Jetic runs behavior at scale.
+
+```bash
+jetic simulate
+```
+
+or:
+
+```bash
+jetic simulate user-registration
+```
+
+Conceptually:
+
+```text
+Workflow
+    ↓
+generate data
+    ↓
+create N actors
+    ↓
+execute behavior
+    ↓
+collect traces
+    ↓
+analyze results
+```
+
+For example:
+
+```text
+500 simulated users
+
+User 1 → registration → verification → login
+User 2 → registration → verification → login
+...
+User 500
+```
+
+This can use tools such as Faker.
+
+---
+
+# 34. Dynamic data
+
+Tools and workflows allow:
+
+```text
+{{user.email}}
+{{token}}
+{{otp}}
+{{project.id}}
+{{random.uuid}}
+```
+
+Jetic maintains runtime memory:
+
+```text
+MEMORY
+├── token
+├── otp
+├── user
+├── project
+└── invitation
+```
+
+This makes multi-step testing possible.
+
+---
+
+# 35. Conditions
+
+Conditions are first-class workflow logic.
+
+For example:
+
+```yaml
+condition:
+  all:
+    - field: response.status
+      operator: equals
+      value: 200
+
+    - field: response.body.active
+      operator: equals
+      value: true
+```
+
+Supported logical operations can include:
+
+```text
+equals
+not_equals
+greater_than
+less_than
+exists
+not_exists
+is_empty
+is_not_empty
+contains
+not_contains
+starts_with
+ends_with
+```
+
+With:
+
+```text
+AND
+OR
+```
+
+groups.
+
+---
+
+# 36. Trace system
+
+Every workflow/run should generate a trace.
+
+Example:
+
+```text
+RUN abc123
+
+POST /login
+├── request
+├── response 200
+└── capture token
+
+WAIT FOR EMAIL
+├── mailbox checked
+├── OTP found
+└── capture otp
+
+GENERATE TOTP
+└── generated
+
+GET /profile
+├── Authorization: Bearer ...
+└── response 200
+```
+
+Traces are critical to agents.
+
+The security/investigator agent should be able to inspect them rather than simply guessing.
+
+---
+
+# 37. Activity system
+
+Jetic maintains an activity stream:
+
+```text
+NEW ENDPOINT
+POST /payments/refund
+
+MODEL CHANGE
+POST /login
++ twoFactorCode
+
+ENDPOINT REMOVED
+DELETE /projects/:id
+
+SCHEMA CHANGE
+User.email
+string → optional string
+```
+
+This allows Jetic to determine:
+
+```text
+what changed
+what is affected
+what should run
+```
+
+---
+
+# 38. `jetic activity`
+
+Possible commands:
+
+```bash
+jetic activity
+jetic activity list
+jetic activity inspect <id>
+jetic activity accept <id>
+jetic activity ignore <id>
+```
+
+The dashboard can expose the same system.
+
+---
+
+# 39. `jetic test`
+
+This is the simple entry point:
+
+```bash
+jetic test
+```
+
+It runs configured Jetic tests/workflows.
+
+Example:
+
+```text
+JETIC TEST
+
+Running 12 workflows...
+
+✓ user-login
+✓ registration
+✓ create-project
+✓ invite-user
+✓ password-reset
+✓ logout
+
+✗ user-access-control
+
+11 passed
+1 failed
+```
+
+---
+
+# 40. Behavioral regression
+
+This is where Jetic becomes particularly useful.
+
+Imagine a PR changes:
+
+```text
+src/middleware/auth.ts
+```
+
+Jetic understands:
+
+```text
+changed middleware
+      ↓
+affected endpoints
+      ↓
+affected workflows
+```
+
+Instead of blindly running everything:
+
+```text
+1,000 workflows
+```
+
+it might determine:
+
+```text
+12 workflows affected
+```
+
+and run those first.
+
+---
+
+# 41. `jetic run`
+
+A general command can exist underneath the specialized commands.
+
+```bash
+jetic run <thing>
+```
+
+For example:
+
+```bash
+jetic run workflow user-login
+jetic run agent regression
+jetic run simulation checkout
+```
+
+This becomes the generic execution interface.
+
+---
+
+# 42. `jetic adapter`
+
+Adapter management:
+
+```bash
+jetic adapter list
+jetic adapter inspect express
+jetic adapter install @acme/jetic-adapter-foo
+jetic adapter test
+```
+
+Example:
+
+```text
+JETIC ADAPTERS
+
+✓ express
+✓ nextjs
+✓ fastify
+✓ nestjs
+✓ hono
+
+Community:
+✓ @acme/jetic-adapter-foo
+```
+
+---
+
+# 43. Custom adapters
+
+A developer can write:
+
+```text
+@acme/jetic-adapter-company-framework
+```
+
+using:
+
+```text
+@jetic/scanner-sdk
+```
+
+It returns Jetic IR.
+
+Local use:
+
+```bash
+npm install @acme/jetic-adapter-company-framework
+```
+
+Cloud execution is different: arbitrary adapter code should execute inside an isolated scanner worker, not on Jetic's main backend.
+
+---
+
+# 44. Adapter Test Mode
+
+Eventually your web platform can let adapter authors test an adapter.
+
+Flow:
+
+```text
+Connect GitHub repository
+        ↓
+Select adapter
+        ↓
+Select test project
+        ↓
+Run scanner
+        ↓
+Inspect:
+  endpoints
+  schemas
+  middleware
+  authentication
+  warnings
+  confidence
+        ↓
+Validate Jetic IR
+```
+
+This is useful for community adapters.
+
+---
+
+# 45. Security model for adapters
+
+Local:
+
+```text
+developer machine
+    ↓
+adapter runs as normal Node process
+```
+
+Cloud:
+
+```text
+Jetic control plane
+    ↓
+scanner worker
+    ↓
+adapter
+```
+
+The scanner worker should have:
+
+```text
+temporary filesystem
+CPU limit
+memory limit
+timeout
+process limit
+restricted/no network
+no database credentials
+no GitHub OAuth token
+no application secrets
+no cloud credentials
+no Docker socket
+```
+
+After execution:
+
+```text
+worker destroyed
+```
+
+Only the result survives.
+
+---
+
+# 46. GitHub scanning
+
+When the cloud platform receives a GitHub scan:
+
+```text
+GitHub repository
+      ↓
+specific commit
+      ↓
+temporary scanner worker
+      ↓
+repository snapshot
+      ↓
+adapter
+      ↓
+Jetic IR
+      ↓
+results
+      ↓
+worker destroyed
+```
+
+You don't need to permanently store the source repository merely to scan it.
+
+The scan should be tied to:
+
+```text
+repository
+branch
+commit SHA
+adapter version
+Jetic version
+```
+
+so that the scan is reproducible.
+
+---
+
+# 47. `jetic doctor`
+
+This should become one of the most useful commands.
+
+```bash
+jetic doctor
+```
+
+Checks:
+
+```text
+Node version
+package manager
+Jetic version
+config validity
+adapter installation
+source paths
+model validity
+workflow validity
+tool loading
+environment
+MCP
+runtime ports
+permissions
+```
+
+Example:
+
+```text
+JETIC DOCTOR
+
+✓ Node.js 22
+✓ jetic.config.json
+✓ Express adapter
+✓ Scanner SDK
+✓ Model valid
+✓ 8 workflows valid
+✓ 6 tools loaded
+✓ MCP ready
+✓ Port 8877 available
+
+No problems found.
+```
+
+---
+
+# 48. `jetic config`
+
+Useful commands:
+
+```bash
+jetic config
+jetic config validate
+jetic config get scanner.adapter
+```
+
+This makes debugging easier.
+
+---
+
+# 49. `jetic report`
+
+Reports can be:
+
+```bash
+jetic report list
+jetic report inspect <id>
+jetic report open <id>
+```
+
+Eventually formats:
+
+```text
+JSON
+HTML
+Markdown
+SARIF
+```
+
+SARIF would be particularly useful for GitHub security/code scanning integrations.
+
+---
+
+# 50. CI
+
+Jetic should also work without the dashboard.
+
+For example:
+
+```bash
+jetic scan
+jetic test
+```
+
+in CI.
+
+Or:
+
+```bash
+jetic test --ci
+```
+
+Output:
+
+```text
+JETIC CI
+
+12 workflows
+11 passed
+1 failed
+
+Behavioral regression detected.
+
+Exit code: 1
+```
+
+That makes it usable in GitHub Actions, GitLab CI, etc.
+
+---
+
+# 51. GitHub PR flow
+
+Eventually:
+
+```text
+Developer opens PR
+       ↓
+Jetic detects changed files
+       ↓
+scan diff
+       ↓
+identify affected model
+       ↓
+identify affected workflows
+       ↓
+run workflows
+       ↓
+investigate failures
+       ↓
+report
+```
+
+Example:
+
+```text
+JETIC REVIEW
+
+✓ API model updated
+✓ 12 affected workflows identified
+✓ 12 workflows executed
+
+11 passed
+1 failed
+
+Behavioral regression detected
+
+GET /users/:id
+User A accessed User B resource
+
+Trace available
+```
+
+The initial implementation should prioritize **concrete behavioral evidence** rather than trying to make speculative AI security claims.
+
+---
+
+# 52. Local vs cloud
+
+This is an important boundary.
+
+## Local Jetic
+
+```text
+@jetic/cli
+@jetic/runtime
+scanner
+adapters
+workflows
+tools
+agents
+MCP
+dashboard
+```
+
+The user's machine owns everything.
+
+## Jetic Cloud
+
+```text
+GitHub integration
+team workspaces
+persistent runs
+PR checks
+scheduled execution
+collaboration
+historical reports
+cloud agent execution
+organization management
+```
+
+The cloud should act primarily as a **control plane and orchestration platform**, while the CLI remains the local developer runtime.
+
+---
+
+# 53. Recommended package architecture
+
+Your repository could eventually be:
+
+```text
+packages/
+│
+├── cli/
+│
+├── runtime/
+│
+├── scanner-core/
+├── scanner-sdk/
+├── ir/
+│
+├── workflow-engine/
+├── workflow-sdk/
+│
+├── tool-runtime/
+├── sdk/
+│
+├── agent-runtime/
+├── agent-sdk/
+│
+├── mcp-server/
+│
+├── config/
+├── model/
+├── parser/
+├── event-bus/
+│
+└── adapters/
+    ├── express/
+    ├── nextjs/
+    ├── fastify/
+    ├── nestjs/
+    └── hono/
+```
+
+Conceptually:
+
+```text
+                    @jetic/cli
+                        │
+                    @jetic/runtime
+                        │
+       ┌────────────────┼────────────────┐
+       ↓                ↓                ↓
+    Scanner          Workflow          Agent
+       │              Engine           Runtime
+       ↓                │                │
+    Adapter             │                │
+       │                ↓                ↓
+       └───────────── Jetic IR ──────────┘
+                        │
+                        ↓
+                     MCP
+                        │
+                        ↓
+                    AI IDE
+```
+
+---
+
+# 54. The event bus
+
+Internally, Jetic should be event-driven.
+
+Events such as:
+
+```text
+project.scanned
+model.updated
+endpoint.added
+endpoint.removed
+workflow.changed
+workflow.started
+workflow.completed
+workflow.failed
+agent.started
+agent.completed
+simulation.completed
+```
+
+Example:
+
+```text
+model.updated
+      ↓
+Workflow Impact Agent
+      ↓
+workflows.affected
+      ↓
+Regression Agent
+      ↓
+run.completed
+      ↓
+Report Agent
+```
+
+This means agents don't have to be manually chained together everywhere.
+
+---
+
+# 55. Memory
+
+Jetic can have runtime memory for values such as:
+
+```text
+token
+otp
+user ID
+project ID
+invitation ID
+session ID
+```
+
+But distinguish:
+
+```text
+Workflow memory
+Agent memory
+Project state
+Secrets
+```
+
+Secrets must not be mixed into ordinary logs or model context.
+
+---
+
+# 56. Environment
+
+The same workflow can run against:
+
+```text
+local
+staging
+CI
+```
+
+through:
+
+```text
+.jetic/environments/
+├── local.yaml
+├── staging.yaml
+└── ci.yaml
+```
+
+Usage:
+
+```bash
+jetic test --env local
+jetic test --env staging
+```
+
+---
+
+# 57. The project lifecycle
+
+The intended developer workflow is approximately:
+
+```text
+npm install @jetic/cli
+        ↓
+jetic init
+        ↓
+jetic scan
+        ↓
+review model
+        ↓
+define workflows
+        ↓
+define tools
+        ↓
+jetic dev
+        ↓
+edit application
+        ↓
+Jetic detects changes
+        ↓
+model/activity updates
+        ↓
+run workflows
+        ↓
+agents investigate
+        ↓
+inspect reports
+```
+
+---
+
+# 58. The AI development lifecycle
+
+Eventually it becomes:
+
+```text
+Developer
+   ↓
+AI IDE
+   ↓
+write/change application code
+   ↓
+Jetic MCP
+   ↓
+Jetic understands change
+   ↓
+affected model/workflows
+   ↓
+Jetic agents
+   ↓
+behavioral execution
+   ↓
+traces
+   ↓
+evidence
+   ↓
+AI IDE
+   ↓
+developer
+```
+
+So Jetic becomes part of the **AI coding feedback loop**.
+
+---
+
+# 59. What Jetic is not
+
+It helps to keep the product boundary clear.
+
+Jetic is not primarily:
+
+```text
+Postman clone
+Swagger UI clone
+OpenAPI generator
+AI chatbot
+generic browser testing framework
+LLM wrapper
+load-testing-only tool
+```
+
+It is:
+
+> **A code-aware system for modeling, executing, and reasoning about API behavior.**
+
+---
+
+# 60. The four central primitives
+
+Everything in Jetic should revolve around four objects:
+
+```text
+MODEL
+What exists.
+
+WORKFLOW
+What happens.
+
+TOOL
+What can be done.
+
+AGENT
+What can reason and decide.
+```
+
+Then:
+
+```text
+ADAPTER
+How Jetic understands a framework.
+
+RUNTIME
+Where everything executes.
+
+MCP
+How external AI systems control Jetic.
+
+IR
+The canonical internal representation.
+```
+
+---
+
+# 61. The simplest mental model for users
+
+A developer should be able to understand Jetic as:
+
+```text
+jetic scan
+```
+
+> Understand my application.
+
+```text
+jetic dev
+```
+
+> Keep understanding it while I develop.
+
+```text
+jetic workflow run ...
+```
+
+> Perform this realistic application behavior.
+
+```text
+jetic test
+```
+
+> Validate the application's behavior.
+
+```text
+jetic agent run ...
+```
+
+> Investigate/reason about something.
+
+```text
+jetic simulate
+```
+
+> Run the behavior at scale.
+
+```text
+jetic mcp
+```
+
+> Let an AI coding environment control Jetic.
+
+---
+
+# 62. The full Jetic stack
+
+The overall architecture becomes:
+
+```text
+                              AI IDE
+                                │
+                              MCP
+                                │
+                    ┌───────────▼───────────┐
+                    │      JETIC MCP        │
+                    └───────────┬───────────┘
+                                │
+                         JETIC RUNTIME
+                                │
+        ┌───────────────────────┼──────────────────────┐
+        │                       │                      │
+        ▼                       ▼                      ▼
+     Scanner                Workflows               Agents
+        │                       │                      │
+     Adapter                  Tools                   LLM
+        │                       │                      │
+        └───────────────┬───────┴──────────────────────┘
+                        │
+                     Jetic IR
+                        │
+              ┌─────────┴─────────┐
+              ▼                   ▼
+            Model              Knowledge
+                                  Graph
+              │                   │
+              └─────────┬─────────┘
+                        │
+               Activity / Runs
+                        │
+                  Reports / Traces
+```
+
+And the **CLI is the front door**:
+
+```text
+jetic init
+jetic scan
+jetic dev
+jetic model
+jetic workflow
+jetic test
+jetic simulate
+jetic agent
+jetic adapter
+jetic report
+jetic mcp
+jetic doctor
+```
+
+---
+
+# 63. Recommended MVP
+
+I would **not build every piece above before releasing**.
+
+The first serious Jetic CLI should be:
+
+```text
+@jetic/cli
+@jetic/runtime
+@jetic/scanner-core
+@jetic/scanner-sdk
+@jetic/ir
+@jetic/workflow-engine
+@jetic/sdk
+@jetic/mcp-server
+```
+
+with:
+
+```text
+Express adapter
+Next.js adapter
+Fastify adapter
+```
+
+and these commands:
+
+```bash
+jetic init
+jetic scan
+jetic dev
+jetic model
+jetic workflow list
+jetic workflow run
+jetic test
+jetic agent run
+jetic mcp
+jetic doctor
+```
+
+The first agents should be:
+
+```text
+Model Watcher
+Workflow Impact
+Regression
+```
+
+Then:
+
+```text
+Security
+Investigator
+Scenario
+Fix
+PR
+```
+
+later.
+
+That gives you a coherent product rather than a CLI that tries to be an entire autonomous software company on day one.
+
+---
+
+## Jetic in one architecture diagram
+
+```text
+                       ┌───────────────────────┐
+                       │       AI IDE          │
+                       │ Cursor / Claude Code  │
+                       │ VS Code / etc.        │
+                       └───────────┬───────────┘
+                                   │
+                                  MCP
+                                   │
+                       ┌───────────▼───────────┐
+                       │     JETIC MCP         │
+                       └───────────┬───────────┘
+                                   │
+                         ┌─────────▼─────────┐
+                         │   JETIC RUNTIME   │
+                         └─────────┬─────────┘
+                                   │
+       ┌───────────────────────────┼─────────────────────────┐
+       │                           │                         │
+       ▼                           ▼                         ▼
+   SCANNER                    WORKFLOW ENGINE           AGENT RUNTIME
+       │                           │                         │
+       ▼                           ▼                         ▼
+   ADAPTERS                      TOOLS                      LLM
+       │                           │                         │
+       └───────────────────────────┼─────────────────────────┘
+                                   ▼
+                                JETIC IR
+                                   │
+                       ┌───────────┴───────────┐
+                       ▼                       ▼
+                     MODEL                 KNOWLEDGE GRAPH
+                       │                       │
+                       └──────────┬────────────┘
+                                  ▼
+                       ACTIVITY / RUNS / TRACES
+                                  │
+                                  ▼
+                            REPORTS / CI
+```
+
+The strongest part of this architecture is that **the same Jetic runtime serves the CLI, dashboard, MCP, CI, and eventually the cloud**. The CLI is not a thin wrapper around a web service; it is the local developer runtime, while MCP gives AI IDEs a semantic interface into that runtime. That makes the scanner SDK, adapter ecosystem, workflows, tools, and agents reusable across the entire Jetic platform.

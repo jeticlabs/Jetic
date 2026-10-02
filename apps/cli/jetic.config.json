@@ -1,0 +1,43 @@
+{
+  "$schema": "https://jetic.dev/schema/config.json",
+  "project": {
+    "name": "cli"
+  },
+  "source": {
+    "root": ".",
+    "include": [
+      "src/**/*.{ts,tsx,js,jsx}"
+    ],
+    "exclude": [
+      "node_modules/**",
+      "dist/**",
+      "build/**",
+      ".next/**",
+      "coverage/**"
+    ]
+  },
+  "scanner": {
+    "adapter": "auto",
+    "incremental": true,
+    "watch": true
+  },
+  "model": {
+    "directory": ".jetic/model"
+  },
+  "workflows": {
+    "directory": ".jetic/workflows"
+  },
+  "agents": {
+    "directory": ".jetic/agents"
+  },
+  "tools": {
+    "entry": "./jetic.tools.ts"
+  },
+  "environments": {
+    "directory": ".jetic/environments",
+    "default": "local"
+  },
+  "runtime": {
+    "baseUrl": "http://localhost:3000"
+  }
+}

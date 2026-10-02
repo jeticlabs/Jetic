@@ -7,5 +7,10 @@
     "build": "tsc",
     "clean": "rm -rf dist"
   },
-  "dependencies": {}
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9"
+  }
 }

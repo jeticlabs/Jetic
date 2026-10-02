@@ -4,22 +4,15 @@
 
 <h1 align="center">Jetic CLI</h1>
 
-<p align="center">
-  <strong>AI-Native API Behavior Testing, Discovery & Simulation Platform</strong>
-</p>
 
 <p align="center">
-  <em>Zero-config static source scanning → Behavioral model graph → Automated API simulations & Visual Traces</em>
+  <a href="#-quickstart">Quickstart</a> •
+  <a href="#-the-4-phase-workflow">4-Phase Workflow</a> •
+  <a href="#-ai-ide-integration-mcp">AI IDE Setup</a> •
+  <a href="#-cli-commands">CLI Reference</a> •
+  <a href="#-jetic-studio">Jetic Studio</a>
 </p>
 
-<p align="center">
-  <a href="https://www.npmjs.com/package/c15t"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/npm/c15t.svg?variant=outline&size=xs&mode=dark"><img src="https://shieldcn.dev/npm/c15t.svg?variant=outline&size=xs&mode=light" alt="Latest NPM Version"></picture></a>
-  <a href="https://github.com/c15t/c15t"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/github/c15t/c15t/stars.svg?variant=outline&size=xs&mode=dark"><img src="https://shieldcn.dev/github/c15t/c15t/stars.svg?variant=outline&size=xs&mode=light" alt="Stars"></picture></a>
-  <a href="https://github.com/c15t/c15t/blob/main/LICENSE.md"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/github/c15t/c15t/license.svg?variant=outline&size=xs&mode=dark"><img src="https://shieldcn.dev/github/c15t/c15t/license.svg?variant=outline&size=xs&mode=light" alt="License"></picture></a>
-  <a href="https://c15t.link/discord"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/discord/1312171102268690493.svg?variant=outline&size=xs&mode=dark"><img src="https://shieldcn.dev/discord/1312171102268690493.svg?variant=outline&size=xs&mode=light" alt="Discord"></picture></a>
-  <a href="https://skills.sh/c15t/skills/c15t"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/skills/c15t/skills/c15t.svg?variant=outline&size=xs&mode=dark"><img src="https://shieldcn.dev/skills/c15t/skills/c15t.svg?variant=outline&size=xs&mode=light" alt="Skills"></picture></a>
-  <a href="https://inth.com?utm_source=github&utm_medium=repo_homepage"><picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/badge/Made%20By-Inth-ffc803.svg?size=xs&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAzOTMgNDAwIj48cGF0aCBmaWxsPSIjMDAwIiBkPSJNMTgyLjY2MiAwdjM2Ljg5NWgtNTkuMDMxdjgyLjczM2g1OS4wMzF2MzYuODkzSDI3LjQ4MnYtMzYuODkzaDU5LjAzVjM2Ljg5NWgtNTkuMDNWMHpNMzIxLjk0MSA4OS44NVYwaDM1LjM1NXYxNTYuNTIxaC0yNS43MTNsLTg2LjEzNy05MC4zNjR2OTAuMzY0aC0zNS4zNTVWMGgyNi4zNTV6Ii8%2BPHBhdGggZmlsbD0iIzAwMCIgZmlsbC1ydWxlPSJldmVub2RkIiBkPSJNMzE4LjU3MSAxODUuNzE0aDc0LjI4NlY0MDBIMFYxODUuNzE0aDI3Mi44NTd2LTQ3LjE0M3ptLTI5MS4wOSAyOC45Njl2MzcuMTE4aDU4LjEzN3YxMTkuNjI4aDM2Ljg5NVYyNTEuODAxaDU4LjU4NHYtMzcuMTE4em0xODIuNjEuMjI0djE1Ni41MjJoMzYuODk0VjMxMy41OWg3My4zNDF2NTcuODM5aDM3LjExOFYyMTQuOTA3aC0zNy4xMTh2NjEuNzg4aC03My4zNDF2LTYxLjc4OHoiIGNsaXAtcnVsZT0iZXZlbm9kZCIvPjwvc3ZnPg%3D%3D&color=ffc803&labelTextColor=000000&valueColor=000000&mode=dark"><img src="https://shieldcn.dev/badge/Made%20By-Inth-ffc803.svg?size=xs&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAzOTMgNDAwIj48cGF0aCBmaWxsPSIjMDAwIiBkPSJNMTgyLjY2MiAwdjM2Ljg5NWgtNTkuMDMxdjgyLjczM2g1OS4wMzF2MzYuODkzSDI3LjQ4MnYtMzYuODkzaDU5LjAzVjM2Ljg5NWgtNTkuMDNWMHpNMzIxLjk0MSA4OS44NVYwaDM1LjM1NXYxNTYuNTIxaC0yNS43MTNsLTg2LjEzNy05MC4zNjR2OTAuMzY0aC0zNS4zNTVWMGgyNi4zNTV6Ii8%2BPHBhdGggZmlsbD0iIzAwMCIgZmlsbC1ydWxlPSJldmVub2RkIiBkPSJNMzE4LjU3MSAxODUuNzE0aDc0LjI4NlY0MDBIMFYxODUuNzE0aDI3Mi44NTd2LTQ3LjE0M3ptLTI5MS4wOSAyOC45Njl2MzcuMTE4aDU4LjEzN3YxMTkuNjI4aDM2Ljg5NVYyNTEuODAxaDU4LjU4NHYtMzcuMTE4em0xODIuNjEuMjI0djE1Ni41MjJoMzYuODk0VjMxMy41OWg3My4zNDF2NTcuODM5aDM3LjExOFYyMTQuOTA3aC0zNy4xMTh2NjEuNzg4aC03My4zNDF2LTYxLjc4OHoiIGNsaXAtcnVsZT0iZXZlbm9kZCIvPjwvc3ZnPg%3D%3D&color=ffc803&labelTextColor=000000&valueColor=000000&mode=light" alt="Made by Inth"></picture></a>
-</p>
 <p align="center">
   <a href="https://www.npmjs.com/package/jetic-cli"><img src="https://img.shields.io/npm/v/jetic-cli.svg" alt="NPM Version"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen" alt="Node Version">
@@ -71,7 +64,7 @@ Jetic operates on a strict, predictable 4-phase lifecycle for total model fideli
 ```
 
 1. **Phase 1 — Initialize (`jetic init`)**: Scaffolds the `.jetic/` directory and empty `model.json` in your project root.
-2. **Phase 2 — Scan & Model (`jetic scan`)**: Keyless AST scan parses routes, controllers, middleware, and TypeScript interfaces. For non-Express backends (FastAPI, Go, NestJS), endpoints can be added manually or via MCP.
+2. **Phase 2 — Scan & Model (`jetic scan`)**: Static AST analysis discovers Express routes, nested paths, path parameters, source locations, and recognizable middleware. It does not infer request/response schemas or business constraints. Other frameworks can be modeled manually or via MCP.
 3. **Phase 3 — Verify (`jetic_verify_model`)**: Validates model structure and ensures all fields (descriptions, tags, parameter/response details) are complete and error-free.
 4. **Phase 4 — Simulate (`jetic simulate`)**: Executes multi-step workflows with dynamic state capture (`captureInput` / `capture`) and header injection (`Authorization: Bearer {{workflow:token}}`).
 
@@ -135,12 +128,17 @@ Use these prompt templates with your editor's AI assistant (opencode, Antigravit
 
 | Command | Description |
 |---|---|
-| `jetic init` | Scaffold `.jetic/` folder and initial configuration |
-| `jetic scan` | Static AST source code scan for Express/TypeScript backends |
+| `jetic init` | Scaffold `.jetic/` folder without provider or API-key configuration |
+| `jetic scan` | Static Express/TypeScript route analysis |
 | `jetic inspect` | Inspect summary metrics or specific endpoint schemas in terminal |
 | `jetic simulate endpoint` | Test live HTTP endpoints against local/staging server |
 | `jetic simulate workflow` | Execute multi-step stateful workflows from `.jetic/workflows/` |
 | `jetic dev` | Launch local **Jetic Studio** dashboard UI on port `8787` with real-time SSE file watcher & `changes.json` live stream |
+| `jetic model list` / `jetic model export --yaml` | List model endpoints, or export `model.json` into the split YAML layout (`.jetic/model/api.yaml` + `paths/*.yaml` + `security/*.yaml`) |
+| `jetic adapter list` / `jetic adapter inspect <id>` | List/inspect framework scanner adapters (currently: Express) |
+| `jetic agent list` / `jetic agent run <id>` | List/run deterministic agents (`model-watcher`, `workflow-impact`); writes a report to `.jetic/runs/<runId>/agent-report.json` |
+| `jetic doctor` | Diagnose setup problems (Node version, config, adapter detection, model/workflow validity, port availability) |
+| `jetic activity list` | List endpoint added/removed events detected by `jetic scan` |
 | `jetic memory` | View, set, or clear runtime variable memory (`.jetic/memory.json`) |
 | `jetic mcp` | Start stdio MCP server for AI IDE integration (includes `jetic_get_changes` & `jetic_clear_changes`) |
 
@@ -151,7 +149,7 @@ Use these prompt templates with your editor's AI assistant (opencode, Antigravit
 Run `jetic dev` to open the local web developer studio:
 
 - **Behavioral Model (`/model`)**: Explore endpoints, request/response schemas, and AST source code lines.
-- **AI Simulations (`/simulations`)**: Visual step-by-step workflow runner with real-time SSE execution logs.
+- **Simulations (`/simulations`)**: Saved workflow runner with real-time SSE execution logs.
 - **Files Changes (`/changes`)**: Real-time SSE stream observer for `.jetic/changes.json` — track modified source files live without browser reloads.
 - **Memory Inspector (`/memory`)**: Edit captured tokens, fake test data, and session variables.
 - **Visual Traces (`/traces`)**: Interactive node-graph execution visualizer powered by ReactFlow.

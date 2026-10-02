@@ -618,9 +618,9 @@ export function Memory() {
         {!loading && entries.length > 0 && (
           <div className="relative">
             <Search
-              className="absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2"
+              className="absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2 theme-text-faint"
               strokeWidth={2}
-              className='theme-text-faint'
+         
             />
             <input
               value={filter}
@@ -714,7 +714,7 @@ export function Memory() {
             <div
               className="flex h-10 w-10 items-center justify-center rounded-lg border theme-border theme-bg-overlay"
             >
-              <Brain className="h-[15px] w-[15px]" strokeWidth={2} className='theme-text-faint' />
+              <Brain className="h-[15px] w-[15px] theme-text-faint" strokeWidth={2} />
             </div>
             <p className="text-[13px] theme-text-muted">
               No entries in <code className="text-blue-400">{activeScope}</code> scope
@@ -734,7 +734,7 @@ export function Memory() {
             <div
               className="flex h-10 w-10 items-center justify-center rounded-lg border theme-border theme-bg-overlay"
             >
-              <Search className="h-[15px] w-[15px]" strokeWidth={2} className='theme-text-faint' />
+              <Search className="h-[15px] w-[15px] theme-text-faint" strokeWidth={2} />
             </div>
             <p className="text-[13px] theme-text-muted">
               No entries match "{filter}"

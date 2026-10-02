@@ -1,42 +1,78 @@
 import { Command } from 'commander';
-import { loadConfig, saveConfig, ensureDirSync } from '@jetic/core';
-import * as readline from 'readline/promises';
-import { stdin as input, stdout as output } from 'process';
+import { loadConfig, ensureDirSync, writeJsonSync } from '@jetic/core';
+import { configureVSCodeMcp, formatVSCodeMcpDiff } from '../lib/ide-config';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export const initCommand = new Command('init')
-  .description('Initialize Jetic in the current directory')
-  .action(async () => {
-    const config = loadConfig();
-    ensureDirSync(config.jeticDir);
-    
-    console.log('\x1b[36mWelcome to Jetic Initialization\x1b[0m\n');
-    
-    const rl = readline.createInterface({ input, output });
-    
-    const providerInput = await rl.question('AI Provider [default: openrouter]: ');
-    const modelInput = await rl.question('Model name [default: meta-llama/llama-3.1-8b-instruct]: ');
-    const apiKeyInput = await rl.question('API Key: ');
-    
-    rl.close();
+  .description('Initialize Jetic or configure an IDE MCP server')
+  .option('--ide <target>', 'Configure an IDE MCP server (currently: vscode)')
+  .option('--dry-run', 'Show the IDE configuration change without writing it')
+  .action(async (options: { ide?: string; dryRun?: boolean }) => {
+    if (options.ide) {
+      if (options.ide !== 'vscode') {
+        console.error(`Unsupported IDE target "${options.ide}". Currently supported: vscode.`);
+        process.exitCode = 2;
+        return;
+      }
 
-    const provider = providerInput.trim() || 'openrouter';
-    const envVarName = `${provider.toUpperCase()}_API_KEY`;
-
-    config.ai = {
-      provider: provider,
-      model: modelInput.trim() || 'meta-llama/llama-3.1-8b-instruct',
-      apiKeyEnvVar: envVarName
-    };
-    saveConfig(config);
-
-    if (apiKeyInput.trim()) {
-      const fs = require('fs');
-      const envPath = require('path').join(process.cwd(), '.env');
-      const envContent = `\n${envVarName}=${apiKeyInput.trim()}\n`;
-      fs.appendFileSync(envPath, envContent);
-      console.log(`\n\x1b[32m✓\x1b[0m Saved API key to .env file as ${envVarName}`);
-      console.log(`(Alternatively, you can run: set ${envVarName}=${apiKeyInput.trim()})\n`);
+      try {
+        const result = configureVSCodeMcp(process.cwd(), options.dryRun);
+        if (!result.changed) {
+          console.log(`VS Code MCP server is already configured in ${result.filePath}.`);
+        } else if (result.dryRun) {
+          console.log(`Dry run: would add the Jetic MCP server to ${result.filePath}.`);
+          console.log(formatVSCodeMcpDiff(result.filePath));
+        } else {
+          console.log(`Configured the Jetic MCP server in ${result.filePath}.`);
+        }
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exitCode = 2;
+      }
+      return;
     }
+
+    const config = loadConfig();
+    const projectConfigPath = path.join(config.projectRoot, 'jetic.config.json');
+    const projectConfig = {
+      $schema: 'https://jetic.dev/schema/config.json',
+      project: { name: path.basename(config.projectRoot) },
+      source: {
+        root: '.',
+        include: ['src/**/*.{ts,tsx,js,jsx}'],
+        exclude: ['node_modules/**', 'dist/**', 'build/**', '.next/**', 'coverage/**'],
+      },
+      scanner: { adapter: 'auto', incremental: true, watch: true },
+      model: { directory: '.jetic/model' },
+      workflows: { directory: '.jetic/workflows' },
+      agents: { directory: '.jetic/agents' },
+      tools: { entry: './jetic.tools.ts' },
+      environments: { directory: '.jetic/environments', default: 'local' },
+      runtime: { baseUrl: 'http://localhost:3000' },
+    };
+
+    if (!fs.existsSync(projectConfigPath)) {
+      writeJsonSync(projectConfigPath, projectConfig);
+    }
+
+    for (const directory of [
+      'model/paths',
+      'model/schemas',
+      'model/security',
+      'workflows',
+      'agents',
+      'environments',
+      'activity',
+      'index',
+      'runs',
+      'reports',
+      'cache',
+    ]) {
+      ensureDirSync(path.join(config.jeticDir, directory));
+    }
+
+    console.log('\x1b[36mJetic Static Analyzer\x1b[0m\n');
 
     const banner = `
 \x1b[36m
@@ -55,10 +91,9 @@ export const initCommand = new Command('init')
 
     console.log(banner);
     console.log(`\x1b[32m✓\x1b[0m Successfully initialized Jetic in \x1b[1m${config.jeticDir}\x1b[0m\n`);
+    console.log(`Project configuration: ${projectConfigPath}`);
     console.log('Available Commands:');
-    console.log('  \x1b[36mjetic init\x1b[0m     Initialize Jetic in the current directory');
-    console.log('  \x1b[36mjetic scan\x1b[0m     Scan the project for API routes and generate behavioral model');
+    console.log('  \x1b[36mjetic scan\x1b[0m     Statically scan Express routes into the behavioral model');
     console.log('  \x1b[36mjetic inspect\x1b[0m  Inspect discovered endpoints and details');
-    console.log('  \x1b[36mjetic config\x1b[0m   Manage Jetic AI provider and settings');
     console.log('');
   });

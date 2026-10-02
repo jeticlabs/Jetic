@@ -31,11 +31,14 @@
   "scripts": {
     "build": "tsc",
     "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "pnpm run build",
+    "test": "jest"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.0",
     "@faker-js/faker": "^9.0.0",
+    "@jetic/agent-sdk": "workspace:*",
+    "@jetic/agents": "workspace:*",
     "@jetic/core": "workspace:*",
     "@jetic/memory": "workspace:*",
     "@jetic/model": "workspace:*",

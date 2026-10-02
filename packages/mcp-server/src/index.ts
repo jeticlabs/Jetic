@@ -18,6 +18,7 @@ export * from './tools/environment-tools';
 export * from './tools/workflow-tools';
 export * from './tools/workflow-authoring-tools';
 export * from './tools/project-tools';
+export * from './tools/agent-tools';
 export * from './server';
 export * from './serial-transport';
 

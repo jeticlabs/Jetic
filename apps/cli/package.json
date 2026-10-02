@@ -1,7 +1,7 @@
 {
   "name": "jetic-cli",
   "version": "0.2.4",
-  "description": "AI-Native API Behavior Testing & Discovery Tool — CLI and Local Studio Dashboard",
+  "description": "Code-aware, deterministic API toolkit for Node.js",
   "main": "dist/index.js",
   "bin": {
     "jetic": "./dist/index.js"
@@ -11,7 +11,8 @@
   ],
   "scripts": {
     "build": "tsup && node -e \"try { const fs = require('fs'); fs.rmSync('./dist/dashboard', { recursive: true, force: true }); fs.cpSync('../dashboard/dist', './dist/dashboard', { recursive: true }); console.log('Bundled dashboard into dist/dashboard'); } catch (e) { console.warn('Could not bundle dashboard dist (build @jetic/dashboard first):', e.message); }\"",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "jest"
   },
   "keywords": [
     "jetic",
@@ -39,22 +40,28 @@
     "url": "https://github.com/jeticlabs/jetic/issues"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^4.0.41",
     "@faker-js/faker": "^9.0.0",
-    "@openrouter/ai-sdk-provider": "^3.0.0",
-    "ai": "^7.0.65",
     "commander": "^12.0.0",
     "express": "^4.21.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
+    "@jetic/agent-sdk": "workspace:*",
+    "@jetic/agents": "workspace:*",
+    "@jetic/adapter-express": "workspace:*",
+    "@jetic/adapter-fastify": "workspace:*",
+    "@jetic/adapter-hono": "workspace:*",
+    "@jetic/adapter-nestjs": "workspace:*",
+    "@jetic/adapter-nextjs": "workspace:*",
     "@jetic/core": "workspace:*",
     "@jetic/dashboard": "workspace:*",
     "@jetic/mcp-server": "workspace:*",
     "@jetic/memory": "workspace:*",
     "@jetic/model": "workspace:*",
     "@jetic/scanner": "workspace:*",
+    "@jetic/scanner-sdk": "workspace:*",
+    "@jetic/sdk": "workspace:*",
     "@jetic/simulator": "workspace:*",
     "tsup": "^8.5.1"
   }

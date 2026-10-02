@@ -175,11 +175,11 @@ function AddEnvDialog({ onClose, onSave }: { onClose: () => void; onSave: (name:
         <div className="space-y-4">
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider theme-text-faint">Name</label>
-            <input ref={nameRef} value={name} onChange={e => setName(e.target.value)} placeholder="production" className={inputCls} className='border theme-border theme-bg-overlay theme-text-primary' />
+            <input ref={nameRef} value={name} onChange={e => setName(e.target.value)} placeholder="production" className={`${inputCls} border theme-border theme-bg-overlay theme-text-primary`} />
           </div>
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider theme-text-faint">Base URL</label>
-            <input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} placeholder="https://api.example.com" className={`${inputCls} font-mono`} className='border theme-border theme-bg-overlay theme-text-primary' />
+            <input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} placeholder="https://api.example.com" className={`${inputCls} font-mono border theme-border theme-bg-overlay theme-text-primary`} />
           </div>
           {err && <p className="text-[12px] text-red-400">{err}</p>}
           <div className="flex items-center justify-end gap-2 pt-1">

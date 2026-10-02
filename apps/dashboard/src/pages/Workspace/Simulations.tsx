@@ -911,12 +911,12 @@ function ConditionEditor({
               type="button"
               onClick={() => setOnFail(action)}
               className={`px-2 py-0.5 rounded text-[9px] font-medium capitalize transition-colors border hover:cursor-pointer ${onFail === action
-                  ? action === 'abort'
-                    ? 'bg-red-500/20 text-red-400 border-red-500/40'
-                    : action === 'continue'
-                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                      : 'bg-blue-500/20 text-blue-400 border-blue-500/40'
-                  : 'theme-bg-overlay-md theme-text-faint theme-border hover:theme-text-muted'
+                ? action === 'abort'
+                  ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                  : action === 'continue'
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                    : 'bg-blue-500/20 text-blue-400 border-blue-500/40'
+                : 'theme-bg-overlay-md theme-text-faint theme-border hover:theme-text-muted'
                 }`}
             >
               {action}
@@ -2041,9 +2041,8 @@ function EmptyState() {
       <div>
         <p className="font-medium theme-text-primary">No workflows yet</p>
         <p className="mt-1 text-[11px] theme-text-muted">
-          Create one with the{' '}
-          <span className="theme-text">+ New Workflow</span> button, or run{' '}
-          <code className="theme-text">jetic simulate workflow --goal "..."</code>
+
+
         </p>
         <p className="mt-1 text-[11px] theme-text-faint">
           Workflows are stored in <code className="theme-text-faint">.jetic/workflows/</code>
@@ -2060,12 +2059,6 @@ export function Simulations({ onViewTraces }: { onViewTraces?: (filter: { workfl
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [newGoal, setNewGoal] = useState('');
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [createLoading, setCreateLoading] = useState(false);
-
-  const resetCreate = () => { setCreating(false); setNewGoal(''); setCreateError(null); };
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
@@ -2076,28 +2069,6 @@ export function Simulations({ onViewTraces }: { onViewTraces?: (filter: { workfl
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  const handleCreate = async () => {
-    if (!newGoal.trim()) return;
-    setCreateLoading(true);
-    setCreateError(null);
-    try {
-      // Try AI generation first
-      const r = await fetch('/api/workflows/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal: newGoal.trim() }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error ?? `HTTP ${r.status}`);
-      resetCreate();
-      await load(true);
-    } catch (e: any) {
-      setCreateError(e.message);
-    } finally {
-      setCreateLoading(false);
-    }
-  };
 
   const handleDelete = (file: string) => {
     setWorkflows(prev => prev.filter(w => w._file !== file));
@@ -2118,53 +2089,6 @@ export function Simulations({ onViewTraces }: { onViewTraces?: (filter: { workfl
         </div>
 
         <div className="flex items-center gap-2">
-          {/* New Workflow button / inline form */}
-          {creating ? (
-            <div className="flex flex-col gap-2 rounded-lg border border-[color:var(--brand)]/20 bg-[color:var(--brand)]/[0.05] p-3 w-80">
-              <div className="flex items-center gap-1.5 text-[10px] text-[color:var(--brand)] font-medium">
-                <Zap className="h-3 w-3" strokeWidth={2} /> AI Workflow Generator
-              </div>
-              <input
-                autoFocus
-                value={newGoal}
-                onChange={e => { setNewGoal(e.target.value); setCreateError(null); }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) handleCreate();
-                  if (e.key === 'Escape') resetCreate();
-                }}
-                placeholder="Describe the workflow goal, e.g. Admin creates workspace, invites teacher and logs out"
-                className="h-7 w-full rounded-lg border border-[color:var(--brand)]/30 theme-bg-overlay-md px-2 text-[11px] theme-text-primary placeholder-[var(--text-faint)] outline-none focus:border-[color:var(--brand)]/60"
-              />
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={handleCreate}
-                  disabled={createLoading || !newGoal.trim()}
-                  className="flex h-6 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--brand)]/40 bg-[color:var(--brand)]/20 px-2 text-[10px] text-[color:var(--brand)] hover:bg-[color:var(--brand)]/30 transition-colors disabled:opacity-40 hover:cursor-pointer"
-                >
-                  {createLoading
-                    ? <><Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} /> AI generating…</>
-                    : <><Zap className="h-3 w-3" strokeWidth={2} /> Generate with AI</>}
-                </button>
-                <button
-                  type="button"
-                  onClick={resetCreate}
-                  className="flex h-6 w-6 items-center justify-center rounded-lg border theme-border theme-bg-overlay theme-text-muted hover:theme-text transition-colors hover:cursor-pointer"
-                >
-                  <X className="h-3 w-3" strokeWidth={2} />
-                </button>
-              </div>
-              {createError && <span className="text-[10px] text-red-400 leading-tight">{createError}</span>}
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setCreating(true)}
-              className="flex h-6 items-center gap-1.5 rounded-lg border border-[color:var(--brand)]/30 bg-[color:var(--brand)]/10 px-2.5 text-[10px] text-[color:var(--brand)] hover:bg-[color:var(--brand)]/20 transition-colors hover:cursor-pointer"
-            >
-              <Plus className="h-3 w-3" strokeWidth={2} /> New Workflow
-            </button>
-          )}
 
           <button
             type="button"
