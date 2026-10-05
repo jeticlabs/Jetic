@@ -3,6 +3,16 @@ import * as path from 'path';
 
 export interface JeticMemoryOptions {
   scope: string;
+  /**
+   * Project root that owns `.jetic/memory.json`. Defaults to `process.cwd()`.
+   * Hosts that serve a project from a different working directory (e.g. the MCP
+   * server started with --project) must pass it so memory lands in the right project.
+   */
+  projectRoot?: string;
+}
+
+function memoryFilePath(projectRoot?: string): string {
+  return path.join(projectRoot ?? process.cwd(), '.jetic', 'memory.json');
 }
 
 export interface SetOptions {
@@ -20,7 +30,7 @@ export class JeticMemory {
 
   constructor(options: JeticMemoryOptions) {
     this.scope = options.scope;
-    this.filePath = path.join(process.cwd(), '.jetic', 'memory.json');
+    this.filePath = memoryFilePath(options.projectRoot);
   }
 
   private ensureDirectory() {
@@ -131,8 +141,8 @@ export class JeticMemory {
     }
   }
 
-  public static getAllMemory(): Record<string, any> {
-    const filePath = path.join(process.cwd(), '.jetic', 'memory.json');
+  public static getAllMemory(projectRoot?: string): Record<string, any> {
+    const filePath = memoryFilePath(projectRoot);
     if (!fs.existsSync(filePath)) return {};
     try {
       const data: Record<string, Record<string, StoredValue>> = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
@@ -154,8 +164,8 @@ export class JeticMemory {
     }
   }
   
-  public static clearAllMemory(): void {
-    const filePath = path.join(process.cwd(), '.jetic', 'memory.json');
+  public static clearAllMemory(projectRoot?: string): void {
+    const filePath = memoryFilePath(projectRoot);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }

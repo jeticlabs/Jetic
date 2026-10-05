@@ -67,15 +67,22 @@ class Spinner {
 
 // ─── Interactive Environment Selector ─────────────────────────────────────────
 
-async function selectEnvironment(environments: Environment[]): Promise<Environment> {
+/** Default environment, mirroring `jetic dev`: model.defaultEnvironment → env marked `default` → first. */
+function defaultEnvironment(model: BehavioralModel, environments: Environment[]): Environment {
+  const defaultName = (model as any).defaultEnvironment ?? environments.find((e: any) => e.default)?.name;
+  return environments.find((e) => e.name === defaultName) ?? environments[0];
+}
+
+async function selectEnvironment(model: BehavioralModel, environments: Environment[]): Promise<Environment> {
   if (environments.length === 0) {
     console.log(`  ${c.yellow}⚠${c.reset}  No environments defined in model.json`);
     console.log(`  ${c.dim}Using default: http://localhost:3000${c.reset}\n`);
     return { name: 'default', baseUrl: 'http://localhost:3000' };
   }
 
-  if (environments.length === 1) {
-    const env = environments[0];
+  // Single environment, or no TTY to drive the interactive picker (CI, piped stdin): use the default.
+  if (environments.length === 1 || !process.stdin.isTTY) {
+    const env = defaultEnvironment(model, environments);
     console.log(`  ${c.cyan}🌍${c.reset} Environment: ${c.bold}${env.name}${c.reset} ${c.dim}→ ${env.baseUrl}${c.reset}\n`);
     return env;
   }
@@ -402,7 +409,8 @@ simulateCommand
   .description('Simulate a specific endpoint or all endpoints')
   .option('--all', 'Simulate all endpoints')
   .option('--verbose', 'Show detailed request/response info', false)
-  .action(async (method: string | undefined, endpointPath: string | undefined, options: { all?: boolean; verbose?: boolean }) => {
+  .option('--env <name>', 'Environment name to use from model.json (skips the interactive picker)')
+  .action(async (method: string | undefined, endpointPath: string | undefined, options: { all?: boolean; verbose?: boolean; env?: string }) => {
     // Banner
     console.log('');
     console.log(`  ${c.bgCyan}${c.black}${c.bold} JETIC ${c.reset}  ${c.cyan}${c.bold}Endpoint Simulator${c.reset}`);
@@ -421,7 +429,18 @@ simulateCommand
 
     // Environment selection
     const environments = model.environments || [];
-    const selectedEnv = await selectEnvironment(environments);
+    let selectedEnv: Environment;
+    if (options.env) {
+      const named = environments.find((e) => e.name === options.env);
+      if (!named) {
+        console.log(`  ${c.red}✗${c.reset} Environment ${c.bold}${options.env}${c.reset} not found. Available: ${environments.map((e) => e.name).join(', ') || '(none)'}\n`);
+        process.exit(2);
+      }
+      selectedEnv = named;
+      console.log(`  ${c.cyan}🌍${c.reset} Environment: ${c.bold}${named.name}${c.reset} ${c.dim}→ ${named.baseUrl}${c.reset}\n`);
+    } else {
+      selectedEnv = await selectEnvironment(model, environments);
+    }
 
     // ── Check Backend Health ───────────────────────────────────────────
     const checkSpinner = new Spinner();

@@ -5,6 +5,13 @@ import fs from 'fs';
 import { loadConfig } from '@jetic/core';
 import { hasYamlModel, loadModelFromDir } from '@jetic/model';
 import { JeticMemory } from '@jetic/memory';
+import {
+  conditionKind,
+  describeInvalidCondition,
+  evaluateLegacyCondition,
+  evaluateRules,
+  isRulesCondition,
+} from '@jetic/simulator';
 
 // ─── Change Scanner ───────────────────────────────────────────────────────────
 // Watches the project root for file edits and persists a lightweight
@@ -192,6 +199,7 @@ class ChangeScanner {
 export const devCommand = new Command('dev')
   .description('Start the Jetic local dashboard')
   .option('-p, --port <number>', 'Port to run the dashboard on', '8787')
+  .option('--no-open', 'Do not open the dashboard in a browser (also: JETIC_NO_OPEN=1)')
   .action(async (options) => {
     const port = parseInt(options.port, 10);
     const app = express();
@@ -961,46 +969,41 @@ export const devCommand = new Command('dev')
         return result;
       }
 
-      async function evalCondRule(rule: { left: string; operator: string; right?: string }, stepIndex: number, stepName: string): Promise<boolean> {
-        const left = await resolveCondRef(rule.left, stepIndex, stepName);
-        const right = rule.right !== undefined ? await resolveCondRef(rule.right, stepIndex, stepName) : undefined;
-        switch (rule.operator) {
-          case 'equals':                return left === right;
-          case 'not_equals':            return left !== right;
-          case 'greater_than':          return Number(left) > Number(right);
-          case 'greater_than_or_equal': return Number(left) >= Number(right);
-          case 'less_than':             return Number(left) < Number(right);
-          case 'less_than_or_equal':    return Number(left) <= Number(right);
-          case 'exists':                return left !== '' && left !== undefined;
-          case 'not_exists':            return left === '' || left === undefined;
-          case 'is_empty':              return left === '';
-          case 'is_not_empty':          return left !== '';
-          case 'contains':              return right !== undefined && left.includes(right);
-          case 'not_contains':          return right !== undefined && !left.includes(right);
-          case 'starts_with':           return right !== undefined && left.startsWith(right);
-          case 'ends_with':             return right !== undefined && left.endsWith(right);
-          default:                      return false;
-        }
-      }
-
+      // Operators live in @jetic/simulator so every runner evaluates conditions identically.
       async function evalCondition(condition: any, stepIndex: number, stepName: string): Promise<{ passed: boolean; reason: string }> {
-        const rules: any[] = condition.rules?.all ?? condition.rules?.any ?? [];
-        const isAnd = !!(condition.rules?.all);
-        if (rules.length === 0) return { passed: true, reason: 'No rules' };
-        const results: { rule: any; ok: boolean }[] = [];
-        for (const rule of rules) results.push({ rule, ok: await evalCondRule(rule, stepIndex, stepName) });
-        const passed = isAnd ? results.every(r => r.ok) : results.some(r => r.ok);
-        const failing = results.filter(r => !r.ok);
-        const reason = passed
-          ? `All conditions met (${isAnd ? 'AND' : 'OR'})`
-          : `Failed: ${failing.map(r => `${r.rule.left} ${r.rule.operator}${r.rule.right !== undefined ? ' ' + r.rule.right : ''}`).join(', ')}`;
-        return { passed, reason };
+        return evaluateRules(condition.rules ?? {}, (value) => resolveCondRef(value, stepIndex, stepName));
       }
 
       for (let i = 0; i < workflow.steps.length; i++) {
         if (aborted) break;
         const step = workflow.steps[i];
         send('step_start', { index: i, step: { name: step.name, method: step.method, path: step.path } });
+
+        // ── Conditions that decide before the step runs ───────────────────
+        const condKind = step.condition ? conditionKind(step.condition) : undefined;
+        const stepSummary = { name: step.name, method: step.method, path: step.path, description: step.description };
+        if (condKind === 'invalid') {
+          // Never ignore an unrecognized condition: a guarded step would run unchecked and the run could look green.
+          const reason = `Step ${i + 1} "${step.name || `${step.method} ${step.path}`}": ${describeInvalidCondition(step.condition)}`;
+          failed++;
+          send('step_result', { index: i, step: stepSummary, status: 0, passed: false, durationMs: 0, captured: [], injected: {}, responseBody: null, error: reason });
+          send('aborted', { index: i, reason });
+          res.end();
+          return;
+        }
+        if (condKind === 'legacy') {
+          // Legacy `{ if, equals… }` guard: a miss skips just this step (counts as passed).
+          const guard = await evaluateLegacyCondition(step.condition, (value) => resolveCondRef(value, i, step.name || ''));
+          if (!guard.matched) {
+            passed++;
+            send('step_result', {
+              index: i, step: stepSummary, status: 0, passed: true, skipped: true, durationMs: 0,
+              captured: [], injected: {}, responseBody: null, error: null,
+              skipReason: `legacy guard not met (resolved "${guard.evaluated}")`,
+            });
+            continue;
+          }
+        }
 
         let result;
         try {
@@ -1028,7 +1031,7 @@ export const devCommand = new Command('dev')
         });
 
         // ── Evaluate step condition (if present) ──────────────────────────
-        if (step.condition && !aborted) {
+        if (isRulesCondition(step.condition) && !aborted) {
           const condResult = await evalCondition(step.condition, i, step.name || `${step.method} ${step.path}`);
           send('condition_result', {
             index: i,
@@ -1226,7 +1229,10 @@ export const devCommand = new Command('dev')
     app.listen(port, () => {
       const url = `http://localhost:${port}`;
       console.log(`\n🚀 Jetic Studio is running at ${url}\n`);
-      
+
+      const noOpenEnv = process.env.JETIC_NO_OPEN;
+      if (!options.open || (noOpenEnv && noOpenEnv !== '0' && noOpenEnv.toLowerCase() !== 'false')) return;
+
       const { exec } = require('child_process');
       const start = (process.platform == 'darwin' ? 'open' : process.platform == 'win32' ? 'start' : 'xdg-open');
       exec(`${start} ${url}`);

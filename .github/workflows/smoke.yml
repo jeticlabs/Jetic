@@ -1,0 +1,50 @@
+name: Smoke
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: smoke (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        # 20 is the CLI's engines floor; 22 is current LTS.
+        node: [20, 22]
+    env:
+      # Nightly/manual runs add the slow + network tests (packed tarball install).
+      SMOKE_NIGHTLY: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm 11 (which wrote the lockfile) requires Node >= 22.13, so install + build always run on 22 ...
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r run build
+
+      # ... then the smoke tests (and every CLI process they spawn) run on the matrix Node version.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --version
+      - name: Smoke tests
+        working-directory: tests/smoke
+        run: node node_modules/jest/bin/jest.js --ci

@@ -1,28 +1,18 @@
 import { BehavioralModel, Environment } from '@jetic/model';
 import { JeticMemory } from '@jetic/memory';
 import { faker } from '@faker-js/faker';
+import {
+  conditionKind,
+  describeInvalidCondition,
+  evaluateLegacyCondition,
+  evaluateRules,
+  RulesCondition,
+  StepCondition,
+} from './conditions';
 
-// ── Step condition ──────────────────────────────────────────────────────────
-// Evaluated before the step executes. If the condition is not met, the step
-// is skipped (counts as passed so the workflow continues).
-export interface StepCondition {
-  /** Template expression to resolve, e.g. "{{workflow:role}}" */
-  if: string;
-  /** Resolved value must equal this string */
-  equals?: string;
-  /** Resolved value must NOT equal this string */
-  notEquals?: string;
-  /** Resolved value must contain this substring */
-  contains?: string;
-  /** true → value must be non-empty; false → value must be empty */
-  exists?: boolean;
-  /** Numeric greater-than comparison */
-  greaterThan?: number;
-  /** Numeric less-than comparison */
-  lessThan?: number;
-  /** Resolved value must be in this list */
-  in?: string[];
-}
+// Conditions live in ./conditions (shared with the CLI and dev runners). Both the canonical
+// rules shape and the legacy pre-step guard are accepted; see that module for semantics.
+export type { StepCondition } from './conditions';
 
 export interface WorkflowStepDef {
   name: string;
@@ -34,7 +24,10 @@ export interface WorkflowStepDef {
   captureInput?: Record<string, string>;
   expectStatus?: number;
   body?: Record<string, any>;
-  /** Skip this step when condition is not met. */
+  /**
+   * Rules condition (canonical): evaluated after the step; `onFail` controls the flow.
+   * Legacy `{ if, equals… }` guard: evaluated before the step; a miss skips it.
+   */
   condition?: StepCondition;
   /** What to do when expectStatus/continueOnStatus check fails. Default: 'abort'. */
   onFailure?: 'abort' | 'continue';
@@ -70,8 +63,10 @@ export interface WorkflowStepResult {
   retryCount: number;
   /** Set when onFailure was evaluated after a step failed. */
   failureHandling?: 'aborted' | 'continued';
-  /** Set when the step had a condition; shows the resolved value + match result. */
+  /** Set when the step had a condition; shows the resolved value (legacy) or reason (rules) + match result. */
   conditionResult?: { evaluated: string; matched: boolean };
+  /** Set when a rules condition did not hold: what the runner did about it. */
+  conditionOutcome?: 'abort' | 'continue' | 'switch';
   requestHeaders: Record<string, string>;
   requestBody: Record<string, any>;
   responseBody: any;
@@ -111,38 +106,130 @@ function deepGet(obj: any, dotPath: string): any {
   return current;
 }
 
+export interface SimulateWorkflowOptions {
+  clearMemory?: boolean;
+  /** Resolves another workflow (by slug or name) for `onFail: "switch"` conditions. */
+  loadWorkflow?: (slugOrName: string) => WorkflowDef | null | Promise<WorkflowDef | null>;
+}
+
+export interface WorkflowSimulatorRuntime {
+  /**
+   * Project that owns `.jetic/memory.json`. Defaults to `process.cwd()`; hosts that serve a
+   * project from a different working directory (the MCP server) must set it.
+   */
+  projectRoot?: string;
+}
+
+interface RunState {
+  results: WorkflowStepResult[];
+  allPassed: boolean;
+  /** A failure (not a quiet `continue` branch) ended the run. */
+  halted: boolean;
+}
+
 export class WorkflowSimulator {
   constructor(
     private model: BehavioralModel,
-    private environment: Environment
+    private environment: Environment,
+    private runtime: WorkflowSimulatorRuntime = {}
   ) {}
+
+  private memory(scope: string): JeticMemory {
+    return new JeticMemory({ scope, projectRoot: this.runtime.projectRoot });
+  }
 
   public async simulateWorkflow(
     workflow: WorkflowDef,
-    options?: { clearMemory?: boolean }
+    options?: SimulateWorkflowOptions
   ): Promise<WorkflowSimulationResult> {
     if (options?.clearMemory) {
-      JeticMemory.clearAllMemory();
+      JeticMemory.clearAllMemory(this.runtime.projectRoot);
     }
 
-    const baseUrl = this.environment.baseUrl;
     const startTime = Date.now();
-    const stepResults: WorkflowStepResult[] = [];
-    let allPassed = true;
+    const state: RunState = { results: [], allPassed: true, halted: false };
+    await this.runSteps(workflow, options, state, [workflow.name]);
+    const stepResults = state.results;
+    const totalTimeMs = Date.now() - startTime;
+
+    return {
+      success: state.allPassed,
+      workflow: {
+        name: workflow.name,
+        description: workflow.description,
+        stepsCount: workflow.steps.length,
+      },
+      environment: {
+        name: this.environment.name,
+        baseUrl: this.environment.baseUrl,
+      },
+      stats: {
+        totalSteps: workflow.steps.length,
+        executedSteps: stepResults.length,
+        passedSteps: stepResults.filter((r) => r.passed).length,
+        failedSteps: stepResults.filter((r) => !r.passed).length,
+        totalTimeMs,
+      },
+      results: stepResults,
+    };
+  }
+
+  /**
+   * Runs one workflow's steps, appending to `state`. Returns `'stop'` when the remaining steps
+   * of THIS workflow must not run (failure, `onFail: continue|switch`), else `'done'`.
+   * `state.halted` is set only for failures, so a caller resuming after a switch knows whether to go on.
+   */
+  private async runSteps(
+    workflow: WorkflowDef,
+    options: SimulateWorkflowOptions | undefined,
+    state: RunState,
+    lineage: string[]
+  ): Promise<'done' | 'stop'> {
+    const baseUrl = this.environment.baseUrl;
+    const resolve = (value: string) => this.resolveTemplateString(value);
 
     for (let i = 0; i < workflow.steps.length; i++) {
       const step = workflow.steps[i];
       const stepStartTime = Date.now();
+      const stepName = step.name || `${step.method} ${step.path}`;
+      const kind = step.condition === undefined ? undefined : conditionKind(step.condition);
 
-      // ── Condition gate ────────────────────────────────────────────────────
-      // If the step declares a condition and it resolves to false, skip the
-      // step entirely. Skipped steps count as passed so the workflow continues.
-      if (step.condition) {
-        const condResult = await this.evaluateCondition(step.condition);
+      // ── Unrecognized condition ───────────────────────────────────────────
+      // Never ignore it: a step that was meant to be guarded would run (or be skipped)
+      // unchecked and the workflow could report green.
+      if (kind === 'invalid') {
+        const reason = describeInvalidCondition(step.condition);
+        state.results.push({
+          stepIndex: i + 1,
+          name: stepName,
+          method: step.method,
+          path: step.path,
+          targetUrl: '',
+          expectedStatus: step.expectStatus ?? 200,
+          actualStatus: 0,
+          durationMs: Date.now() - stepStartTime,
+          passed: false,
+          skipped: false,
+          retryCount: 0,
+          requestHeaders: {},
+          requestBody: {},
+          responseBody: null,
+          capturedMemory: [],
+          error: `Step ${i + 1} "${stepName}": ${reason}`,
+        });
+        state.allPassed = false;
+        state.halted = true;
+        return 'stop';
+      }
+
+      // ── Legacy pre-step guard ────────────────────────────────────────────
+      // A miss skips the step; skipped steps count as passed so the workflow continues.
+      if (kind === 'legacy') {
+        const condResult = await evaluateLegacyCondition(step.condition as any, resolve);
         if (!condResult.matched) {
-          stepResults.push({
+          state.results.push({
             stepIndex: i + 1,
-            name: step.name || `${step.method} ${step.path}`,
+            name: stepName,
             method: step.method,
             path: step.path,
             targetUrl: '',
@@ -239,115 +326,79 @@ export class WorkflowSimulator {
         ? await this.captureToMemory(step.capture, responseBody)
         : [];
 
-      // ── onFailure handling ────────────────────────────────────────────────
-      if (!stepPassed) {
-        allPassed = false;
-        const onFailure = step.onFailure ?? 'abort';
-
-        stepResults.push({
-          stepIndex: i + 1,
-          name: step.name || `${step.method} ${step.path}`,
-          method: step.method,
-          path: step.path,
-          targetUrl: fullUrl,
-          expectedStatus,
-          actualStatus: responseStatus,
-          durationMs: Date.now() - stepStartTime,
-          passed: false,
-          skipped: false,
-          retryCount: attempts - 1,
-          failureHandling: onFailure === 'continue' ? 'continued' : 'aborted',
-          requestHeaders: injectedHeaders,
-          requestBody: finalBody,
-          responseBody,
-          capturedMemory: [...inputCaptured],
-          error: errorMsg,
-        });
-
-        if (onFailure === 'abort') break;
-        // onFailure === 'continue': log the failure and proceed to next step
-        continue;
-      }
-
-      stepResults.push({
+      // ── Record the step; onFailure decides whether a failed step ends the run ─
+      const onFailure = step.onFailure ?? 'abort';
+      const result: WorkflowStepResult = {
         stepIndex: i + 1,
-        name: step.name || `${step.method} ${step.path}`,
+        name: stepName,
         method: step.method,
         path: step.path,
         targetUrl: fullUrl,
         expectedStatus,
         actualStatus: responseStatus,
         durationMs: Date.now() - stepStartTime,
-        passed: true,
+        passed: stepPassed,
         skipped: false,
         retryCount: attempts - 1,
         requestHeaders: injectedHeaders,
         requestBody: finalBody,
         responseBody,
-        capturedMemory: [...inputCaptured, ...responseCaptured],
-      });
+        capturedMemory: stepPassed ? [...inputCaptured, ...responseCaptured] : [...inputCaptured],
+        ...(stepPassed
+          ? {}
+          : {
+              failureHandling: onFailure === 'continue' ? ('continued' as const) : ('aborted' as const),
+              error: errorMsg,
+            }),
+      };
+      state.results.push(result);
+
+      if (!stepPassed) {
+        state.allPassed = false;
+        if (onFailure === 'abort') {
+          state.halted = true;
+          return 'stop';
+        }
+      }
+
+      // ── Rules condition: evaluated after the step; onFail steers the run ──
+      if (kind === 'rules') {
+        const condition = step.condition as RulesCondition;
+        const outcome = await evaluateRules(condition.rules, resolve);
+        result.conditionResult = { evaluated: outcome.reason, matched: outcome.passed };
+        if (outcome.passed) continue;
+
+        result.conditionOutcome = condition.onFail;
+        const fail = (message: string) => {
+          result.passed = false;
+          result.error = result.error ? `${result.error}; ${message}` : message;
+          state.allPassed = false;
+          state.halted = true;
+          return 'stop' as const;
+        };
+
+        if (condition.onFail === 'continue') return 'stop'; // branch not applicable: end quietly, not a failure
+        if (condition.onFail !== 'switch') return fail(`Condition failed at step ${i + 1}: ${outcome.reason}`);
+
+        // onFail: switch → run another workflow
+        const target = condition.switchToWorkflow;
+        if (!target) return fail(`Condition failed at step ${i + 1} (${outcome.reason}) and onFail "switch" has no switchToWorkflow`);
+        if (!options?.loadWorkflow) {
+          return fail(`Condition failed at step ${i + 1} (${outcome.reason}); cannot switch to "${target}": this runner was not given a workflow loader`);
+        }
+        const switched = await options.loadWorkflow(target);
+        if (!switched) return fail(`Condition failed at step ${i + 1} (${outcome.reason}); switch target workflow "${target}" was not found`);
+        if (lineage.includes(switched.name)) {
+          return fail(`Condition failed at step ${i + 1}; switching to "${switched.name}" would loop (${[...lineage, switched.name].join(' → ')})`);
+        }
+
+        await this.runSteps(switched, options, state, [...lineage, switched.name]);
+        if (state.halted || !condition.returnOnComplete) return 'stop';
+        // returnOnComplete: resume the main workflow with the next step
+      }
     }
 
-    const totalTimeMs = Date.now() - startTime;
-
-    return {
-      success: allPassed,
-      workflow: {
-        name: workflow.name,
-        description: workflow.description,
-        stepsCount: workflow.steps.length,
-      },
-      environment: {
-        name: this.environment.name,
-        baseUrl,
-      },
-      stats: {
-        totalSteps: workflow.steps.length,
-        executedSteps: stepResults.length,
-        passedSteps: stepResults.filter((r) => r.passed).length,
-        failedSteps: stepResults.filter((r) => !r.passed).length,
-        totalTimeMs,
-      },
-      results: stepResults,
-    };
-  }
-
-  // ── Condition evaluator ────────────────────────────────────────────────────
-  // Resolves the `if` template and applies the declared operator. Returns
-  // `matched: true` when the condition passes (step should execute).
-  private async evaluateCondition(
-    condition: StepCondition
-  ): Promise<{ matched: boolean; evaluated: string }> {
-    const evaluated = await this.resolveTemplateString(condition.if);
-    let matched: boolean;
-
-    if (condition.exists !== undefined) {
-      const hasValue =
-        evaluated !== '' && evaluated !== 'null' && evaluated !== 'undefined';
-      matched = condition.exists ? hasValue : !hasValue;
-    } else if (condition.equals !== undefined) {
-      matched = evaluated === condition.equals;
-    } else if (condition.notEquals !== undefined) {
-      matched = evaluated !== condition.notEquals;
-    } else if (condition.contains !== undefined) {
-      matched = evaluated.includes(condition.contains);
-    } else if (condition.greaterThan !== undefined) {
-      matched = Number(evaluated) > condition.greaterThan;
-    } else if (condition.lessThan !== undefined) {
-      matched = Number(evaluated) < condition.lessThan;
-    } else if (condition.in !== undefined) {
-      matched = condition.in.includes(evaluated);
-    } else {
-      // No explicit operator — truthy check (non-empty, not 'false'/'0'/'null')
-      matched =
-        evaluated !== '' &&
-        evaluated !== 'false' &&
-        evaluated !== '0' &&
-        evaluated !== 'null' &&
-        evaluated !== 'undefined';
-    }
-
-    return { matched, evaluated };
+    return 'done';
   }
 
   private async resolveTemplateString(value: string): Promise<string> {
@@ -372,7 +423,7 @@ export class WorkflowSimulator {
             continue;
           }
         }
-        const mem = new JeticMemory({ scope });
+        const mem = this.memory(scope);
         const memVal = await mem.get(key);
         replacements.push({ placeholder: match[0], resolved: memVal != null ? String(memVal) : '' });
         continue;
@@ -422,7 +473,7 @@ export class WorkflowSimulator {
         const [scope, key] = memKeyOrTemplate.includes(':')
           ? memKeyOrTemplate.split(':', 2)
           : ['workflow', memKeyOrTemplate];
-        const scopedMemory = new JeticMemory({ scope });
+        const scopedMemory = this.memory(scope);
         const value = await scopedMemory.get(key);
         if (value === null) continue;
         strValue = typeof value === 'string' ? value : JSON.stringify(value);
@@ -449,7 +500,7 @@ export class WorkflowSimulator {
       if (value === undefined || value === null) continue;
 
       const [scope, key] = memKey.includes(':') ? memKey.split(':', 2) : ['workflow', memKey];
-      const memory = new JeticMemory({ scope });
+      const memory = this.memory(scope);
       await memory.set(key, value);
       captured.push(`${scope}:${key} = ${JSON.stringify(value)}`);
     }
@@ -466,7 +517,7 @@ export class WorkflowSimulator {
       if (value === undefined || value === null) continue;
 
       const [scope, key] = memKey.includes(':') ? memKey.split(':', 2) : ['workflow', memKey];
-      const memory = new JeticMemory({ scope });
+      const memory = this.memory(scope);
       await memory.set(key, value);
       captured.push(`${scope}:${key} = ${JSON.stringify(value)}`);
     }
@@ -484,7 +535,7 @@ export class WorkflowSimulator {
       if (body[paramName] !== undefined) {
         result = result.replace(p, String(body[paramName]));
       } else {
-        const memory = new JeticMemory({ scope: 'workflow' });
+        const memory = this.memory('workflow');
         const memVal = await memory.get(paramName);
         if (memVal !== null) {
           result = result.replace(p, String(memVal));

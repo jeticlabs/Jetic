@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
-import { loadModel } from '../types';
-import { listWorkflowFiles, readWorkflowDefinitionFile } from '@jetic/model';
+import { loadModel, projectRootOfModel } from '../types';
+import { listWorkflowFiles, loadWorkflowByName, readWorkflowDefinitionFile } from '@jetic/model';
 import { WorkflowSimulator, WorkflowDef } from '@jetic/simulator';
 
 export const listWorkflowsSchema = z.object({
@@ -225,8 +225,15 @@ export async function handleSimulateWorkflow(args: z.infer<typeof simulateWorkfl
   };
 
   // 4. Delegate workflow simulation directly to WorkflowSimulator from @jetic/simulator
-  const simulator = new WorkflowSimulator(model, effectiveEnv);
-  const result = await simulator.simulateWorkflow(workflowDef, { clearMemory: args.clearMemory ?? false });
+  // Memory and switch targets belong to the project being served, which is not necessarily the
+  // server's working directory (e.g. `jetic mcp --project X`).
+  const projectRoot = projectRootOfModel(filePath);
+  const workflowsDir = path.join(path.dirname(filePath), 'workflows');
+  const simulator = new WorkflowSimulator(model, effectiveEnv, { projectRoot });
+  const result = await simulator.simulateWorkflow(workflowDef, {
+    clearMemory: args.clearMemory ?? false,
+    loadWorkflow: (slugOrName) => loadWorkflowByName<WorkflowDef>(workflowsDir, slugOrName),
+  });
 
   return {
     ...result,
