@@ -1,0 +1,1 @@
+{ "name": "hono-mini", "private": true, "dependencies": { "hono": "^4.5.0" } }

@@ -389,12 +389,18 @@ importers:
 
   tests/smoke:
     devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
       '@types/jest':
         specifier: ^29.5.12
         version: 29.5.14
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
+      express:
+        specifier: ^4.21.2
+        version: 4.22.2
       jest:
         specifier: ^29.7.0
         version: 29.7.0(@types/node@26.2.0)

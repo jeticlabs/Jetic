@@ -27,7 +27,7 @@ export function createProject(options: { from?: string; name?: string } = {}): T
   if (options.from) {
     fs.cpSync(options.from, dir, {
       recursive: true,
-      filter: (src) => !src.split(path.sep).includes('node_modules') && !src.split(path.sep).includes('.jetic'),
+      filter: (src) => !src.split(path.sep).includes('node_modules'),
     });
   } else {
     fs.mkdirSync(dir, { recursive: true });

@@ -142,6 +142,13 @@ describe('Tier 0 — build & packaging', () => {
     });
   });
 
+  (NIGHTLY ? test : test.skip)('SMK-117 upgrade --check reaches the registry and reports a version (network)', async () => {
+    const result = await runCli(['upgrade', '--check'], { timeoutMs: 60_000 });
+    expect(result.code).toBe(0);
+    expect(result.out).toContain(`Current version: v${cliPackage.version}`);
+    expect(result.out).toMatch(/Target version:\s+v\d+\.\d+\.\d+/);
+  });
+
   (NIGHTLY ? test : test.skip)(
     'SMK-006 packed tarball installs and runs outside the workspace',
     async () => {

@@ -6,5 +6,6 @@
     "declarationMap": false,
     "types": ["jest", "node"]
   },
-  "include": ["harness/**/*.ts", "specs/**/*.ts"]
+  "include": ["harness/**/*.ts", "specs/**/*.ts", "fixtures/**/*.ts"],
+  "exclude": ["fixtures/adapters/**"]
 }

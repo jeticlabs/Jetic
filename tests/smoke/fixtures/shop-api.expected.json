@@ -1,0 +1,126 @@
+{
+  "framework": "express",
+  "environments": [
+    {
+      "name": "local",
+      "baseUrl": "http://localhost:3456"
+    }
+  ],
+  "endpoints": [
+    {
+      "id": "DELETE /api/admin/users/:id",
+      "method": "DELETE",
+      "path": "/api/admin/users/:id",
+      "file": "src/routes/admin.ts",
+      "middleware": [
+        "requireAuth",
+        "requireAdmin"
+      ],
+      "security": [
+        "requireAuth"
+      ],
+      "pathParams": [
+        "id"
+      ]
+    },
+    {
+      "id": "GET /api/flaky",
+      "method": "GET",
+      "path": "/api/flaky",
+      "file": "src/routes/flaky.ts",
+      "middleware": [],
+      "security": [],
+      "pathParams": []
+    },
+    {
+      "id": "GET /api/me",
+      "method": "GET",
+      "path": "/api/me",
+      "file": "src/routes/me.ts",
+      "middleware": [
+        "requireAuth"
+      ],
+      "security": [
+        "requireAuth"
+      ],
+      "pathParams": []
+    },
+    {
+      "id": "GET /api/orders/:id",
+      "method": "GET",
+      "path": "/api/orders/:id",
+      "file": "src/routes/orders.ts",
+      "middleware": [
+        "requireAuth"
+      ],
+      "security": [
+        "requireAuth"
+      ],
+      "pathParams": [
+        "id"
+      ]
+    },
+    {
+      "id": "GET /api/reports",
+      "method": "GET",
+      "path": "/api/reports",
+      "file": "src/routes/reports.ts",
+      "middleware": [
+        "requireAuthUnlessLeaky"
+      ],
+      "security": [
+        "requireAuthUnlessLeaky"
+      ],
+      "pathParams": []
+    },
+    {
+      "id": "GET /health",
+      "method": "GET",
+      "path": "/health",
+      "file": "src/app.ts",
+      "middleware": [],
+      "security": [],
+      "pathParams": []
+    },
+    {
+      "id": "POST /api/auth/login",
+      "method": "POST",
+      "path": "/api/auth/login",
+      "file": "src/routes/auth.ts",
+      "middleware": [],
+      "security": [],
+      "pathParams": []
+    },
+    {
+      "id": "POST /api/auth/register",
+      "method": "POST",
+      "path": "/api/auth/register",
+      "file": "src/routes/auth.ts",
+      "middleware": [],
+      "security": [],
+      "pathParams": []
+    },
+    {
+      "id": "POST /api/orders",
+      "method": "POST",
+      "path": "/api/orders",
+      "file": "src/routes/orders.ts",
+      "middleware": [
+        "requireAuth"
+      ],
+      "security": [
+        "requireAuth"
+      ],
+      "pathParams": []
+    },
+    {
+      "id": "POST /api/otp/verify",
+      "method": "POST",
+      "path": "/api/otp/verify",
+      "file": "src/routes/otp.ts",
+      "middleware": [],
+      "security": [],
+      "pathParams": []
+    }
+  ]
+}
