@@ -121,6 +121,39 @@ export function listWorkflowFiles(workflowsDir: string): string[] {
     .sort();
 }
 
+/**
+ * Finds a workflow definition in `workflowsDir` by file slug (`checkout` → checkout.json|yaml|yml)
+ * or by its `name` field — case-insensitive. Returns `null` when nothing matches or a file is unreadable.
+ * Used to resolve `condition.switchToWorkflow`.
+ */
+export function loadWorkflowByName<T extends { name?: string } = { name?: string }>(
+  workflowsDir: string,
+  slugOrName: string
+): T | null {
+  const wanted = slugOrName.trim().toLowerCase();
+  if (!wanted) return null;
+  const files = listWorkflowFiles(workflowsDir);
+
+  const bySlug = files.find((f) => f.replace(/.(json|ya?ml)$/, '').toLowerCase() === wanted);
+  if (bySlug) {
+    try {
+      return readWorkflowDefinitionFile<T>(path.join(workflowsDir, bySlug));
+    } catch {
+      return null;
+    }
+  }
+
+  for (const file of files) {
+    try {
+      const def = readWorkflowDefinitionFile<T>(path.join(workflowsDir, file));
+      if (def?.name && def.name.trim().toLowerCase() === wanted) return def;
+    } catch {
+      // Skip unreadable files; another file may match.
+    }
+  }
+  return null;
+}
+
 /** True when a split-YAML model (api.yaml index) exists at `modelDir`. */
 export function hasYamlModel(modelDir: string): boolean {
   return fs.existsSync(path.join(modelDir, 'api.yaml'));

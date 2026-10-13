@@ -40,3 +40,13 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Compiled output must go to dist/, never next to package sources
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.d.ts.map
+
+# Smoke test scratch (compile cache, kept failures)
+tests/smoke/.tmp/
+docs/*

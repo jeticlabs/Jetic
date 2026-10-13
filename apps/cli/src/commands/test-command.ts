@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as path from 'path';
 import { loadConfig, jeticEvents } from '@jetic/core';
-import { BehavioralModel, listWorkflowFiles, readWorkflowDefinitionFile } from '@jetic/model';
+import { BehavioralModel, listWorkflowFiles, loadWorkflowByName, readWorkflowDefinitionFile } from '@jetic/model';
 import { WorkflowSimulator, WorkflowDef } from '@jetic/simulator';
 import { hasYamlModel, loadModelFromDir } from '@jetic/model';
 import * as fs from 'fs';
@@ -38,7 +38,12 @@ export const testCommand = new Command('test')
       baseUrl: 'http://localhost:3000',
     };
 
-    const results: Array<{ name: string; passed: boolean; durationMs: number }> = [];
+    const results: Array<{
+      name: string;
+      passed: boolean;
+      durationMs: number;
+      failures: Array<{ step: string; status: number; error?: string }>;
+    }> = [];
 
     if (!options.ci) console.log(`\nJETIC TEST\n\nRunning ${files.length} workflow(s)...\n`);
 
@@ -46,9 +51,15 @@ export const testCommand = new Command('test')
       const workflow = readWorkflowDefinitionFile<WorkflowDef>(path.join(config.workflowsDir, file));
       jeticEvents.emit('workflow.started', { workflowId: workflow.name });
 
-      const simulator = new WorkflowSimulator(model, targetEnv);
-      const result = await simulator.simulateWorkflow(workflow);
-      results.push({ name: workflow.name, passed: result.success, durationMs: result.stats.totalTimeMs });
+      // Memory belongs to the project under test; switch targets resolve from its workflows dir.
+      const simulator = new WorkflowSimulator(model, targetEnv, { projectRoot: config.projectRoot });
+      const result = await simulator.simulateWorkflow(workflow, {
+        loadWorkflow: (slugOrName) => loadWorkflowByName<WorkflowDef>(config.workflowsDir, slugOrName),
+      });
+      const failures = result.results
+        .filter((r) => !r.passed)
+        .map((r) => ({ step: r.name, status: r.actualStatus, error: r.error }));
+      results.push({ name: workflow.name, passed: result.success, durationMs: result.stats.totalTimeMs, failures });
 
       if (result.success) {
         jeticEvents.emit('workflow.completed', { workflowId: workflow.name, passed: true });
@@ -58,6 +69,10 @@ export const testCommand = new Command('test')
 
       if (!options.ci) {
         console.log(`  ${result.success ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${workflow.name}`);
+        for (const failure of failures) {
+          const detail = failure.error ?? (failure.status ? `HTTP ${failure.status}` : 'failed');
+          console.log(`      \x1b[2m↳ ${failure.step}: ${detail}\x1b[0m`);
+        }
       }
     }
 

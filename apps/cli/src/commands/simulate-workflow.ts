@@ -3,7 +3,17 @@ import * as fs from 'fs';
 import { Command } from 'commander';
 import { loadConfig, readJsonSync } from '@jetic/core';
 import { BehavioralModel, Environment } from '@jetic/model';
+import { loadWorkflowByName } from '@jetic/model';
 import { JeticMemory } from '@jetic/memory';
+import {
+  RulesCondition,
+  StepCondition,
+  conditionKind,
+  describeInvalidCondition,
+  evaluateLegacyCondition,
+  evaluateRules,
+  isRulesCondition,
+} from '@jetic/simulator';
 import { faker } from '@faker-js/faker';
 
 // ─── ANSI Helpers ──────────────────────────────────────────────────────────────
@@ -58,34 +68,7 @@ class Spinner {
 
 // ─── Condition Types ──────────────────────────────────────────────────────────
 
-export type ConditionOperator =
-  | 'equals' | 'not_equals'
-  | 'greater_than' | 'greater_than_or_equal'
-  | 'less_than' | 'less_than_or_equal'
-  | 'exists' | 'not_exists'
-  | 'is_empty' | 'is_not_empty'
-  | 'contains' | 'not_contains'
-  | 'starts_with' | 'ends_with';
-
-export interface ConditionRule {
-  left: string;
-  operator: ConditionOperator;
-  right?: string;
-}
-
-export interface ConditionGroup {
-  all?: ConditionRule[];  // AND
-  any?: ConditionRule[];  // OR
-}
-
-export type ConditionOnFail = 'abort' | 'continue' | 'switch';
-
-export interface StepCondition {
-  rules: ConditionGroup;
-  onFail: ConditionOnFail;
-  switchToWorkflow?: string;
-  returnOnComplete?: boolean;
-}
+// Condition types and operator logic are shared with the other runners: see @jetic/simulator conditions.
 
 export interface WorkflowStepDef {
   /** Step label e.g. "Register User" */
@@ -123,9 +106,9 @@ export interface WorkflowStepDef {
   /** Hardcoded request body overrides */
   body?: Record<string, any>;
   /**
-   * Optional condition evaluated after the step runs.
-   * If the condition fails, `onFail` controls whether to abort, continue,
-   * or switch to another workflow.
+   * Optional condition. A rules condition is evaluated after the step runs and `onFail` controls
+   * whether to abort, continue, or switch to another workflow. A legacy `{ if, equals… }` guard is
+   * evaluated before the step and skips it on a miss. Anything else fails the step.
    */
   condition?: StepCondition;
 }
@@ -151,9 +134,7 @@ function deepGet(obj: any, dotPath: string): any {
 }
 
 // ─── Condition Evaluator ──────────────────────────────────────────────────────
-// Resolves {{scope:key}} refs from JeticMemory and evaluates the 14 operators.
-
-const UNARY_OPS: ConditionOperator[] = ['exists', 'not_exists', 'is_empty', 'is_not_empty'];
+// Resolves {{scope:key}} refs from JeticMemory; the operators live in @jetic/simulator.
 
 async function resolveConditionRef(ref: string, context = 'condition'): Promise<string> {
   return ref.replace(/\{\{([^}]+)\}\}/g, () => '').trim() === ref.trim()
@@ -161,54 +142,41 @@ async function resolveConditionRef(ref: string, context = 'condition'): Promise<
     : await resolveTemplateString(ref, context);
 }
 
-async function evalConditionRule(rule: ConditionRule, context = 'condition'): Promise<boolean> {
-  const left = await resolveConditionRef(rule.left, context);
-  const right = rule.right !== undefined ? await resolveConditionRef(rule.right, context) : undefined;
-  const op = rule.operator;
-
-  switch (op) {
-    case 'equals':                return left === right;
-    case 'not_equals':            return left !== right;
-    case 'greater_than':          return Number(left) > Number(right);
-    case 'greater_than_or_equal': return Number(left) >= Number(right);
-    case 'less_than':             return Number(left) < Number(right);
-    case 'less_than_or_equal':    return Number(left) <= Number(right);
-    case 'exists':                return left !== '' && left !== undefined;
-    case 'not_exists':            return left === '' || left === undefined;
-    case 'is_empty':              return left === '';
-    case 'is_not_empty':          return left !== '';
-    case 'contains':              return right !== undefined && left.includes(right);
-    case 'not_contains':          return right !== undefined && !left.includes(right);
-    case 'starts_with':           return right !== undefined && left.startsWith(right);
-    case 'ends_with':             return right !== undefined && left.endsWith(right);
-    default:                      return false;
-  }
-}
-
 async function evaluateStepCondition(
-  condition: StepCondition,
+  condition: RulesCondition,
   context = 'condition',
 ): Promise<{ passed: boolean; reason: string }> {
-  const { rules } = condition;
-  const ruleList = rules.all ?? rules.any ?? [];
-  const isAnd = !!rules.all;
+  return evaluateRules(condition.rules, (value) => resolveConditionRef(value, context));
+}
 
-  if (ruleList.length === 0) return { passed: true, reason: 'No rules defined' };
+/**
+ * Handles conditions that decide BEFORE the step runs. Returns a finished result when the step
+ * must not execute — a legacy guard that missed (skipped, counts as passed) or an unrecognized
+ * condition (failed: it is never silently ignored) — or null to run the step normally.
+ */
+async function preStepCondition(step: WorkflowStepDef): Promise<StepResult | null> {
+  if (!step.condition) return null;
+  const label = step.name || `${step.method} ${step.path}`;
+  const base = { step, status: 0, responseBody: null, durationMs: 0, captured: [], injected: {} };
 
-  const results: { rule: ConditionRule; ok: boolean }[] = [];
-  for (const rule of ruleList) {
-    results.push({ rule, ok: await evalConditionRule(rule, context) });
+  const kind = conditionKind(step.condition);
+  if (kind === 'invalid') {
+    return { ...base, passed: false, error: `Step "${label}": ${describeInvalidCondition(step.condition)}` };
   }
-
-  const passed = isAnd ? results.every(r => r.ok) : results.some(r => r.ok);
-  const failing = results.filter(r => !r.ok);
-  const reason = passed
-    ? `All conditions met (${isAnd ? 'AND' : 'OR'})`
-    : `Failed: ${failing.map(r =>
-        `${r.rule.left} ${r.rule.operator}${r.rule.right !== undefined ? ' ' + r.rule.right : ''}`
-      ).join(', ')}`;
-
-  return { passed, reason };
+  if (kind === 'legacy') {
+    const outcome = await evaluateLegacyCondition(step.condition as any, (value) =>
+      resolveConditionRef(value, `condition of step "${label}"`)
+    );
+    if (!outcome.matched) {
+      return {
+        ...base,
+        passed: true,
+        skipped: true,
+        conditionResult: { passed: false, reason: `legacy guard not met (resolved "${outcome.evaluated}")` },
+      };
+    }
+  }
+  return null;
 }
 
 // ─── Human input ({{human:key}}) ─────────────────────────────────────────────
@@ -487,6 +455,8 @@ interface StepResult {
   error?: string;
   injected: Record<string, string>;
   conditionResult?: { passed: boolean; reason: string };
+  /** A legacy guard did not match, so the step was not run. */
+  skipped?: boolean;
 }
 
 async function executeStep(
@@ -631,12 +601,14 @@ function renderStepResult(result: StepResult, index: number, total: number): voi
   }
 
   // Show condition evaluation result
-  if (result.conditionResult) {
+  if (result.skipped) {
+    console.log(`  ${CHAIN}   ${c.yellow}⊘ skipped${c.reset}  ${c.dim}${result.conditionResult?.reason ?? ''}${c.reset}`);
+  } else if (result.conditionResult) {
     const { passed: condPassed, reason } = result.conditionResult;
     const condIcon = condPassed ? `${c.magenta}◇${c.reset}` : `${c.yellow}◈${c.reset}`;
     const condColor = condPassed ? c.magenta : c.yellow;
     console.log(`  ${CHAIN}   ${condIcon} ${condColor}condition ${condPassed ? 'passed' : 'failed'}${c.reset}  ${c.dim}${reason}${c.reset}`);
-    if (!condPassed && result.step.condition) {
+    if (!condPassed && isRulesCondition(result.step.condition)) {
       const { onFail, switchToWorkflow } = result.step.condition;
       const actionStr = onFail === 'switch'
         ? `switching to workflow: ${switchToWorkflow ?? 'unknown'}`
@@ -914,15 +886,22 @@ export const simulateWorkflowCommand = new Command('workflow')
 
       let result: StepResult;
       try {
-        result = await executeStep(step, baseUrl, {});
+        const preempted = await preStepCondition(step);
+        result = preempted ?? await executeStep(step, baseUrl, {});
 
-        // ── Evaluate condition (if present) ───────────────────────────────────
-        if (step.condition) {
+        // ── Evaluate rules condition (if present) ─────────────────────────────
+        if (!preempted && isRulesCondition(step.condition)) {
           const condResult = await evaluateStepCondition(step.condition, `condition of step "${step.name || step.path}"`);
           result.conditionResult = condResult;
 
         if (!condResult.passed) {
           const { onFail, switchToWorkflow } = step.condition;
+
+          // An abort is a failed run: the step itself may have passed over HTTP, but the exit code must not.
+          if (onFail === 'abort') {
+            result.passed = false;
+            result.error = `Condition failed: ${condResult.reason}`;
+          }
 
           results.push(result);
           const icon = result.passed ? TICK : CROSS;
@@ -940,10 +919,9 @@ export const simulateWorkflowCommand = new Command('workflow')
           } else if (onFail === 'switch' && switchToWorkflow) {
             console.log(`  ${ARROW} Condition failed — switching to workflow: ${c.bold}${switchToWorkflow}${c.reset}\n`);
             // Load and execute the target workflow
-            const switchPath = path.join(workflowsDir, `${switchToWorkflow}.json`);
-            if (fs.existsSync(switchPath)) {
+            const switchedWorkflow = loadWorkflowByName<WorkflowDef>(workflowsDir, switchToWorkflow);
+            if (switchedWorkflow) {
               try {
-                const switchedWorkflow: WorkflowDef = JSON.parse(fs.readFileSync(switchPath, 'utf-8'));
                 console.log(`  ${TICK} Loaded switch workflow: ${c.bold}${switchedWorkflow.name}${c.reset}\n`);
                 renderWorkflowHeader(switchedWorkflow);
                 console.log(`  ${c.magenta}🚀${c.reset} Executing sub-workflow...\n`);
@@ -952,8 +930,9 @@ export const simulateWorkflowCommand = new Command('workflow')
                   const switchLabel = `${c.dim}${si + 1}/${switchedWorkflow.steps.length}${c.reset}  ${getMethodColor(switchStep.method)}${switchStep.method}${c.reset} ${switchStep.path}`;
                   const switchSpinner = new Spinner();
                   switchSpinner.start(`${switchLabel}  ${c.dim}${switchStep.name}${c.reset}...`);
-                  const switchResult = await executeStep(switchStep, baseUrl, {});
-                  if (switchStep.condition) {
+                  const switchPre = await preStepCondition(switchStep);
+                  const switchResult = switchPre ?? await executeStep(switchStep, baseUrl, {});
+                  if (!switchPre && isRulesCondition(switchStep.condition)) {
                     switchResult.conditionResult = await evaluateStepCondition(
                       switchStep.condition,
                       `condition of step "${switchStep.name || switchStep.path}"`
@@ -965,10 +944,14 @@ export const simulateWorkflowCommand = new Command('workflow')
                   renderStepResult(switchResult, si, switchedWorkflow.steps.length);
                 }
               } catch (e: any) {
-                console.log(`  ${c.red}✗ Failed to load switch workflow: ${e.message}${c.reset}\n`);
+                console.log(`  ${c.red}✗ Failed to run switch workflow: ${e.message}${c.reset}\n`);
+                result.passed = false;
+                result.error = `Switch workflow "${switchToWorkflow}" failed: ${e.message}`;
               }
             } else {
-              console.log(`  ${c.yellow}⚠ Switch workflow not found: ${switchPath}${c.reset}\n`);
+              console.log(`  ${c.red}✗ Switch workflow not found: ${switchToWorkflow}${c.reset}\n`);
+              result.passed = false;
+              result.error = `Switch workflow "${switchToWorkflow}" was not found in ${workflowsDir}`;
             }
 
             if (step.condition.returnOnComplete) {
@@ -978,6 +961,14 @@ export const simulateWorkflowCommand = new Command('workflow')
               stopOnFailure = true;
               break;
             }
+          }
+
+          if (onFail === 'switch' && !switchToWorkflow) {
+            console.log(`  ${c.red}✗ Condition failed and onFail "switch" has no switchToWorkflow.${c.reset}\n`);
+            result.passed = false;
+            result.error = 'onFail "switch" has no switchToWorkflow';
+            stopOnFailure = true;
+            break;
           }
 
           continue; // already pushed & rendered
@@ -994,10 +985,17 @@ export const simulateWorkflowCommand = new Command('workflow')
 
       results.push(result);
 
-      const icon = result.passed ? TICK : CROSS;
+      const icon = result.skipped ? SKIP : result.passed ? TICK : CROSS;
       spinner.stop(`  ${icon} ${stepLabel}  ${formatStatus(result.status)}  ${c.dim}${result.durationMs}ms${c.reset}`);
 
       renderStepResult(result, i, workflow.steps.length);
+
+      // An unrecognized condition is a hard failure: do not run the rest of a workflow built on it.
+      if (!result.passed && result.error && !result.status && conditionKind(step.condition) === 'invalid') {
+        console.log(`  ${c.red}${c.bold}⚠ Unrecognized condition — stopping workflow.${c.reset}\n`);
+        stopOnFailure = true;
+        break;
+      }
 
       // If a critical step fails (auth steps), stop early
       if (!result.passed && (

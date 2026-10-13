@@ -1,0 +1,1 @@
+{ "name": "fastify-mini", "private": true, "dependencies": { "fastify": "^4.28.0" } }

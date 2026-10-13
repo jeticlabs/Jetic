@@ -3,15 +3,42 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { loadModel, projectRootOfModel, resolveModelPath } from '../types';
 import { handleListWorkflows } from './workflow-tools';
-import type { WorkflowDef, WorkflowStepDef } from '@jetic/simulator';
+import type { WorkflowDef, WorkflowStepDef, ConditionOperator } from '@jetic/simulator';
+import { CONDITION_OPERATORS, UNARY_OPERATORS, conditionKind } from '@jetic/simulator';
+import { loadWorkflowByName } from '@jetic/model';
 
 // ── Step schema (file-workflow dialect — the only dialect the simulator runs) ──────────────────────
 // NOTE: this deliberately excludes model-embedded fields (`call`, `auth`, `bind`).
 // The validator warns when those appear so AI authors don’t rely on silently-ignored fields.
 
-// Condition sub-schema: evaluated before the step executes;
-// if not met, the step is skipped (counts as passed so the workflow continues).
-const stepConditionSchema = z
+// Conditions. Two shapes are accepted (see @jetic/simulator conditions.ts):
+//  - rules  (canonical): evaluated AFTER the step; onFail = abort | continue | switch
+//  - legacy { if, equals… }: evaluated BEFORE the step; a miss skips just that step
+const conditionRuleSchema = z.object({
+  left: z.string().min(1).describe('Value to test, usually a template: "{{workflow:role}}"'),
+  operator: z
+    .enum(CONDITION_OPERATORS as unknown as [ConditionOperator, ...ConditionOperator[]])
+    .describe('equals, not_equals, greater_than(_or_equal), less_than(_or_equal), exists, not_exists, is_empty, is_not_empty, contains, not_contains, starts_with, ends_with'),
+  right: z.string().optional().describe('Value to compare against (omit for exists/not_exists/is_empty/is_not_empty)'),
+});
+
+const rulesConditionSchema = z
+  .object({
+    rules: z
+      .object({
+        all: z.array(conditionRuleSchema).optional().describe('AND — every rule must hold'),
+        any: z.array(conditionRuleSchema).optional().describe('OR — at least one rule must hold'),
+      })
+      .describe('Rule group evaluated after the step runs'),
+    onFail: z
+      .enum(['abort', 'continue', 'switch'])
+      .describe('When the rules do not hold: abort = fail the workflow; continue = stop remaining steps without failing; switch = run switchToWorkflow'),
+    switchToWorkflow: z.string().optional().describe('Workflow slug or name to run when onFail is "switch"'),
+    returnOnComplete: z.boolean().optional().describe('With onFail "switch": resume this workflow after the target finishes'),
+  })
+  .describe('Canonical condition: evaluated after the step; onFail steers the run');
+
+const legacyConditionSchema = z
   .object({
     if: z.string().min(1).describe('Template expression to resolve, e.g. "{{workflow:role}}"'),
     equals: z.string().optional().describe('Resolved value must equal this string'),
@@ -22,7 +49,9 @@ const stepConditionSchema = z
     lessThan: z.number().optional().describe('Numeric less-than comparison'),
     in: z.array(z.string()).optional().describe('Resolved value must be one of these strings'),
   })
-  .describe('Skip this step when the condition is not met');
+  .describe('Legacy guard: evaluated before the step; if not met the step is skipped');
+
+const stepConditionSchema = z.union([rulesConditionSchema, legacyConditionSchema]);
 
 // Retry sub-schema — usable per step and at the workflow level as a global default.
 const stepRetrySchema = z.object({
@@ -64,7 +93,7 @@ export const workflowStepSchema = z.object({
     .describe('Expected HTTP status (default 200; any 2xx passes when expecting 2xx)'),
   condition: stepConditionSchema
     .optional()
-    .describe('Skip this step when condition is not met. Use {{workflow:key}} in the "if" field.'),
+    .describe('Preferred: { rules: { all|any: [{ left, operator, right }] }, onFail: abort|continue|switch } — evaluated after the step. Legacy: { if, equals… } skips the step when not met.'),
   onFailure: z
     .enum(['abort', 'continue'])
     .optional()
@@ -176,6 +205,84 @@ function suggestEndpoints(model: { method: string; path: string }[], method: str
 }
 
 /**
+ * Validates a rules condition's structure and returns the {{template}} refs in its operands
+ * (the caller checks them against memory once the step's own captures are known).
+ */
+function checkRulesCondition(
+  cond: any,
+  stepNo: number,
+  sName: string | undefined,
+  errors: WorkflowValidationIssue[],
+  warnings: WorkflowValidationIssue[],
+  ownName: string | undefined,
+  workflowsDir: string
+): string[] {
+  const refs: string[] = [];
+  const rules = cond.rules as Record<string, unknown>;
+  let ruleCount = 0;
+
+  for (const group of ['all', 'any'] as const) {
+    const list = rules[group];
+    if (list === undefined) continue;
+    if (!Array.isArray(list)) {
+      err(errors, stepNo, sName, 'BAD_CONDITION', `Step ${stepNo} "condition.rules.${group}" must be an array of rules.`,
+        `Use "${group}": [{ "left": "{{workflow:role}}", "operator": "equals", "right": "admin" }].`);
+      continue;
+    }
+    list.forEach((rule: any, ri: number) => {
+      ruleCount++;
+      const where = `Step ${stepNo} condition.rules.${group}[${ri}]`;
+      if (!rule || typeof rule !== 'object' || Array.isArray(rule)) {
+        err(errors, stepNo, sName, 'BAD_CONDITION', `${where} must be an object { left, operator, right? }.`, 'Use { "left": "{{workflow:role}}", "operator": "equals", "right": "admin" }.');
+        return;
+      }
+      if (typeof rule.left !== 'string' || !rule.left.trim()) {
+        err(errors, stepNo, sName, 'BAD_CONDITION', `${where} needs a non-empty "left".`, 'Set "left" to a value or template like "{{workflow:role}}".');
+      } else if (!/\{\{[^}]+\}\}/.test(rule.left)) {
+        warn(warnings, stepNo, sName, 'CONDITION_BARE_IF', `${where} "left" ("${rule.left}") contains no {{template}} and is compared literally.`,
+          'Use {{workflow:key}} or {{scope:key}} to reference captured memory values.');
+      }
+      if (!CONDITION_OPERATORS.includes(rule.operator)) {
+        err(errors, stepNo, sName, 'BAD_CONDITION_OPERATOR', `${where} has unknown operator ${JSON.stringify(rule.operator)}.`,
+          `Use one of: ${CONDITION_OPERATORS.join(', ')}.`);
+      } else if (!UNARY_OPERATORS.includes(rule.operator) && rule.right === undefined) {
+        err(errors, stepNo, sName, 'CONDITION_MISSING_RIGHT', `${where} uses "${rule.operator}" but has no "right" operand.`,
+          'Add "right", or use exists / not_exists / is_empty / is_not_empty.');
+      }
+      collectTemplateRefs(rule.left, refs);
+      collectTemplateRefs(rule.right, refs);
+    });
+  }
+
+  if (ruleCount === 0 && !errors.some((e) => e.stepIndex === stepNo && e.code === 'BAD_CONDITION')) {
+    warn(warnings, stepNo, sName, 'CONDITION_NO_RULES', `Step ${stepNo} condition has no rules, so it always passes.`,
+      'Add rules under "rules.all" or "rules.any".');
+  }
+
+  if (!['abort', 'continue', 'switch'].includes(cond.onFail)) {
+    err(errors, stepNo, sName, 'BAD_CONDITION_ONFAIL', `Step ${stepNo} condition needs "onFail" of "abort", "continue" or "switch" (got ${JSON.stringify(cond.onFail)}).`,
+      '"abort" fails the workflow, "continue" stops the remaining steps quietly, "switch" runs switchToWorkflow.');
+  } else if (cond.onFail === 'switch') {
+    const target = typeof cond.switchToWorkflow === 'string' ? cond.switchToWorkflow.trim() : '';
+    if (!target) {
+      err(errors, stepNo, sName, 'CONDITION_SWITCH_NO_TARGET', `Step ${stepNo} uses onFail "switch" but has no "switchToWorkflow".`,
+        'Set "switchToWorkflow" to the slug or name of the workflow to run.');
+    } else if (ownName && target.toLowerCase() === ownName.trim().toLowerCase()) {
+      err(errors, stepNo, sName, 'CONDITION_SWITCH_SELF', `Step ${stepNo} switches to this same workflow ("${target}"), which would loop.`,
+        'Point "switchToWorkflow" at a different workflow.');
+    } else if (!loadWorkflowByName(workflowsDir, target)) {
+      warn(warnings, stepNo, sName, 'CONDITION_SWITCH_TARGET_MISSING', `Step ${stepNo} switches to "${target}", which does not exist in .jetic/workflows yet.`,
+        'Create that workflow before running this one, or the run fails when the condition triggers.');
+    }
+  } else if (cond.returnOnComplete !== undefined || cond.switchToWorkflow !== undefined) {
+    warn(warnings, stepNo, sName, 'CONDITION_UNUSED_SWITCH_FIELDS', `Step ${stepNo} sets switchToWorkflow/returnOnComplete but onFail is "${cond.onFail}", so they are ignored.`,
+      'Use onFail "switch" or remove those fields.');
+  }
+
+  return refs;
+}
+
+/**
  * Deep-validates a workflow definition: structure, endpoint cross-checks
  * against model.json, and full memory data-flow analysis (every {{scope:key}}
  * must be produced by an earlier step or exist in memory.json).
@@ -229,6 +336,9 @@ export function validateWorkflowDefinition(
       return;
     }
     const step = rawStep as Record<string, any>;
+    // Refs from a rules condition. It runs AFTER the step, so it may use this step's own captures;
+    // they are checked once those are registered, at the end of the step.
+    let rulesRefs: string[] = [];
 
     // Unknown / dialect-mixing keys.
     for (const key of Object.keys(step)) {
@@ -248,11 +358,13 @@ export function validateWorkflowDefinition(
       if (!cond || typeof cond !== 'object' || Array.isArray(cond)) {
         err(errors, stepNo, sName, 'BAD_CONDITION',
           `Step ${stepNo} "condition" must be an object.`,
-          'Use { "condition": { "if": "{{workflow:role}}", "equals": "admin" } }.');
+          'Use { "condition": { "rules": { "all": [{ "left": "{{workflow:role}}", "operator": "equals", "right": "admin" }] }, "onFail": "abort" } }.');
+      } else if (conditionKind(cond) === 'rules') {
+        rulesRefs = checkRulesCondition(cond, stepNo, sName, errors, warnings, wf.name, path.join(projectRoot, '.jetic', 'workflows'));
       } else if (!cond.if || typeof cond.if !== 'string' || !cond.if.trim()) {
         err(errors, stepNo, sName, 'BAD_CONDITION',
-          `Step ${stepNo} "condition" must have a non-empty "if" field.`,
-          'Set "if" to a template expression like "{{workflow:role}}".');
+          `Step ${stepNo} "condition" is neither a rules condition (needs "rules" + "onFail") nor a legacy guard (needs a non-empty "if"). The runners fail steps with an unrecognized condition.`,
+          'Use { "rules": { "all": [{ "left": "{{workflow:role}}", "operator": "equals", "right": "admin" }] }, "onFail": "abort" }.');
       } else {
         const operators = ['equals', 'notEquals', 'contains', 'exists', 'greaterThan', 'lessThan', 'in'];
         const usedOps = operators.filter((op) => op in cond && cond[op] !== undefined);
@@ -511,6 +623,25 @@ export function validateWorkflowDefinition(
           const { scope, key } = splitMemKey(memKey);
           if (key) defined.add(`${scope}:${key}`);
         }
+      }
+    }
+
+    for (const ref of rulesRefs) {
+      if (ref.startsWith('faker.')) continue;
+      if (!ref.includes(':')) {
+        err(errors, stepNo, sName, 'BAD_TEMPLATE',
+          `"{{${ref}}}" in the condition of step ${stepNo} needs a scope ("{{workflow:key}}").`,
+          'Bare {{key}} is left literal — add the scope prefix.');
+        continue;
+      }
+      const { scope, key } = splitMemKey(ref);
+      if (!key) continue;
+      if (scope === 'human') { humanKeys.add(key); continue; }
+      const full = `${scope}:${key}`;
+      if (!defined.has(full) && !persistedMemory.has(full)) {
+        err(errors, stepNo, sName, 'UNDEFINED_MEMORY_REF',
+          `"{{${ref}}}" in the condition of step ${stepNo} is not captured by this or an earlier step and is not in memory.json.`,
+          `Capture "${full}" in this step or an earlier one before referencing it in a condition.`);
       }
     }
   });

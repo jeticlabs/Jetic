@@ -1,0 +1,9 @@
+{
+  "name": "shop-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Smoke-test fixture: a small Express+TypeScript API that Jetic scans and the harness serves",
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
