@@ -1,0 +1,25 @@
+Here's the honest retro — the manual work I did that Jetic should have handled, mapped to concrete gaps you could productize.
+
+What I did by hand that Jetic should do
+Preflight / target health check. Jetic fired all 79 steps against a dead server and reported 79 failed … "fetch failed" (HTTP 0) instead of one clear diagnosis. I had to Test-NetConnection, read npm run dev logs, and find the P1001 Can't reach database server … neon.tech:5432 crash myself. A tool that claims to "simulate against the live server" should probe GET baseUrl first, distinguish connection-refused vs 5xx app error vs auth error, and abort early.
+Env/baseURL discovery. jetic_init defaulted to :3000; the app runs on :4000 (PORT in .env). I read .env and called jetic_manage_environment manually. Infer baseUrl from .env / server bootstrap.
+Model enrichment. The static scan produced bare method + path endpoints. To pass the Phase 3 gate I wrote a custom PowerShell script (enrich-jetic.ps1) to inject description/summary/tags/responses/param descriptions across 72 endpoints. The scan did not derive request/response bodies or status codes from the handlers/Prisma schema. That should come from the AST (validators, TS types, prisma/schema.prisma).
+Path-param plumbing. :params resolve only from a body field or workflow-memory key of the same name — {{templates}} don't work in path. I hand-duplicated every path param into body for ~30 steps. Either support templates in path, or have scaffolding emit the right body keys automatically.
+Bearer prefix. inject: {"header:Authorization": "{{workflow:accessToken}}"} did not add Bearer (the run output shows "Authorization": "Bearer " with the token stripped). I had to hardcode "Bearer {{workflow:accessToken}}". If the auto-prefix is advertised, it's broken; fix or document.
+Deep template resolution. Only top-level string body values are templated — arrays/objects are not recursed. Real payloads broke: webhook bodies stayed literally "reference": "{{workflow:reference}}", and incorrect_answers/questionAttempts never resolved. I designed bodies around the limitation. Templates should deep-resolve.
+Faker ergonomics. I learned by trial that faker needs parameterless, ≥3-segment expressions ({{faker.internet.email}}); {{faker.number.int({min,max})}} silently fails. Provide a validated faker catalog / lint at authoring time, not runtime.
+Step wiring. I hand-authored all 79 steps and manually chained producer→consumer captures (workspaceId, adminId, inviteToken, accessToken, reference) and captureInput for emails/tokens. jetic_scaffold_workflow is meant to derive this from securitySchemes.obtainedFrom + endpoint.produces — it didn't cover setup-returned IDs or invite tokens here, so I did it manually.
+Ordering & cleanup. I reasoned through FK-safe create→delete ordering and flagged that DELETE /workspaces/:id may 500. Jetic should infer resource dependencies and warn on destructive/idempotency/cleanup ordering.
+Limitations worth fixing for the team
+No async run handle. jetic_simulate_workflow returned MCP error -32001: Request timed out at the transport layer, but the run kept going server-side. I had to poll .jetic/memory.json file mtimes to track progress. Contrast: jetic_run_agent writes .jetic/runs/<runId>/agent-report.json; simulate writes nothing. Fix: return a runId immediately, add jetic_get_run/streaming progress, and always persist results (steps + captures) to .jetic/runs/.
+Result truncation. The 79-step result exceeded the 51 KB cap and got dumped to a file, killing inline usability. Return a compact summary (counts + failures) first, details on demand.
+Timeout semantics. simulate has a fixed request timeout far shorter than a realistic end-to-end run → guaranteed false timeout on large suites. Support a configurable/max timeout or job model.
+Validator noise. 46 warnings, dominated by CONTINUE_WITH_CAPTURE — which is exactly the intended pattern for negative/branch flows (onFailure:"continue" + capture). Tune severity, or only warn when a downstream step depends on a skipped capture.
+GET-with-body. GET bodies silently become query params (15 GET_WITH_BODY warnings). Scaffold/test should emit query: explicitly and only warn on genuine misuse.
+Safety defaults. Since onFailure:"abort" is the default but every step here used continue, a real run mutates a production-looking Neon DB and sends real Paystack/Resend calls with no dry-run/record mode. Offer a record/replay or sandbox mode, and a "read-only / destructive steps" summary before execution.
+Error quality. The jetic_create_workflow JSON parse failure (Expected ':' … at position 19406) was my typo, but the tool could pinpoint the offending step/field instead of a raw byte offset.
+Highest-ROI quick wins
+Preflight probe + early-abort with distinct connection vs app errors.
+Async run handle + persisted .jetic/runs/<runId> + progress polling.
+Fix the two mechanics that cause silent wrong requests: Bearer auto-prefix and deep template resolution.
+Auto-fill Phase 3 model fields from source so the enrichment script is unnecessary.

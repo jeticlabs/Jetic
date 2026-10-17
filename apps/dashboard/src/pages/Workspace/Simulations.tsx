@@ -182,8 +182,8 @@ function evaluateCondition(
   memory: Record<string, string>,
 ): { passed: boolean; reason: string } {
   const { rules } = condition;
-  const ruleList = rules.all ?? rules.any ?? [];
-  const isAnd = !!rules.all;
+  const ruleList = rules?.all ?? rules?.any ?? [];
+  const isAnd = !!(rules?.all);
 
   if (ruleList.length === 0) return { passed: true, reason: 'No rules' };
 
@@ -786,8 +786,8 @@ function ConditionEditor({
   onRemove: () => void;
   onCancel: () => void;
 }) {
-  const [logic, setLogic] = useState<'all' | 'any'>(existingCondition?.rules.all ? 'all' : (existingCondition?.rules.any ? 'any' : 'all'));
-  const existing = existingCondition?.rules.all ?? existingCondition?.rules.any ?? [];
+  const [logic, setLogic] = useState<'all' | 'any'>(existingCondition?.rules?.all ? 'all' : (existingCondition?.rules?.any ? 'any' : 'all'));
+  const existing = existingCondition?.rules?.all ?? existingCondition?.rules?.any ?? [];
   const [rules, setRules] = useState<ConditionRule[]>(existing.length > 0 ? existing : [makeEmptyRule()]);
   const [onFail, setOnFail] = useState<ConditionOnFail>(existingCondition?.onFail ?? 'abort');
   const [switchSlug, setSwitchSlug] = useState(existingCondition?.switchToWorkflow ?? '');
