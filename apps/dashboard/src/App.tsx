@@ -4,7 +4,8 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { AssistantPanel } from "./components/layout/AssistantPanel";
 import { ChangesNotification } from "./components/layout/ChangesNotification";
 import { type PageId } from "./types";
-import { ThemeProvider } from "./context/ThemeContext";
+import { ThemeProvider, useTheme } from "./context/ThemeContext";
+import { JeticAnimatedIcon } from "./components/jetic-animated-icon";
 
 // Workspace
 import { Overview } from "./pages/Workspace/Overview";
@@ -54,7 +55,34 @@ const VALID_PAGES: PageId[] = [
   "traces", "events", "changes", "settings", "docs"
 ];
 
+const LOADER_MS = 5000;
+
+/** Boot splash shown while Jetic Local Studio warms up. */
+function LoadingScreen() {
+  const { theme } = useTheme();
+  return (
+    <div className="jetic-surface flex h-screen w-full flex-col items-center justify-center gap-7">
+      <JeticAnimatedIcon
+        size={56}
+        loop
+        sheen={theme === "dark" ? "#000" : "#fff"}
+        className="theme-text-primary"
+      />
+      <div className="flex flex-col items-center gap-1.5 text-center">
+        <span className="text-[13.5px] font-medium tracking-tight theme-text-primary">
+          Jetic Local Studio is loading…
+        </span>
+        <span className="text-[11px] theme-text-muted">Preparing your workspace</span>
+      </div>
+      <div className="h-[3px] w-40 overflow-hidden rounded-full theme-bg-overlay">
+        <div className="jetic-loader-bar h-full w-full origin-left rounded-full theme-bg-brand" />
+      </div>
+    </div>
+  );
+}
+
 function AppInner() {
+  const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState<PageId>(() => {
     const saved = localStorage.getItem("active_sidebar_item") as PageId;
     return VALID_PAGES.includes(saved) ? saved : "overview";
@@ -71,6 +99,11 @@ function AppInner() {
 
   // Trace filter context: when navigating to Traces from Simulations/Model
   const [traceFilter, setTraceFilter] = useState<{ workflowName?: string; endpointPath?: string; traceId?: string } | undefined>(undefined);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), LOADER_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("active_sidebar_item", currentPage);
@@ -134,6 +167,8 @@ function AppInner() {
       default: return <Overview />;
     }
   };
+
+  if (isLoading) return <LoadingScreen />;
 
   return (
     <div className="flex h-screen w-full overflow-hidden antialiased [font-feature-settings:'ss01'] font-sans text-xs transition-colors duration-300 theme-bg-base theme-text">

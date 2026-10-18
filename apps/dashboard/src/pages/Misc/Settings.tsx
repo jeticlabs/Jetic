@@ -38,7 +38,7 @@ function SectionHeader({
   return (
     <div className="flex items-start gap-3 pb-4 border-b theme-border">
       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border theme-border theme-bg-overlay">
-        <Icon className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
+        <Icon className="h-[15px] w-[15px] text-[color:var(--brand)]" strokeWidth={2} />
       </div>
       <div>
         <p className="text-[13.5px] font-medium theme-text-primary">{label}</p>
@@ -83,12 +83,12 @@ function Toggle({
     <button
       onClick={() => onChange(!value)}
       className={`relative flex h-5 w-9 items-center rounded-full border transition-colors ${value
-        ? 'bg-blue-500 border-blue-400'
-        : 'bg-white/[0.04] border-white/10'
+        ? 'bg-[var(--action)] border-[color:var(--brand)]'
+        : 'theme-bg-overlay-md theme-border'
         }`}
     >
       <span
-        className={`absolute h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${value ? 'translate-x-4' : 'translate-x-0.5'
+        className={`absolute h-3.5 w-3.5 rounded-full bg-[color:var(--action-foreground)] shadow transition-transform ${value ? 'translate-x-4' : 'translate-x-0.5'
           }`}
       />
     </button>
@@ -114,7 +114,7 @@ function TextInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className={`w-56 rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 text-[12px] theme-text-primary outline-none focus:border-blue-500/50 focus:theme-bg-overlay-md placeholder:theme-text-faint transition-colors ${mono ? 'font-mono' : ''
+      className={`w-56 rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 text-[12px] theme-text-primary outline-none focus:border-[color:var(--brand)]/50 focus:theme-bg-overlay-md placeholder:theme-text-faint transition-colors ${mono ? 'font-mono' : ''
         }`}
     />
   );
@@ -133,7 +133,7 @@ function SelectInput({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="rounded-lg border theme-border theme-bg-surface px-3 py-1.5 text-[12px] theme-text-primary outline-none focus:border-blue-500/50 transition-colors"
+      className="rounded-lg border theme-border theme-bg-surface px-3 py-1.5 text-[12px] theme-text-primary outline-none focus:border-[color:var(--brand)]/50 transition-colors"
     >
       {options.map((o) => (
         <option key={o} value={o}>
@@ -153,7 +153,7 @@ function Card({
 }) {
   return (
     <div
-      className={`rounded-lg border border-white/10 bg-white/[0.02] p-5 space-y-1 ${className}`}
+      className={`rounded-lg border theme-border theme-bg-overlay p-5 space-y-1 ${className}`}
     >
       {children}
     </div>
@@ -171,7 +171,7 @@ function SaveBtn({
     <button
       onClick={onClick}
       disabled={saving}
-      className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-blue-400 disabled:opacity-50 transition-colors"
+      className="flex items-center gap-1.5 rounded-lg bg-[var(--action)] px-3 py-1.5 text-[12px] font-medium text-[color:var(--action-foreground)] hover:bg-[var(--action-hover)] disabled:opacity-50 transition-colors"
     >
       {saving ? (
         <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
@@ -309,13 +309,13 @@ function EnvironmentsSection({ model }: { model: SettingsData | null }) {
                 value={env.name}
                 onChange={(e) => updateEnv(i, 'name', e.target.value)}
                 placeholder="local"
-                className="w-24 rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 text-[12px] theme-text-primary outline-none focus:border-blue-500/50 focus:theme-bg-overlay-md placeholder:theme-text-faint transition-colors"
+                className="w-24 rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 text-[12px] theme-text-primary outline-none focus:border-[color:var(--brand)]/50 focus:theme-bg-overlay-md placeholder:theme-text-faint transition-colors"
               />
               <input
                 value={env.baseUrl}
                 onChange={(e) => updateEnv(i, 'baseUrl', e.target.value)}
                 placeholder="http://localhost:3000"
-                className="flex-1 rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 font-mono text-[12px] theme-text-primary outline-none focus:border-blue-500/50 focus:theme-bg-overlay-md placeholder:theme-text-faint transition-colors"
+                className="flex-1 rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 font-mono text-[12px] theme-text-primary outline-none focus:border-[color:var(--brand)]/50 focus:theme-bg-overlay-md placeholder:theme-text-faint transition-colors"
               />
               <button
                 onClick={() => removeEnv(i)}
@@ -327,12 +327,12 @@ function EnvironmentsSection({ model }: { model: SettingsData | null }) {
           ))}
           <button
             onClick={addEnv}
-            className="text-[12px] text-blue-400 hover:text-blue-300 transition-colors mt-1"
+            className="text-[12px] text-[color:var(--brand)] hover:text-[color:var(--brand)] transition-colors mt-1"
           >
             + Add environment
           </button>
         </div>
-        <div className="flex justify-end pt-3 gap-2 border-t border-white/[0.06]">
+        <div className="flex justify-end pt-3 gap-2 border-t theme-border">
           {saved && (
             <span className="flex items-center gap-1 text-[11px] text-emerald-400">
               <Check className="h-3.5 w-3.5" strokeWidth={2} /> Saved
@@ -343,7 +343,7 @@ function EnvironmentsSection({ model }: { model: SettingsData | null }) {
       </Card>
 
       <div className="rounded-lg border theme-border theme-bg-overlay px-4 py-3 flex items-start gap-2.5">
-        <Info className="h-3.5 w-3.5 text-blue-400/70 shrink-0 mt-0.5" strokeWidth={2} />
+        <Info className="h-3.5 w-3.5 text-[color:var(--brand)]/70 shrink-0 mt-0.5" strokeWidth={2} />
         <p className="text-[11px] theme-text-muted">
           The{' '}
           <code className="theme-text-primary theme-bg-overlay-md px-1 py-0.5 rounded text-[10px]">
@@ -364,8 +364,8 @@ function AppearanceSection() {
 
   const accents = ['blue', 'violet', 'emerald', 'amber', 'rose'];
   const accentDots: Record<string, string> = {
-    blue: '#3b82f6',
-    violet: '#8b5cf6',
+    blue: 'var(--brand)',
+    violet: 'var(--brand)',
     emerald: '#34d399',
     amber: '#fbbf24',
     rose: '#fb7185',
@@ -380,14 +380,14 @@ function AppearanceSection() {
       />
       <Card>
         <Row label="Theme" description="Choose your preferred colour scheme">
-          <div className="flex gap-px overflow-hidden rounded-lg border border-white/10">
+          <div className="flex gap-px overflow-hidden rounded-lg border theme-border">
             {(['dark', 'darker'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTheme(t)}
                 className={`px-3 py-1.5 text-[12px] transition-colors capitalize ${theme === t
-                  ? 'bg-blue-500 text-white'
-                  : 'text-zinc-400 hover:text-zinc-200 bg-white/[0.02] hover:bg-white/[0.05]'
+                  ? 'bg-[var(--action)] text-[color:var(--action-foreground)]'
+                  : 'theme-text-muted hover:theme-text-primary theme-bg-overlay hover:theme-bg-overlay-md'
                   }`}
               >
                 {t}
@@ -402,7 +402,7 @@ function AppearanceSection() {
                 key={a}
                 onClick={() => setAccent(a)}
                 className={`h-5 w-5 rounded-full border-2 transition-transform ${accentColor === a
-                  ? 'scale-110 border-white/40'
+                  ? 'scale-110 theme-border-md'
                   : 'border-transparent hover:scale-105'
                   }`}
                 style={{ background: accentDots[a] }}
@@ -411,14 +411,14 @@ function AppearanceSection() {
           </div>
         </Row>
         <Row label="Density" description="Controls spacing throughout the layout">
-          <div className="flex gap-px overflow-hidden rounded-lg border border-white/10">
+          <div className="flex gap-px overflow-hidden rounded-lg border theme-border">
             {(['comfortable', 'compact'] as const).map((d) => (
               <button
                 key={d}
                 onClick={() => setDensity(d)}
                 className={`px-3 py-1.5 text-[12px] transition-colors capitalize ${density === d
-                  ? 'bg-blue-500 text-white'
-                  : 'text-zinc-400 hover:text-zinc-200 bg-white/[0.02] hover:bg-white/[0.05]'
+                  ? 'bg-[var(--action)] text-[color:var(--action-foreground)]'
+                  : 'theme-text-muted hover:theme-text-primary theme-bg-overlay hover:theme-bg-overlay-md'
                   }`}
               >
                 {d}
@@ -539,11 +539,11 @@ function ApiSection() {
               value={defaultBearer}
               onChange={(e) => setDefaultBearer(e.target.value)}
               placeholder="eyJ…"
-              className="w-48 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 font-mono text-[12px] text-zinc-200 outline-none focus:border-blue-500/50 focus:bg-white/[0.05] placeholder-zinc-600 transition-colors"
+              className="w-48 rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 font-mono text-[12px] theme-text-primary outline-none focus:border-[color:var(--brand)]/50 focus:theme-bg-overlay-md placeholder:text-[color:var(--text-muted)] transition-colors"
             />
             <button
               onClick={() => setShowSecrets((s) => !s)}
-              className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+              className="text-[11px] theme-text-muted hover:theme-text transition-colors"
             >
               {showSecrets ? 'Hide' : 'Show'}
             </button>
@@ -673,14 +673,14 @@ function AboutBadge() {
   return (
     <div className="rounded-lg border theme-border theme-bg-overlay p-4 flex items-center gap-3">
       <div className="flex h-9 w-9 items-center justify-center rounded-lg border theme-border theme-bg-overlay-md">
-        <Zap className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
+        <Zap className="h-[15px] w-[15px] text-[color:var(--brand)]" strokeWidth={2} />
       </div>
       <div>
         <p className="text-[13.5px] font-medium theme-text-primary">Jetic Studio</p>
         <p className="text-[11px] theme-text-muted">v0.1.0 · Local development dashboard</p>
       </div>
       <div className="ml-auto flex items-center gap-1.5 rounded-full border theme-border theme-bg-overlay px-2.5 py-1">
-        <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+        <span className="h-1.5 w-1.5 rounded-full theme-bg-brand animate-pulse" />
         <span className="text-[11px] theme-text-muted font-medium">Running</span>
       </div>
     </div>
@@ -710,7 +710,7 @@ function SettingsNavItem({
         }`}
     >
       {active && (
-        <span className="absolute -left-3 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full bg-blue-500" />
+        <span className="absolute -left-3 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full theme-bg-brand" />
       )}
       <Icon className="h-[15px] w-[15px] shrink-0" strokeWidth={2} />
       <span>{label}</span>
@@ -786,7 +786,7 @@ export function Settings() {
           {/* Version pill */}
           <div className="hidden pt-4 mt-2 border-t theme-border">
             <div className="flex items-center gap-1.5 rounded-full border theme-border theme-bg-overlay px-2.5 py-1 w-fit">
-              <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+              <span className="h-1.5 w-1.5 rounded-full theme-bg-brand" />
               <span className="text-[11px] font-medium theme-text-muted">v0.1.0</span>
             </div>
           </div>
@@ -799,7 +799,7 @@ export function Settings() {
               {[1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="h-16 animate-pulse rounded-lg border border-white/10 bg-white/[0.02]"
+                  className="h-16 animate-pulse rounded-lg border theme-border theme-bg-overlay"
                   style={{ opacity: 1 - i * 0.25 }}
                 />
               ))}

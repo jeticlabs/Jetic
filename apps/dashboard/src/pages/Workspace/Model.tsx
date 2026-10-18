@@ -68,12 +68,12 @@ interface Model {
 
 const METHOD_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   GET: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', dot: '#34d399' },
-  POST: { bg: 'bg-blue-500/10', text: 'text-blue-400', dot: '#60a5fa' },
+  POST: { bg: 'bg-[color:var(--brand)]/10', text: 'text-[color:var(--brand)]', dot: 'var(--brand)' },
   PUT: { bg: 'bg-amber-500/10', text: 'text-amber-400', dot: '#fbbf24' },
   PATCH: { bg: 'bg-orange-500/10', text: 'text-orange-400', dot: '#fb923c' },
   DELETE: { bg: 'bg-red-500/10', text: 'text-red-400', dot: '#f87171' },
   HEAD: { bg: 'theme-bg-overlay-md', text: 'theme-text-muted', dot: 'var(--text-muted)' },
-  OPTIONS: { bg: 'bg-purple-500/10', text: 'text-purple-400', dot: '#c084fc' },
+  OPTIONS: { bg: 'bg-[color:var(--brand)]/10', text: 'text-[color:var(--brand)]', dot: 'var(--brand)' },
 };
 
 function ms(m: string) {
@@ -149,7 +149,7 @@ function InlineEdit({ value, onSave, mono = true }: { value: string; onSave: (v:
         ref={ref} value={draft}
         onChange={e => setDraft(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
-        className={`rounded border border-blue-500/40 theme-bg-overlay-md px-1.5 py-0.5 text-xs theme-text-primary outline-none w-56 ${mono ? 'font-mono' : ''}`}
+        className={`rounded border border-[color:var(--brand)]/40 theme-bg-overlay-md px-1.5 py-0.5 text-xs theme-text-primary outline-none w-56 ${mono ? 'font-mono' : ''}`}
       />
       <button type="button" onClick={commit} disabled={saving} className="text-emerald-400 hover:text-emerald-300 hover:cursor-pointer">
         {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
@@ -205,14 +205,14 @@ function EndpointRow({ ep, onUpdate, onInspect, onViewTraces, onEdit }: { ep: En
         </span>
         <span
           onClick={e => { e.stopPropagation(); onInspect(ep); }}
-          className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] border border-blue-500/40 text-blue-400 hover:bg-blue-500/10 hover:border-blue-400/60 hover:cursor-pointer transition-colors"
+          className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] border border-[color:var(--brand)]/40 text-[color:var(--brand)] hover:bg-[color:var(--brand)]/10 hover:border-[color:var(--brand)]/60 hover:cursor-pointer transition-colors"
         >
           INSPECT
         </span>
         {onViewTraces && (
           <span
             onClick={e => { e.stopPropagation(); onViewTraces(ep.path); }}
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:cursor-pointer transition-colors"
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] border border-[color:var(--brand)]/30 text-[color:var(--brand)] hover:bg-[color:var(--brand)]/10 hover:cursor-pointer transition-colors"
           >
             <Activity className="h-2.5 w-2.5" /> Traces
           </span>
@@ -312,8 +312,8 @@ function GroupSection({ prefix, endpoints, onUpdate, onInspect, onViewTraces, on
         onClick={() => setCollapsed(c => !c)}
         className="flex w-full items-center gap-3 px-4 py-2 hover:theme-bg-overlay-md transition-colors theme-bg-overlay hover:cursor-pointer"
       >
-        <span className="text-blue-400">{collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}</span>
-        <span className="font-mono text-xs font-medium text-blue-400">{prefix}</span>
+        <span className="text-[color:var(--brand)]">{collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}</span>
+        <span className="font-mono text-xs font-medium text-[color:var(--brand)]">{prefix}</span>
         <span className="ml-auto rounded-full border theme-border theme-bg-overlay-md px-2 py-0.5 text-[10px] theme-text-muted">{endpoints.length}</span>
       </button>
       <div className="flex flex-col overflow-y-auto max-h-[calc(100vh-280px)]">
@@ -362,6 +362,9 @@ function GraphView({ endpoints }: { endpoints: Endpoint[] }) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const brand = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#ffffff';
+    ctx.strokeStyle = brand;
+    ctx.globalAlpha = 0.14;
 
     cols.forEach(([, eps], ci) => {
       if (ci >= cols.length - 1) return;
@@ -374,7 +377,6 @@ function GraphView({ endpoints }: { endpoints: Endpoint[] }) {
           const tx = to.x, ty = to.y + NODE_H / 2;
           const cp = (fx + tx) / 2;
           ctx.beginPath();
-          ctx.strokeStyle = 'rgba(96,165,250,0.14)';
           ctx.lineWidth = 1;
           ctx.moveTo(fx, fy);
           ctx.bezierCurveTo(cp, fy, cp, ty, tx, ty);
@@ -392,7 +394,7 @@ function GraphView({ endpoints }: { endpoints: Endpoint[] }) {
       {cols.map(([prefix], ci) => (
         <div
           key={prefix}
-          className="absolute text-[9px] font-medium text-blue-400/70 uppercase tracking-widest text-center"
+          className="absolute text-[9px] font-medium text-[color:var(--brand)]/70 uppercase tracking-widest text-center"
           style={{ left: PAD + ci * (NODE_W + COL_GAP), top: PAD, width: NODE_W }}
         >
           {prefix}
@@ -407,7 +409,7 @@ function GraphView({ endpoints }: { endpoints: Endpoint[] }) {
         return (
           <div
             key={ep.id}
-            className="absolute rounded-lg border theme-border theme-bg-overlay shadow-md flex items-center gap-2 px-3 overflow-hidden hover:border-blue-500/30 transition-colors"
+            className="absolute rounded-lg border theme-border theme-bg-overlay shadow-md flex items-center gap-2 px-3 overflow-hidden hover:border-[color:var(--brand)]/30 transition-colors"
             style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}
           >
             <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: s.dot }} />
@@ -429,8 +431,8 @@ function ScanCTA({ onScan, scanning, error }: { onScan: () => void; scanning: bo
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-5 py-20 text-center">
       <div className="relative flex h-16 w-16 items-center justify-center">
-        <div className="absolute inset-0 rounded-full bg-blue-500/10 blur-xl" />
-        <div className="relative flex h-16 w-16 items-center justify-center rounded-full border theme-border theme-bg-overlay text-blue-400">
+        <div className="absolute inset-0 rounded-full bg-[color:var(--brand)]/10 blur-xl" />
+        <div className="relative flex h-16 w-16 items-center justify-center rounded-full border theme-border theme-bg-overlay text-[color:var(--brand)]">
           <ScanLine className="h-7 w-7" strokeWidth={2} />
         </div>
       </div>
@@ -445,7 +447,7 @@ function ScanCTA({ onScan, scanning, error }: { onScan: () => void; scanning: bo
         type="button"
         onClick={onScan}
         disabled={scanning}
-        className="flex items-center gap-2 rounded-lg bg-blue-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-400 disabled:opacity-50 transition-colors hover:cursor-pointer"
+        className="flex items-center gap-2 rounded-lg bg-[var(--action)] px-5 py-2.5 text-sm font-medium text-[color:var(--action-foreground)] hover:bg-[var(--action-hover)] disabled:opacity-50 transition-colors hover:cursor-pointer"
       >
         {scanning ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : <ScanLine className="h-4 w-4" strokeWidth={2} />}
         {scanning ? 'Scanning project…' : 'Scan Project'}
@@ -659,7 +661,7 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
     { key: 'middleware', label: `Middleware${middlewareList.length > 0 ? ` (${middlewareList.length})` : ''}` },
   ];
 
-  const inputCls = 'w-full rounded-lg border theme-border theme-bg-overlay px-3 py-2 text-xs theme-text placeholder-[var(--text-faint)] outline-none focus:border-blue-500/50 focus:theme-bg-overlay-md transition-all';
+  const inputCls = 'w-full rounded-lg border theme-border theme-bg-overlay px-3 py-2 text-xs theme-text placeholder-[var(--text-faint)] outline-none focus:border-[color:var(--brand)]/50 focus:theme-bg-overlay-md transition-all';
   const labelCls = 'block text-[10px] theme-text-faint mb-1.5 uppercase tracking-wider font-medium';
 
   return (
@@ -674,8 +676,8 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-6 py-4 border-b theme-border">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500/10">
-              <PlusCircle className="h-4 w-4 text-blue-400" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[color:var(--brand)]/10">
+              <PlusCircle className="h-4 w-4 text-[color:var(--brand)]" />
             </div>
             <h2 className="text-sm font-medium theme-text-primary">Add Endpoint</h2>
           </div>
@@ -693,7 +695,7 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
               onClick={() => setTab(t.key)}
               className={`rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all duration-200 hover:cursor-pointer ${
                 tab === t.key
-                  ? 'bg-blue-500/15 text-blue-400 shadow-sm'
+                  ? 'bg-[color:var(--brand)]/15 text-[color:var(--brand)] shadow-sm'
                   : 'theme-text-faint hover:theme-text-muted hover:theme-bg-overlay'
               }`}
             >
@@ -777,7 +779,7 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className={labelCls + ' mb-0'}>Parameters</p>
-                  <button type="button" onClick={addParam} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-blue-400 hover:bg-blue-500/10 transition-colors hover:cursor-pointer">
+                  <button type="button" onClick={addParam} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-[color:var(--brand)] hover:bg-[color:var(--brand)]/10 transition-colors hover:cursor-pointer">
                     <Plus className="h-3 w-3" /> Add Parameter
                   </button>
                 </div>
@@ -803,7 +805,7 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
                       </div>
                       <div className="flex items-center gap-3">
                         <label className="flex items-center gap-1.5 text-[10px] theme-text-muted hover:cursor-pointer select-none">
-                          <input type="checkbox" checked={p.required} onChange={e => updateParam(i, { required: e.target.checked })} className="accent-blue-500" />
+                          <input type="checkbox" checked={p.required} onChange={e => updateParam(i, { required: e.target.checked })} className="accent-[color:var(--brand)]" />
                           Required
                         </label>
                         <input value={p.description} onChange={e => updateParam(i, { description: e.target.value })} placeholder="Description" className={`${inputCls} flex-1 text-[10px]`} />
@@ -829,7 +831,7 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
                       </select>
                     </div>
                     <label className="flex items-center gap-1.5 text-[10px] theme-text-muted mt-5 hover:cursor-pointer select-none">
-                      <input type="checkbox" checked={bodyRequired} onChange={e => setBodyRequired(e.target.checked)} className="accent-blue-500" />
+                      <input type="checkbox" checked={bodyRequired} onChange={e => setBodyRequired(e.target.checked)} className="accent-[color:var(--brand)]" />
                       Required
                     </label>
                   </div>
@@ -863,7 +865,7 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
             <>
               <div className="flex items-center justify-between mb-2">
                 <p className={labelCls + ' mb-0'}>Responses</p>
-                <button type="button" onClick={addResponse} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-blue-400 hover:bg-blue-500/10 transition-colors hover:cursor-pointer">
+                <button type="button" onClick={addResponse} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-[color:var(--brand)] hover:bg-[color:var(--brand)]/10 transition-colors hover:cursor-pointer">
                   <Plus className="h-3 w-3" /> Add Response
                 </button>
               </div>
@@ -926,7 +928,7 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
                   <p className={labelCls + ' mb-0'}>Middleware Chain</p>
                   <p className="text-[10px] theme-text-faint mt-0.5">Executed in order, top → bottom</p>
                 </div>
-                <button type="button" onClick={addMiddleware} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-blue-400 hover:bg-blue-500/10 transition-colors hover:cursor-pointer">
+                <button type="button" onClick={addMiddleware} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-[color:var(--brand)] hover:bg-[color:var(--brand)]/10 transition-colors hover:cursor-pointer">
                   <Plus className="h-3 w-3" /> Add Middleware
                 </button>
               </div>
@@ -998,7 +1000,7 @@ function AddEndpointDialog({ open, onClose, onCreated }: { open: boolean; onClos
               type="button"
               onClick={handleSubmit}
               disabled={saving}
-              className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-4 py-2 text-xs font-medium text-white hover:bg-blue-400 disabled:opacity-50 transition-colors hover:cursor-pointer"
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--action)] px-4 py-2 text-xs font-medium text-[color:var(--action-foreground)] hover:bg-[var(--action-hover)] disabled:opacity-50 transition-colors hover:cursor-pointer"
             >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
               {saving ? 'Adding…' : 'Add Endpoint'}
@@ -1173,7 +1175,7 @@ function EditEndpointDialog({ endpoint, onClose, onSaved }: {
     { key: 'middleware', label: `Middleware${middlewareList.length > 0 ? ` (${middlewareList.length})` : ''}` },
   ];
 
-  const inputCls = 'w-full rounded-lg border theme-border theme-bg-overlay px-3 py-2 text-xs theme-text placeholder-[var(--text-faint)] outline-none focus:border-blue-500/50 focus:theme-bg-overlay-md transition-all';
+  const inputCls = 'w-full rounded-lg border theme-border theme-bg-overlay px-3 py-2 text-xs theme-text placeholder-[var(--text-faint)] outline-none focus:border-[color:var(--brand)]/50 focus:theme-bg-overlay-md transition-all';
   const labelCls = 'block text-[10px] theme-text-faint mb-1.5 uppercase tracking-wider font-medium';
 
   return (
@@ -1439,7 +1441,7 @@ function EditEndpointDialog({ endpoint, onClose, onSaved }: {
             <button type="button" onClick={onClose} className="rounded-lg border theme-border px-4 py-2 text-xs font-medium theme-text-muted hover:theme-bg-overlay-md hover:theme-text transition-colors hover:cursor-pointer">
               Cancel
             </button>
-            <button type="button" onClick={handleSubmit} disabled={saving} className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-xs font-medium text-white hover:bg-amber-400 disabled:opacity-50 transition-colors hover:cursor-pointer">
+            <button type="button" onClick={handleSubmit} disabled={saving} className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-xs font-medium theme-text-primary hover:bg-amber-400 disabled:opacity-50 transition-colors hover:cursor-pointer">
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
               {saving ? 'Saving…' : 'Save Changes'}
             </button>
@@ -1533,7 +1535,7 @@ export function Model({ onInspect, onViewTraces }: { onInspect?: (ep: Endpoint) 
                   key={v}
                   onClick={() => setView(v)}
                   className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all duration-200 hover:cursor-pointer ${view === v
-                      ? 'bg-blue-500/15 text-blue-400 shadow-sm'
+                      ? 'bg-[color:var(--brand)]/15 text-[color:var(--brand)] shadow-sm'
                       : 'theme-text-faint hover:theme-text-muted'
                     }`}
                 >
@@ -1557,7 +1559,7 @@ export function Model({ onInspect, onViewTraces }: { onInspect?: (ep: Endpoint) 
             type="button"
             onClick={handleScan}
             disabled={scanning}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-400 disabled:opacity-50 transition-colors hover:cursor-pointer"
+            className="flex items-center gap-1.5 rounded-lg bg-[var(--action)] px-3 py-1.5 text-sm font-medium text-[color:var(--action-foreground)] hover:bg-[var(--action-hover)] disabled:opacity-50 transition-colors hover:cursor-pointer"
           >
             {scanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} /> : <ScanLine className="h-3.5 w-3.5" strokeWidth={2} />}
             {scanning ? 'Scanning…' : 'Re-scan'}
@@ -1566,7 +1568,7 @@ export function Model({ onInspect, onViewTraces }: { onInspect?: (ep: Endpoint) 
           <button
             type="button"
             onClick={() => setAddDialogOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-400 transition-colors hover:cursor-pointer"
+            className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-medium theme-text-primary hover:bg-emerald-400 transition-colors hover:cursor-pointer"
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={2} />
             Add Endpoint
@@ -1625,7 +1627,7 @@ export function Model({ onInspect, onViewTraces }: { onInspect?: (ep: Endpoint) 
                 value={filter}
                 onChange={e => setFilter(e.target.value)}
                 placeholder="Filter by path, method or handler…"
-                className="w-full max-w-sm rounded-lg border theme-border theme-bg-overlay py-1.5 px-3 text-xs theme-text placeholder-[var(--text-faint)] outline-none focus:border-blue-500/50 focus:theme-bg-overlay-md transition-all"
+                className="w-full max-w-sm rounded-lg border theme-border theme-bg-overlay py-1.5 px-3 text-xs theme-text placeholder-[var(--text-faint)] outline-none focus:border-[color:var(--brand)]/50 focus:theme-bg-overlay-md transition-all"
               />
               {filter && <button type="button" onClick={() => setFilter('')} className="theme-text-faint hover:theme-text hover:cursor-pointer"><X className="h-3.5 w-3.5" strokeWidth={2} /></button>}
               <span className="ml-auto text-[10px] theme-text-faint">{filtered.length} endpoint{filtered.length !== 1 ? 's' : ''}</span>
@@ -1639,7 +1641,7 @@ export function Model({ onInspect, onViewTraces }: { onInspect?: (ep: Endpoint) 
               {filtered.length === 0 && (
                 <div className="flex flex-col items-center gap-2 py-12 text-center">
                   <p className="text-sm theme-text-muted">No endpoints match "{filter}"</p>
-                  <button type="button" onClick={() => setFilter('')} className="text-xs text-blue-400 hover:text-blue-300 transition-colors hover:cursor-pointer">Clear filter</button>
+                  <button type="button" onClick={() => setFilter('')} className="text-xs text-[color:var(--brand)] hover:text-[color:var(--brand)] transition-colors hover:cursor-pointer">Clear filter</button>
                 </div>
               )}
             </div>

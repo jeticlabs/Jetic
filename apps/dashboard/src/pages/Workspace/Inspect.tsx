@@ -41,12 +41,12 @@ export interface Endpoint {
 
 const METHOD_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   GET: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30' },
-  POST: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30' },
+  POST: { bg: 'bg-[color:var(--brand)]/10', text: 'text-[color:var(--brand)]', border: 'border-[color:var(--brand)]/30' },
   PUT: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30' },
   PATCH: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30' },
   DELETE: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30' },
   HEAD: { bg: 'theme-bg-overlay-md', text: 'theme-text-muted', border: 'theme-border' },
-  OPTIONS: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30' },
+  OPTIONS: { bg: 'bg-[color:var(--brand)]/10', text: 'text-[color:var(--brand)]', border: 'border-[color:var(--brand)]/30' },
 };
 function mc(m: string) {
   return METHOD_COLORS[m.toUpperCase()] ?? METHOD_COLORS['GET'];
@@ -109,7 +109,7 @@ function SectionHeader({
 }) {
   return (
     <div className="flex items-center gap-2.5 border-b theme-border px-4 py-2.5 theme-bg-overlay-md">
-      <Icon className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
+      <Icon className="h-[15px] w-[15px] text-[color:var(--brand)]" strokeWidth={2} />
       <span className="text-[11px] font-semibold tracking-wider theme-text-faint uppercase">{label}</span>
       {count !== undefined && (
         <span className="rounded-full border theme-border theme-bg-overlay px-2 py-0.5 text-[10px] theme-text-muted">
@@ -172,7 +172,7 @@ function SourcePanel({ endpoint }: { endpoint: Endpoint }) {
     <SectionCard>
       {/* Header */}
       <div className="flex items-center gap-2.5 border-b theme-border px-4 py-2.5 theme-bg-overlay-md">
-        <FileCode2 className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
+        <FileCode2 className="h-[15px] w-[15px] text-[color:var(--brand)]" strokeWidth={2} />
         <span className="text-[11px] font-semibold tracking-wider theme-text-faint uppercase">Source</span>
         <span className="ml-2 font-mono text-[11px] theme-text-muted truncate">{shortPath}</span>
         <span className="rounded border theme-border theme-bg-overlay px-1.5 py-0.5 font-mono text-[10px] theme-text">
@@ -209,9 +209,9 @@ function SourcePanel({ endpoint }: { endpoint: Endpoint }) {
                   const lineNum = startLine + i;
                   const isHighlight = i === highlightOffset;
                   return (
-                    <tr key={i} className={isHighlight ? 'bg-blue-500/[0.08]' : 'hover:theme-bg-overlay-md'}>
+                    <tr key={i} className={isHighlight ? 'bg-[color:var(--brand)]/[0.08]' : 'hover:theme-bg-overlay-md'}>
                       <td
-                        className={`select-none w-12 px-3 py-0 text-right font-mono text-[10px] border-r theme-border leading-5 ${isHighlight ? 'text-blue-400' : 'theme-text-faint'
+                        className={`select-none w-12 px-3 py-0 text-right font-mono text-[10px] border-r theme-border leading-5 ${isHighlight ? 'text-[color:var(--brand)]' : 'theme-text-faint'
                           }`}
                       >
                         {lineNum}
@@ -255,7 +255,7 @@ function RelatedFilesPanel({ endpoint }: { endpoint: Endpoint }) {
   }, [endpoint.id]);
 
   const extColors: Record<string, string> = {
-    ts: 'text-blue-400', tsx: 'text-cyan-400', js: 'text-amber-400',
+    ts: 'text-[color:var(--brand)]', tsx: 'text-[color:var(--brand)]', js: 'text-amber-400',
     jsx: 'text-amber-300', json: 'text-emerald-400',
   };
 
@@ -423,7 +423,7 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
           type="button"
           onClick={() => setMode('fake')}
           className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-[11px] font-medium transition-all duration-200 hover:cursor-pointer ${mode === 'fake'
-            ? 'bg-blue-500/15 text-blue-400 shadow-sm'
+            ? 'bg-[color:var(--brand)]/15 text-[color:var(--brand)] shadow-sm'
             : 'theme-text-faint hover:theme-text-muted'
             }`}
         >
@@ -434,7 +434,7 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
           type="button"
           onClick={() => setMode('real')}
           className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-[11px] font-medium transition-all duration-200 hover:cursor-pointer ${mode === 'real'
-            ? 'bg-blue-500/15 text-blue-400 shadow-sm'
+            ? 'bg-[color:var(--brand)]/15 text-[color:var(--brand)] shadow-sm'
             : 'theme-text-faint hover:theme-text-muted'
             }`}
         >
@@ -455,15 +455,15 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
                   key={env.name}
                   type="button"
                   onClick={() => { setDefaultEnv(env.name); setBaseUrl(env.baseUrl); }}
-                  className={`group flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:cursor-pointer border-t theme-border ${isSelected ? 'bg-blue-500/10' : 'hover:theme-bg-overlay-md'}`}
+                  className={`group flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:cursor-pointer border-t theme-border ${isSelected ? 'bg-[color:var(--brand)]/10' : 'hover:theme-bg-overlay-md'}`}
                 >
                   <div
-                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${isSelected ? 'border-blue-400 bg-blue-500/20' : 'theme-border bg-transparent'}`}
+                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${isSelected ? 'border-[color:var(--brand)] bg-[color:var(--brand)]/20' : 'theme-border bg-transparent'}`}
                   >
-                    {isSelected && <Check className="h-2.5 w-2.5 text-blue-400" strokeWidth={3} />}
+                    {isSelected && <Check className="h-2.5 w-2.5 text-[color:var(--brand)]" strokeWidth={3} />}
                   </div>
-                  <Globe className={`h-3 w-3 shrink-0 ${isSelected ? 'text-blue-400' : 'theme-text-faint'}`} strokeWidth={2} />
-                  <span className={`text-[11px] w-14 shrink-0 font-medium ${isSelected ? 'text-blue-400' : 'theme-text-muted'}`}>{env.name}</span>
+                  <Globe className={`h-3 w-3 shrink-0 ${isSelected ? 'text-[color:var(--brand)]' : 'theme-text-faint'}`} strokeWidth={2} />
+                  <span className={`text-[11px] w-14 shrink-0 font-medium ${isSelected ? 'text-[color:var(--brand)]' : 'theme-text-muted'}`}>{env.name}</span>
                   <span className="font-mono text-[11px] theme-text-faint truncate">{env.baseUrl}</span>
                 </button>
               );
@@ -473,7 +473,7 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
           <input
             value={baseUrl}
             onChange={e => setBaseUrl(e.target.value)}
-            className="w-full rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 font-mono text-[12px] theme-text-primary outline-none focus:border-blue-500/50 focus:theme-bg-overlay-md placeholder-[var(--text-faint)] transition-colors"
+            className="w-full rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 font-mono text-[12px] theme-text-primary outline-none focus:border-[color:var(--brand)]/50 focus:theme-bg-overlay-md placeholder-[var(--text-faint)] transition-colors"
             placeholder="http://localhost:3000"
           />
         )}
@@ -499,7 +499,7 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
       {mode === 'fake' && Object.keys(fields).length > 0 && (
         <div>
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider theme-text-faint flex items-center gap-1.5">
-            <Zap className="h-3 w-3 text-blue-400" strokeWidth={2} /> Auto-generated body
+            <Zap className="h-3 w-3 text-[color:var(--brand)]" strokeWidth={2} /> Auto-generated body
           </p>
           <div className="space-y-1">
             {Object.entries(fields).map(([name, def]) => (
@@ -509,7 +509,7 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
               >
                 <span className="text-[11px] theme-text w-20 truncate shrink-0">{name}</span>
                 <span className="text-[11px] theme-text-faint shrink-0">{def.type}</span>
-                <span className="ml-auto font-mono text-[11px] text-blue-400/80 truncate">
+                <span className="ml-auto font-mono text-[11px] text-[color:var(--brand)]/80 truncate">
                   {fakeValue(name, def.type, def.format)}
                 </span>
               </div>
@@ -522,7 +522,7 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
       {mode === 'real' && Object.keys(fields).length > 0 && (
         <div>
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider theme-text-faint flex items-center gap-1.5">
-            <Send className="h-3 w-3 text-blue-400" strokeWidth={2} /> Request body
+            <Send className="h-3 w-3 text-[color:var(--brand)]" strokeWidth={2} /> Request body
           </p>
           <div className="space-y-2">
             {Object.entries(fields).map(([name, def]) => (
@@ -535,7 +535,7 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
                   value={formValues[name] ?? ''}
                   onChange={e => setFormValues(p => ({ ...p, [name]: e.target.value }))}
                   placeholder={`${def.type}${def.format ? ` (${def.format})` : ''}`}
-                  className="rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 font-mono text-[12px] theme-text-primary outline-none focus:border-blue-500/50 focus:theme-bg-overlay-md placeholder-[var(--text-faint)] transition-colors"
+                  className="rounded-lg border theme-border theme-bg-overlay px-3 py-1.5 font-mono text-[12px] theme-text-primary outline-none focus:border-[color:var(--brand)]/50 focus:theme-bg-overlay-md placeholder-[var(--text-faint)] transition-colors"
                 />
               </label>
             ))}
@@ -555,7 +555,7 @@ function SimulatePanel({ endpoint }: { endpoint: Endpoint }) {
         type="button"
         onClick={run}
         disabled={running}
-        className="flex w-full items-center justify-center gap-2 rounded-lg border theme-border bg-blue-500 py-2 text-[12px] font-medium text-white hover:bg-blue-400 disabled:opacity-50 transition-colors hover:cursor-pointer"
+        className="flex w-full items-center justify-center gap-2 rounded-lg border theme-border bg-[var(--action)] py-2 text-[12px] font-medium text-[color:var(--action-foreground)] hover:bg-[var(--action-hover)] disabled:opacity-50 transition-colors hover:cursor-pointer"
       >
         {running
           ? <Loader2 className="h-[15px] w-[15px] animate-spin" strokeWidth={2} />
@@ -613,15 +613,15 @@ export const Inspect = ({ endpoint, onBack }: InspectProps) => {
     return (
       <div className="flex min-h-full w-full flex-col items-center justify-center gap-5 text-center p-12">
         <div className="relative flex h-16 w-16 items-center justify-center">
-          <div className="absolute inset-0 rounded-full bg-blue-500/10 blur-xl" />
-          <div className="relative flex h-16 w-16 items-center justify-center rounded-lg border theme-border theme-bg-overlay text-blue-400">
+          <div className="absolute inset-0 rounded-full bg-[color:var(--brand)]/10 blur-xl" />
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-lg border theme-border theme-bg-overlay text-[color:var(--brand)]">
             <FileCode2 className="h-7 w-7" strokeWidth={2} />
           </div>
         </div>
         <div>
           <p className="text-[13.5px] font-medium theme-text-primary">No endpoint selected</p>
           <p className="mt-1 text-[12px] theme-text-muted">
-            Click <span className="text-blue-400 font-medium">INSPECT</span> on any endpoint in the Model view.
+            Click <span className="text-[color:var(--brand)] font-medium">INSPECT</span> on any endpoint in the Model view.
           </p>
         </div>
         <button
@@ -754,7 +754,7 @@ export const Inspect = ({ endpoint, onBack }: InspectProps) => {
                     className="flex items-center gap-4 rounded-lg border theme-border theme-bg-overlay px-3 py-2 hover:theme-bg-overlay-md transition-colors"
                   >
                     <span className="w-28 shrink-0 font-mono text-[12px] theme-text-primary truncate">{name}</span>
-                    <span className="w-16 shrink-0 text-[11px] text-blue-400">{def.type}</span>
+                    <span className="w-16 shrink-0 text-[11px] text-[color:var(--brand)]">{def.type}</span>
                     <span className="flex-1 text-[11px] theme-text-faint">{def.format ?? '—'}</span>
                     {def.required
                       ? <span className="ml-auto shrink-0 rounded border border-rose-500/25 bg-rose-500/10 px-1.5 py-0.5 text-[10px] text-rose-400">required</span>
@@ -819,7 +819,7 @@ export const Inspect = ({ endpoint, onBack }: InspectProps) => {
       {/* ══════════════════════ Right: simulate rail ══════════════════════ */}
       <aside className="hidden lg:flex w-[400px] shrink-0 flex-col border-l theme-border bg-[var(--sidebar-bg)]">
         <div className="flex items-center gap-2.5 border-b theme-border px-5 py-[18px]">
-          <Zap className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
+          <Zap className="h-[15px] w-[15px] text-[color:var(--brand)]" strokeWidth={2} />
           <span className="text-[13.5px] font-medium theme-text-primary">Simulate Endpoint</span>
         </div>
         <div className="flex-1 overflow-y-auto p-5">

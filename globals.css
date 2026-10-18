@@ -1,0 +1,204 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-walsheim);
+  --font-mono: var(--font-geist-mono);
+}
+
+@theme {
+  --container-8xl: 88rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-walsheim), system-ui, Arial, Helvetica, sans-serif;
+}
+
+/* ---------- Jetic product theme (onboarding / sign-in / dashboard) ---------- */
+
+:root {
+  --jetic-bg: #111111;
+  --jetic-well: #1e1e1e;
+  --jetic-recess: #1a1a1a;
+  --jetic-button: #222222;
+  --jetic-button-hover: #2c2c2c;
+  --jetic-muted: #8a8a8a;
+  --jetic-faint: #555555;
+  --jetic-emphasis: #ededed;
+  --jetic-ring: #4a4a4a;
+}
+
+@layer components {
+  /* Page surface: Inter, dark bg, antialiased. Pair with layout utilities. */
+  .jetic-surface {
+    background-color: var(--jetic-bg);
+    color: #ffffff;
+    font-family: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .jetic-muted {
+    color: var(--jetic-muted);
+  }
+
+  .jetic-divider {
+    height: 1px;
+    flex: 1 1 0%;
+    background-color: rgb(255 255 255 / 0.1);
+  }
+
+  .jetic-card {
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid rgb(255 255 255 / 0.1);
+  }
+
+  .jetic-input {
+    height: 45px;
+    width: 100%;
+    border-radius: 12px;
+    border: none;
+    background-color: var(--jetic-well);
+    padding-left: 12px;
+    padding-right: 12px;
+    font-size: 15px;
+    color: #ffffff;
+  }
+  .jetic-input::placeholder {
+    color: var(--jetic-muted);
+  }
+  .jetic-input:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(255 255 255 / 0.2);
+  }
+
+  .jetic-btn {
+    height: 45px;
+    width: 100%;
+    border-radius: 12px;
+    background-color: var(--jetic-button);
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 500;
+    transition: background-color 150ms ease;
+  }
+  .jetic-btn:hover:not(:disabled) {
+    background-color: var(--jetic-button-hover);
+  }
+  .jetic-btn:disabled {
+    cursor: not-allowed;
+    background-color: var(--jetic-recess);
+    color: var(--jetic-faint);
+  }
+  .jetic-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(255 255 255 / 0.3);
+  }
+
+  .jetic-btn-light {
+    height: 45px;
+    width: 100%;
+    border-radius: 12px;
+    background-color: #ffffff;
+    color: #000000;
+    font-size: 15px;
+    font-weight: 500;
+    transition: opacity 150ms ease;
+  }
+  .jetic-btn-light:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+  .jetic-btn-light:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px rgb(255 255 255 / 0.6),
+      0 0 0 4px var(--jetic-bg);
+  }
+
+  .jetic-pill {
+    flex-shrink: 0;
+    border-radius: 9999px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+  }
+  .jetic-pill-pro {
+    background-color: #ffffff;
+    color: #000000;
+  }
+  .jetic-pill-hobby {
+    background-color: var(--jetic-button);
+    color: var(--jetic-emphasis);
+  }
+
+  /* Custom select trigger + dropdown menu (sandbox, filters, user pills). */
+  .jetic-select {
+    height: 45px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 12px;
+    border: 1px solid rgb(255 255 255 / 0.1);
+    background-color: var(--jetic-well);
+    padding-left: 12px;
+    padding-right: 12px;
+    font-size: 14px;
+    color: #ffffff;
+    text-align: left;
+    transition: border-color 150ms ease;
+  }
+  .jetic-select:hover {
+    border-color: rgb(255 255 255 / 0.2);
+  }
+  .jetic-select:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(255 255 255 / 0.2);
+  }
+
+  .jetic-menu {
+    border-radius: 12px;
+    border: 1px solid rgb(255 255 255 / 0.1);
+    background-color: var(--jetic-recess);
+    padding: 4px;
+    box-shadow: 0 16px 40px rgb(0 0 0 / 0.5);
+  }
+
+  .jetic-menu-item {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 14px;
+    color: #ffffff;
+    text-align: left;
+    transition: background-color 150ms ease;
+  }
+  .jetic-menu-item:hover,
+  .jetic-menu-item[aria-selected="true"] {
+    background-color: var(--jetic-button);
+  }
+  .jetic-menu-item:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.3);
+  }
+}

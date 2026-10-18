@@ -31,7 +31,7 @@ interface ChangesFile {
 function getFileIcon(filePath: string): { icon: React.ElementType; color: string } {
   const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
   if (['ts', 'tsx', 'js', 'jsx', 'mjs', 'py', 'go', 'rs'].includes(ext))
-    return { icon: FileCode, color: 'text-blue-400' };
+    return { icon: FileCode, color: 'text-[color:var(--brand)]' };
   if (['json', 'yaml', 'yml', 'toml', 'env'].includes(ext))
     return { icon: FileText, color: 'text-amber-400' };
   if (['sql', 'prisma', 'graphql', 'gql'].includes(ext))
@@ -155,7 +155,7 @@ export function Changes({ onNavigate: _onNavigate }: ChangesProps = {}) {
 
           {/* Live indicator — same pill style as version badge in sidebar */}
           <div className="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium border theme-border theme-bg-overlay theme-text-muted">
-            <span className={`h-1.5 w-1.5 rounded-full ${isLive ? 'bg-blue-500 animate-pulse' : 'bg-[var(--text-faint)]'}`} />
+            <span className={`h-1.5 w-1.5 rounded-full ${isLive ? 'theme-bg-brand animate-pulse' : 'bg-[var(--text-faint)]'}`} />
             {isLive ? 'Live' : 'Polling'}
           </div>
         </div>
@@ -195,7 +195,7 @@ export function Changes({ onNavigate: _onNavigate }: ChangesProps = {}) {
             placeholder="Filter by filename or path…"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg py-1.5 pl-8 pr-3 text-[12px] focus:outline-none focus:ring-1 focus:ring-blue-500/50 border theme-border theme-bg-overlay theme-text-primary"
+            className="w-full rounded-lg py-1.5 pl-8 pr-3 text-[12px] focus:outline-none focus:ring-1 focus:ring-[color:var(--brand)]/50 border theme-border theme-bg-overlay theme-text-primary"
           />
           {searchQuery && (
             <button
@@ -223,12 +223,12 @@ export function Changes({ onNavigate: _onNavigate }: ChangesProps = {}) {
       <div className="flex flex-1 flex-col overflow-y-auto">
         {loading && !data ? (
           <div className="flex items-center justify-center gap-2 p-10 theme-text-muted">
-            <RefreshCw className="h-4 w-4 animate-spin text-blue-400" strokeWidth={2} />
+            <RefreshCw className="h-4 w-4 animate-spin text-[color:var(--brand)]" strokeWidth={2} />
             <span className="text-[12px]">Connecting…</span>
           </div>
         ) : filteredChanges.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-1 p-10 text-center">
-            <Check className="h-5 w-5 mb-1 text-blue-400" strokeWidth={2} />
+            <Check className="h-5 w-5 mb-1 text-[color:var(--brand)]" strokeWidth={2} />
             <span className="text-[13px] font-medium theme-text-primary">
               {changesCount === 0 ? 'No pending changes' : 'No files match filter'}
             </span>
@@ -284,7 +284,7 @@ export function Changes({ onNavigate: _onNavigate }: ChangesProps = {}) {
                     className="flex h-6 w-6 items-center justify-center rounded transition-colors border theme-border theme-bg-overlay theme-text-faint"
                   >
                     {isCopied
-                      ? <Check className="h-3 w-3 text-blue-400" strokeWidth={2} />
+                      ? <Check className="h-3 w-3 text-[color:var(--brand)]" strokeWidth={2} />
                       : <Copy className="h-3 w-3" strokeWidth={2} />
                     }
                   </button>

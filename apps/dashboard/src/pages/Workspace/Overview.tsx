@@ -49,7 +49,7 @@ interface MemEntry { key: string; value: any }
 
 const MC: Record<string, { bg: string; text: string; dot: string }> = {
   GET: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', dot: '#34d399' },
-  POST: { bg: 'bg-blue-500/10', text: 'text-blue-400', dot: '#60a5fa' },
+  POST: { bg: 'bg-[color:var(--brand)]/10', text: 'text-[color:var(--brand)]', dot: 'var(--brand)' },
   PUT: { bg: 'bg-amber-500/10', text: 'text-amber-400', dot: '#fbbf24' },
   PATCH: { bg: 'bg-orange-500/10', text: 'text-orange-400', dot: '#fb923c' },
   DELETE: { bg: 'bg-red-500/10', text: 'text-red-400', dot: '#f87171' },
@@ -70,7 +70,7 @@ function StatCard({
   accent?: 'blue' | 'emerald' | 'amber' | 'red' | 'zinc';
 }) {
   const colors = {
-    blue: { glow: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
+    blue: { glow: 'bg-[color:var(--brand)]/10', text: 'text-[color:var(--brand)]', border: 'border-[color:var(--brand)]/20' },
     emerald: { glow: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
     amber: { glow: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20' },
     red: { glow: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20' },
@@ -106,7 +106,7 @@ function SCard({
   return (
     <div className="rounded-lg border theme-border theme-bg-overlay overflow-hidden">
       <div className="flex items-center gap-2.5 border-b theme-border px-4 py-2.5 theme-bg-overlay-md">
-        {Icon && <Icon className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />}
+        {Icon && <Icon className="h-[15px] w-[15px] text-[color:var(--brand)]" strokeWidth={2} />}
         <span className="text-[11px] font-semibold tracking-wider theme-text-faint uppercase">{title}</span>
         {action && <span className="ml-auto">{action}</span>}
       </div>
@@ -151,7 +151,7 @@ function AddEnvDialog({ onClose, onSave }: { onClose: () => void; onSave: (name:
     catch (e: any) { setErr(e.message); setSaving(false); }
   };
 
-  const inputCls = 'w-full rounded-lg px-3 py-2 text-[12px] outline-none transition-colors focus:border-blue-500/50 focus:theme-bg-overlay-md';
+  const inputCls = 'w-full rounded-lg px-3 py-2 text-[12px] outline-none transition-colors focus:border-[color:var(--brand)]/50 focus:theme-bg-overlay-md';
 
   return (
     <div
@@ -164,7 +164,7 @@ function AddEnvDialog({ onClose, onSave }: { onClose: () => void; onSave: (name:
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg border theme-border theme-bg-overlay">
-              <Globe className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
+              <Globe className="h-[15px] w-[15px] text-[color:var(--brand)]" strokeWidth={2} />
             </div>
             <h2 className="text-[13.5px] font-medium theme-text-primary">Add Environment</h2>
           </div>
@@ -184,7 +184,7 @@ function AddEnvDialog({ onClose, onSave }: { onClose: () => void; onSave: (name:
           {err && <p className="text-[12px] text-red-400">{err}</p>}
           <div className="flex items-center justify-end gap-2 pt-1">
             <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-[12px] transition-colors hover:cursor-pointer hover:theme-bg-overlay-md border theme-border theme-bg-overlay theme-text-muted">Cancel</button>
-            <button onClick={handleSubmit} disabled={saving} className="flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-[12px] font-medium text-white transition-colors hover:cursor-pointer hover:bg-blue-400 disabled:opacity-50">
+            <button onClick={handleSubmit} disabled={saving} className="flex items-center gap-2 rounded-lg bg-[var(--action)] px-4 py-2 text-[12px] font-medium text-[color:var(--action-foreground)] transition-colors hover:cursor-pointer hover:bg-[var(--action-hover)] disabled:opacity-50">
               {saving && <Loader2 className="h-[14px] w-[14px] animate-spin" strokeWidth={2} />}
               {saving ? 'Saving…' : 'Add Environment'}
             </button>
@@ -285,7 +285,7 @@ export function Overview({ onNavigate }: { onNavigate?: (page: string) => void }
             <button
               type="button"
               onClick={() => onNavigate?.('model')}
-              className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-blue-400 transition-colors hover:cursor-pointer"
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--action)] px-3 py-1.5 text-[12px] font-medium text-[color:var(--action-foreground)] hover:bg-[var(--action-hover)] transition-colors hover:cursor-pointer"
             >
               <ScanLine className="h-[15px] w-[15px]" strokeWidth={2} /> Scan Project
             </button>
@@ -351,7 +351,7 @@ export function Overview({ onNavigate }: { onNavigate?: (page: string) => void }
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 items-center justify-center rounded-lg border theme-border theme-bg-overlay-md">
-                        <Terminal className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
+                        <Terminal className="h-[15px] w-[15px] text-[color:var(--brand)]" strokeWidth={2} />
                       </div>
                       <div>
                         <p className="text-[13.5px] font-medium theme-text-primary">{model.project.name}</p>
@@ -369,7 +369,7 @@ export function Overview({ onNavigate }: { onNavigate?: (page: string) => void }
                         <button
                           type="button"
                           onClick={() => setShowAddEnv(true)}
-                          className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-blue-400 transition-colors hover:bg-blue-500/10 hover:cursor-pointer border theme-border"
+                          className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-[color:var(--brand)] transition-colors hover:bg-[color:var(--brand)]/10 hover:cursor-pointer border theme-border"
                         >
                           <Plus className="h-3 w-3" strokeWidth={2} /> Add
                         </button>
@@ -385,7 +385,7 @@ export function Overview({ onNavigate }: { onNavigate?: (page: string) => void }
                             return (
                               <div
                                 key={env.name}
-                                className={`group flex items-center gap-2.5 rounded-lg border px-3 py-2 transition-all ${isDefault ? 'border-blue-500/30 bg-blue-500/[0.05]' : 'theme-border theme-bg-overlay-md'}`}
+                                className={`group flex items-center gap-2.5 rounded-lg border px-3 py-2 transition-all ${isDefault ? 'border-[color:var(--brand)]/30 bg-[color:var(--brand)]/[0.05]' : 'theme-border theme-bg-overlay-md'}`}
                               >
                                 {/* Radio */}
                                 <button
@@ -400,16 +400,16 @@ export function Overview({ onNavigate }: { onNavigate?: (page: string) => void }
                                       setModel(prev => prev ? { ...prev, defaultEnvironment: env.name } : prev);
                                     } finally { setSettingDefault(null); }
                                   }}
-                                  className={`shrink-0 flex h-4 w-4 items-center justify-center rounded-full border-2 transition-colors hover:cursor-pointer ${isDefault ? 'border-blue-400 bg-blue-500/20' : 'theme-border bg-transparent'}`}
+                                  className={`shrink-0 flex h-4 w-4 items-center justify-center rounded-full border-2 transition-colors hover:cursor-pointer ${isDefault ? 'border-[color:var(--brand)] bg-[color:var(--brand)]/20' : 'theme-border bg-transparent'}`}
                                 >
                                   {isSettingThis
-                                    ? <Loader2 className="h-2.5 w-2.5 text-blue-400 animate-spin" strokeWidth={3} />
-                                    : isDefault && <Check className="h-2.5 w-2.5 text-blue-400" strokeWidth={3} />}
+                                    ? <Loader2 className="h-2.5 w-2.5 text-[color:var(--brand)] animate-spin" strokeWidth={3} />
+                                    : isDefault && <Check className="h-2.5 w-2.5 text-[color:var(--brand)]" strokeWidth={3} />}
                                 </button>
                                 <Globe className="h-[14px] w-[14px] theme-text-faint shrink-0" strokeWidth={2} />
-                                <span className={`text-[11px] w-16 shrink-0 font-medium ${isDefault ? 'text-blue-400' : 'theme-text-muted'}`}>{env.name}</span>
+                                <span className={`text-[11px] w-16 shrink-0 font-medium ${isDefault ? 'text-[color:var(--brand)]' : 'theme-text-muted'}`}>{env.name}</span>
                                 <span className="font-mono text-[11px] theme-text truncate flex-1">{env.baseUrl}</span>
-                                {isDefault && <span className="shrink-0 rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-blue-400 border border-blue-500/20">default</span>}
+                                {isDefault && <span className="shrink-0 rounded-full bg-[color:var(--brand)]/10 px-1.5 py-0.5 text-[9px] font-semibold text-[color:var(--brand)] border border-[color:var(--brand)]/20">default</span>}
                                 {/* Delete */}
                                 <button
                                   type="button"
@@ -439,7 +439,7 @@ export function Overview({ onNavigate }: { onNavigate?: (page: string) => void }
                       <button
                         type="button"
                         onClick={() => onNavigate?.('model')}
-                        className="flex items-center gap-1.5 rounded-lg border theme-border theme-bg-overlay-md px-3 py-1.5 text-[12px] theme-text hover:bg-blue-500 hover:text-white hover:border-blue-400 transition-colors hover:cursor-pointer"
+                        className="flex items-center gap-1.5 rounded-lg border theme-border theme-bg-overlay-md px-3 py-1.5 text-[12px] theme-text hover:bg-[var(--action)] hover:text-[color:var(--action-foreground)] hover:border-[color:var(--brand)] transition-colors hover:cursor-pointer"
                       >
                         <Layers className="h-[15px] w-[15px]" strokeWidth={2} /> View Model
                       </button>
@@ -499,7 +499,7 @@ export function Overview({ onNavigate }: { onNavigate?: (page: string) => void }
                 <button
                   type="button"
                   onClick={() => onNavigate?.('model')}
-                  className="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 transition-colors hover:cursor-pointer"
+                  className="flex items-center gap-1 text-[11px] text-[color:var(--brand)] hover:text-[color:var(--brand)] transition-colors hover:cursor-pointer"
                 >
                   View all <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
                 </button>
@@ -552,7 +552,7 @@ export function Overview({ onNavigate }: { onNavigate?: (page: string) => void }
                   <button
                     type="button"
                     onClick={() => onNavigate?.('simulations')}
-                    className="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 transition-colors hover:cursor-pointer"
+                    className="flex items-center gap-1 text-[11px] text-[color:var(--brand)] hover:text-[color:var(--brand)] transition-colors hover:cursor-pointer"
                   >
                     View all <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
                   </button>
@@ -570,7 +570,7 @@ export function Overview({ onNavigate }: { onNavigate?: (page: string) => void }
                           className="group flex w-full items-center gap-3 px-4 py-2.5 hover:theme-bg-overlay-md text-left transition-colors hover:cursor-pointer"
                         >
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border theme-border theme-bg-overlay-md">
-                            <Zap className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
+                            <Zap className="h-[15px] w-[15px] text-[color:var(--brand)]" strokeWidth={2} />
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-[13px] theme-text-primary">{wf.name}</p>
@@ -593,7 +593,7 @@ export function Overview({ onNavigate }: { onNavigate?: (page: string) => void }
                   <button
                     type="button"
                     onClick={() => onNavigate?.('memory')}
-                    className="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 transition-colors hover:cursor-pointer"
+                    className="flex items-center gap-1 text-[11px] text-[color:var(--brand)] hover:text-[color:var(--brand)] transition-colors hover:cursor-pointer"
                   >
                     Inspect <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
                   </button>

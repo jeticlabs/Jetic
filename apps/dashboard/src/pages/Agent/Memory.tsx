@@ -160,7 +160,7 @@ function AddEntryModal({
             <div
               className="flex h-7 w-7 items-center justify-center rounded-lg border theme-border theme-bg-overlay"
             >
-              <Plus className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
+              <Plus className="h-[15px] w-[15px] text-[color:var(--brand)]" strokeWidth={2} />
             </div>
             <h2 className="text-[13.5px] font-medium theme-text-primary">
               Add Memory Entry
@@ -187,7 +187,7 @@ function AddEntryModal({
               value={key}
               onChange={(e) => setKey(e.target.value)}
               placeholder="global:myKey  or  myKey"
-              className="w-full rounded-lg px-3 py-2 text-[12px] outline-none transition-colors focus:border-blue-500/50 focus:theme-bg-overlay-md border theme-border theme-bg-overlay theme-text-primary"
+              className="w-full rounded-lg px-3 py-2 text-[12px] outline-none transition-colors focus:border-[color:var(--brand)]/50 focus:theme-bg-overlay-md border theme-border theme-bg-overlay theme-text-primary"
             />
             <p className="mt-1.5 text-[10px] theme-text-faint">
               Prefix with{' '}
@@ -224,7 +224,7 @@ function AddEntryModal({
               onChange={(e) => setValue(e.target.value)}
               placeholder="Enter a string value…"
               rows={4}
-              className="w-full resize-none rounded-lg px-3 py-2 text-[12px] outline-none transition-colors focus:border-blue-500/50 focus:theme-bg-overlay-md border theme-border theme-bg-overlay theme-text-primary"
+              className="w-full resize-none rounded-lg px-3 py-2 text-[12px] outline-none transition-colors focus:border-[color:var(--brand)]/50 focus:theme-bg-overlay-md border theme-border theme-bg-overlay theme-text-primary"
             />
           </div>
 
@@ -247,7 +247,7 @@ function AddEntryModal({
             <button
               onClick={handleSubmit}
               disabled={saving}
-              className="flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-[12px] font-medium text-white transition-colors hover:cursor-pointer hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg bg-[var(--action)] px-4 py-2 text-[12px] font-medium text-[color:var(--action-foreground)] transition-colors hover:cursor-pointer hover:bg-[var(--action-hover)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving && <Loader2 className="h-[15px] w-[15px] animate-spin" strokeWidth={2} />}
               {saving ? 'Saving…' : 'Save Entry'}
@@ -295,7 +295,7 @@ function AddScopeModal({
             <div
               className="flex h-7 w-7 items-center justify-center rounded-lg border theme-border theme-bg-overlay"
             >
-              <Plus className="h-[15px] w-[15px] text-blue-400" strokeWidth={2} />
+              <Plus className="h-[15px] w-[15px] text-[color:var(--brand)]" strokeWidth={2} />
             </div>
             <h2 className="text-[13.5px] font-medium theme-text-primary">Add Scope</h2>
           </div>
@@ -317,7 +317,7 @@ function AddScopeModal({
               value={name}
               onChange={(e) => { setName(e.target.value); setError(''); }}
               placeholder="e.g. session, user, cart"
-              className="w-full rounded-lg px-3 py-2 text-[12px] outline-none transition-colors focus:border-blue-500/50 border theme-border theme-bg-overlay theme-text-primary"
+              className="w-full rounded-lg px-3 py-2 text-[12px] outline-none transition-colors focus:border-[color:var(--brand)]/50 border theme-border theme-bg-overlay theme-text-primary"
             />
             <p className="mt-1.5 text-[10px] theme-text-faint">
               Memory entries under this scope will be keyed as{' '}
@@ -337,7 +337,7 @@ function AddScopeModal({
             </button>
             <button
               onClick={handleSubmit}
-              className="flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-[12px] font-medium text-white transition-colors hover:cursor-pointer hover:bg-blue-400"
+              className="flex items-center gap-2 rounded-lg bg-[var(--action)] px-4 py-2 text-[12px] font-medium text-[color:var(--action-foreground)] transition-colors hover:cursor-pointer hover:bg-[var(--action-hover)]"
             >
               <Check className="h-[14px] w-[14px]" strokeWidth={2} /> Create Scope
             </button>
@@ -357,8 +357,8 @@ const BUILT_IN_SCOPE_ICONS: Record<string, React.ElementType> = {
 
 const SCOPE_COLORS: Record<string, { border: string; bg: string; dot: string; text: string; activeBg: string; activeBorder: string }> = {
   workflow: {
-    border: 'border-blue-500/20', bg: 'bg-blue-500/5', dot: 'bg-blue-500/40',
-    text: 'text-blue-400', activeBg: 'bg-blue-500/15', activeBorder: 'border-blue-500/40',
+    border: 'border-[color:var(--brand)]/20', bg: 'bg-[color:var(--brand)]/5', dot: 'bg-[color:var(--brand)]/40',
+    text: 'text-[color:var(--brand)]', activeBg: 'bg-[color:var(--brand)]/15', activeBorder: 'border-[color:var(--brand)]/40',
   },
   environment: {
     border: 'border-emerald-500/20', bg: 'bg-emerald-500/5', dot: 'bg-emerald-500/40',
@@ -370,8 +370,8 @@ const SCOPE_COLORS: Record<string, { border: string; bg: string; dot: string; te
   },
 };
 const DEFAULT_COLOR = {
-  border: 'border-purple-500/20', bg: 'bg-purple-500/5', dot: 'bg-purple-500/40',
-  text: 'text-purple-400', activeBg: 'bg-purple-500/15', activeBorder: 'border-purple-500/40',
+  border: 'border-[color:var(--brand)]/20', bg: 'bg-[color:var(--brand)]/5', dot: 'bg-[color:var(--brand)]/40',
+  text: 'text-[color:var(--brand)]', activeBg: 'bg-[color:var(--brand)]/15', activeBorder: 'border-[color:var(--brand)]/40',
 };
 
 function getScopeColor(scope: string) {
@@ -564,7 +564,7 @@ export function Memory() {
 
           <button
             onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:cursor-pointer hover:bg-blue-400"
+            className="flex items-center gap-1.5 rounded-lg bg-[var(--action)] px-3 py-1.5 text-[12px] font-medium text-[color:var(--action-foreground)] transition-colors hover:cursor-pointer hover:bg-[var(--action-hover)]"
           >
             <Plus className="h-[15px] w-[15px]" strokeWidth={2} />
             Add Entry
@@ -603,7 +603,7 @@ export function Memory() {
               <button
                 type="button"
                 onClick={() => setActiveScope(null)}
-                className="mt-2 text-[11px] transition-colors hover:cursor-pointer hover:text-blue-300 theme-text-faint"
+                className="mt-2 text-[11px] transition-colors hover:cursor-pointer hover:text-[color:var(--brand)] theme-text-faint"
               >
                 ← Show all scopes
               </button>
@@ -626,7 +626,7 @@ export function Memory() {
               value={filter}
               onChange={e => setFilter(e.target.value)}
               placeholder={activeScope ? `Filter ${activeScope} entries…` : 'Filter by key or value…'}
-              className="w-full rounded-lg py-2 pl-9 pr-9 text-[12px] outline-none transition-colors focus:border-blue-500/50 focus:theme-bg-overlay-md border theme-border theme-bg-overlay theme-text"
+              className="w-full rounded-lg py-2 pl-9 pr-9 text-[12px] outline-none transition-colors focus:border-[color:var(--brand)]/50 focus:theme-bg-overlay-md border theme-border theme-bg-overlay theme-text"
             />
             {filter && (
               <button
@@ -677,9 +677,9 @@ export function Memory() {
         {!loading && !error && entries.length === 0 && (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 py-20 text-center">
             <div className="relative flex h-16 w-16 items-center justify-center">
-              <div className="absolute inset-0 rounded-full bg-blue-500/10 blur-xl" />
+              <div className="absolute inset-0 rounded-full bg-[color:var(--brand)]/10 blur-xl" />
               <div
-                className="relative flex h-16 w-16 items-center justify-center rounded-lg text-blue-400 border theme-border theme-bg-overlay"
+                className="relative flex h-16 w-16 items-center justify-center rounded-lg text-[color:var(--brand)] border theme-border theme-bg-overlay"
               >
                 <Brain className="h-7 w-7" strokeWidth={2} />
               </div>
@@ -700,7 +700,7 @@ export function Memory() {
             </div>
             <button
               onClick={() => setShowAdd(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-4 py-2 text-[12px] font-medium text-white transition-colors hover:cursor-pointer hover:bg-blue-400"
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--action)] px-4 py-2 text-[12px] font-medium text-[color:var(--action-foreground)] transition-colors hover:cursor-pointer hover:bg-[var(--action-hover)]"
             >
               <Plus className="h-[15px] w-[15px]" strokeWidth={2} />
               Add Entry
@@ -717,11 +717,11 @@ export function Memory() {
               <Brain className="h-[15px] w-[15px] theme-text-faint" strokeWidth={2} />
             </div>
             <p className="text-[13px] theme-text-muted">
-              No entries in <code className="text-blue-400">{activeScope}</code> scope
+              No entries in <code className="text-[color:var(--brand)]">{activeScope}</code> scope
             </p>
             <button
               onClick={() => setShowAdd(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:cursor-pointer hover:bg-blue-400"
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--action)] px-3 py-1.5 text-[12px] font-medium text-[color:var(--action-foreground)] transition-colors hover:cursor-pointer hover:bg-[var(--action-hover)]"
             >
               <Plus className="h-[14px] w-[14px]" strokeWidth={2} /> Add to {activeScope}
             </button>
@@ -741,7 +741,7 @@ export function Memory() {
             </p>
             <button
               onClick={() => setFilter('')}
-              className="text-[12px] text-blue-400 transition-colors hover:cursor-pointer hover:text-blue-300"
+              className="text-[12px] text-[color:var(--brand)] transition-colors hover:cursor-pointer hover:text-[color:var(--brand)]"
             >
               Clear filter
             </button>
@@ -864,7 +864,7 @@ export function Memory() {
           <span className="ml-auto">
             <button
               onClick={() => load(true)}
-              className="text-[11px] transition-colors hover:cursor-pointer hover:text-blue-400 theme-text-faint"
+              className="text-[11px] transition-colors hover:cursor-pointer hover:text-[color:var(--brand)] theme-text-faint"
             >
               Refresh
             </button>

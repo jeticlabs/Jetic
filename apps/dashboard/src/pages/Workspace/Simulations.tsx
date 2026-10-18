@@ -127,12 +127,12 @@ interface RunState {
 
 const METHOD_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   GET: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', dot: '#34d399' },
-  POST: { bg: 'bg-blue-500/10', text: 'text-blue-400', dot: '#60a5fa' },
+  POST: { bg: 'bg-[color:var(--brand)]/10', text: 'text-[color:var(--brand)]', dot: 'var(--brand)' },
   PUT: { bg: 'bg-amber-500/10', text: 'text-amber-400', dot: '#fbbf24' },
   PATCH: { bg: 'bg-orange-500/10', text: 'text-orange-400', dot: '#fb923c' },
   DELETE: { bg: 'bg-red-500/10', text: 'text-red-400', dot: '#f87171' },
   HEAD: { bg: 'theme-bg-overlay-md', text: 'theme-text-muted', dot: 'var(--text-muted)' },
-  OPTIONS: { bg: 'bg-purple-500/10', text: 'text-purple-400', dot: '#c084fc' },
+  OPTIONS: { bg: 'bg-[color:var(--brand)]/10', text: 'text-[color:var(--brand)]', dot: 'var(--brand)' },
 };
 function mc(m: string) { return METHOD_COLORS[m.toUpperCase()] ?? METHOD_COLORS['GET']; }
 
@@ -367,14 +367,14 @@ function StepNode({ data }: { data: any }) {
   const s = mc(data.method);
   const statusColors: Record<StepStatus, string> = {
     idle: 'theme-border',
-    running: 'border-blue-500/60',
+    running: 'border-[color:var(--brand)]/60',
     passed: 'border-emerald-500/40',
     failed: 'border-red-500/40',
     skipped: 'theme-border',
   };
   const glows: Record<StepStatus, string> = {
     idle: '',
-    running: 'shadow-[0_0_12px_rgba(96,165,250,0.28)]',
+    running: 'shadow-[0_0_12px_color-mix(in_srgb,var(--brand)_28%,transparent)]',
     passed: 'shadow-[0_0_8px_rgba(52,211,153,0.15)]',
     failed: 'shadow-[0_0_8px_rgba(248,113,113,0.15)]',
     skipped: '',
@@ -390,12 +390,12 @@ function StepNode({ data }: { data: any }) {
 
       {/* Left method bar */}
       <div className="absolute left-0 top-0 bottom-0 w-[3px] transition-colors duration-300"
-        style={{ background: status === 'running' ? '#60a5fa' : status === 'passed' ? s.dot : status === 'failed' ? '#f87171' : s.dot + '60' }}
+        style={{ background: status === 'running' ? 'var(--brand)' : status === 'passed' ? s.dot : status === 'failed' ? '#f87171' : `color-mix(in srgb, ${s.dot} 40%, transparent)` }}
       />
 
       {/* Status indicator */}
       <div className="shrink-0 flex items-center justify-center">
-        {status === 'running' && <Loader2 className="h-3.5 w-3.5 text-blue-400 animate-spin" strokeWidth={2} />}
+        {status === 'running' && <Loader2 className="h-3.5 w-3.5 text-[color:var(--brand)] animate-spin" strokeWidth={2} />}
         {status === 'passed' && <Check className="h-3.5 w-3.5 text-emerald-400" strokeWidth={2} />}
         {status === 'failed' && <AlertCircle className="h-3.5 w-3.5 text-red-400" strokeWidth={2} />}
         {status === 'idle' && <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border theme-border text-[8px] font-medium theme-text-faint">{data.index + 1}</span>}
@@ -425,7 +425,7 @@ function StepNode({ data }: { data: any }) {
 function ConditionNode({ data }: { data: any }) {
   const passed = data.passed;
   const color = passed === undefined
-    ? 'rgba(96,165,250,0.5)'
+    ? 'color-mix(in srgb, var(--brand) 50%, transparent)'
     : passed ? 'rgba(52,211,153,0.7)' : 'rgba(248,113,113,0.7)';
   return (
     <div style={{ width: 40, height: 40, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -492,7 +492,7 @@ function SimFlowGraph({ steps, runState }: { steps: WorkflowStep[]; runState: Ru
         });
 
         // Step → condition
-        const stepEdgeColor = fromStatus === 'passed' ? 'rgba(52,211,153,0.3)' : fromStatus === 'failed' ? 'rgba(248,113,113,0.3)' : 'rgba(96,165,250,0.18)';
+        const stepEdgeColor = fromStatus === 'passed' ? 'rgba(52,211,153,0.3)' : fromStatus === 'failed' ? 'rgba(248,113,113,0.3)' : 'color-mix(in srgb, var(--brand) 18%, transparent)';
         newEdges.push({
           id: `e-${i}-cond`,
           source: `step-${i}`,
@@ -506,8 +506,8 @@ function SimFlowGraph({ steps, runState }: { steps: WorkflowStep[]; runState: Ru
 
         // Condition → next step
         if (i < steps.length - 1) {
-          const passColor = condResult?.passed === true ? 'rgba(52,211,153,0.5)' : 'rgba(96,165,250,0.18)';
-          const failColor = condResult?.passed === false ? 'rgba(248,113,113,0.5)' : 'rgba(96,165,250,0.1)';
+          const passColor = condResult?.passed === true ? 'rgba(52,211,153,0.5)' : 'color-mix(in srgb, var(--brand) 18%, transparent)';
+          const failColor = condResult?.passed === false ? 'rgba(248,113,113,0.5)' : 'color-mix(in srgb, var(--brand) 10%, transparent)';
           newEdges.push({
             id: `e-${i}-cond-pass`,
             source: condId,
@@ -533,16 +533,16 @@ function SimFlowGraph({ steps, runState }: { steps: WorkflowStep[]; runState: Ru
         const captured = Object.keys(step.capture ?? {});
         const label = captured.length > 0 ? captured.map(k => k.split(':').pop()).join(', ') : undefined;
         const fromStatus2 = runState.stepStatuses[i] ?? 'idle';
-        const edgeColor = fromStatus2 === 'passed' ? 'rgba(52,211,153,0.3)' : fromStatus2 === 'failed' ? 'rgba(248,113,113,0.3)' : 'rgba(96,165,250,0.18)';
+        const edgeColor = fromStatus2 === 'passed' ? 'rgba(52,211,153,0.3)' : fromStatus2 === 'failed' ? 'rgba(248,113,113,0.3)' : 'color-mix(in srgb, var(--brand) 18%, transparent)';
         newEdges.push({
           id: `e-${i}`,
           source: `step-${i}`,
           target: `step-${i + 1}`,
           label,
-          labelStyle: { fill: 'rgba(96,165,250,0.7)', fontSize: 9, fontFamily: 'monospace' },
+          labelStyle: { fill: 'color-mix(in srgb, var(--brand) 70%, transparent)', fontSize: 9, fontFamily: 'monospace' },
           labelBgStyle: { fill: 'transparent' },
           style: { stroke: edgeColor, strokeWidth: 1.5, strokeDasharray: fromStatus2 === 'idle' || fromStatus2 === 'running' ? '5 5' : undefined },
-          markerEnd: { type: MarkerType.ArrowClosed, color: fromStatus2 === 'passed' ? 'rgba(52,211,153,0.4)' : 'rgba(96,165,250,0.3)' },
+          markerEnd: { type: MarkerType.ArrowClosed, color: fromStatus2 === 'passed' ? 'rgba(52,211,153,0.4)' : 'color-mix(in srgb, var(--brand) 30%, transparent)' },
           animated: fromStatus2 === 'running',
         });
       }
@@ -596,7 +596,7 @@ function RunLog({ runState, steps, waitingStepIndex }: { runState: RunState; ste
         <span className="ml-auto flex items-center gap-2 text-[10px]">
           {runState.passed > 0 && <span className="text-emerald-400">{runState.passed} passed</span>}
           {runState.failed > 0 && <span className="text-red-400">{runState.failed} failed</span>}
-          {runState.phase === 'running' && <Loader2 className="h-3 w-3 text-blue-400 animate-spin" strokeWidth={2} />}
+          {runState.phase === 'running' && <Loader2 className="h-3 w-3 text-[color:var(--brand)] animate-spin" strokeWidth={2} />}
           {runState.phase === 'done' && <Check className="h-3 w-3 text-emerald-400" strokeWidth={2} />}
           {runState.phase === 'aborted' && <AlertCircle className="h-3 w-3 text-red-400" strokeWidth={2} />}
         </span>
@@ -639,7 +639,7 @@ function RunLog({ runState, steps, waitingStepIndex }: { runState: RunState; ste
             return (
               <div key={i}>
                 <div className="flex items-center gap-2 theme-text-muted">
-                  <Loader2 className="h-3 w-3 animate-spin text-blue-400" strokeWidth={2} />
+                  <Loader2 className="h-3 w-3 animate-spin text-[color:var(--brand)]" strokeWidth={2} />
                   <span className="theme-text-faint">Step {i + 1}/{steps.length}</span>
                   <span className={s.text}>{step.method}</span>
                   <span className="theme-text">{step.path}</span>
@@ -688,7 +688,7 @@ function RunLog({ runState, steps, waitingStepIndex }: { runState: RunState; ste
 
               {/* Condition evaluation result */}
               {result.conditionResult && (
-                <p className={`pl-5 ${result.conditionResult.passed ? 'text-purple-400' : 'text-orange-400'}`}>
+                <p className={`pl-5 ${result.conditionResult.passed ? 'text-[color:var(--brand)]' : 'text-orange-400'}`}>
                   ◇ condition {result.conditionResult.passed ? 'passed' : 'failed'} — {result.conditionResult.reason}
                   {!result.conditionResult.passed && step.condition && (
                     <span className="text-orange-300/70"> → {step.condition.onFail}{step.condition.onFail === 'switch' && step.condition.switchToWorkflow ? `: ${step.condition.switchToWorkflow}` : ''}</span>
@@ -814,15 +814,15 @@ function ConditionEditor({
     onSave(condition);
   };
 
-  const inputCls = 'h-7 rounded-lg border theme-border theme-bg-overlay-md px-2 text-[11px] theme-text-primary placeholder-[var(--text-faint)] outline-none focus:border-purple-500/60 transition-colors';
+  const inputCls = 'h-7 rounded-lg border theme-border theme-bg-overlay-md px-2 text-[11px] theme-text-primary placeholder-[var(--text-faint)] outline-none focus:border-[color:var(--brand)]/60 transition-colors';
   const selectCls = `${inputCls} cursor-pointer`;
 
   return (
-    <div className="mt-2 rounded-lg border border-purple-500/20 bg-purple-500/[0.04] p-3 space-y-3">
+    <div className="mt-2 rounded-lg border border-[color:var(--brand)]/20 bg-[color:var(--brand)]/[0.04] p-3 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-2">
-        <Diamond className="h-3 w-3 text-purple-400" strokeWidth={2} />
-        <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">Step Condition</span>
+        <Diamond className="h-3 w-3 text-[color:var(--brand)]" strokeWidth={2} />
+        <span className="text-[10px] font-semibold text-[color:var(--brand)] uppercase tracking-wider">Step Condition</span>
         <span className="text-[10px] theme-text-faint ml-1">— evaluated after this step runs</span>
         <div className="ml-auto flex items-center gap-1">
           {/* Logic toggle: AND / OR */}
@@ -832,7 +832,7 @@ function ConditionEditor({
               type="button"
               onClick={() => setLogic(l)}
               className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors hover:cursor-pointer ${logic === l
-                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40'
+                ? 'bg-[color:var(--brand)]/20 text-[color:var(--brand)] border border-[color:var(--brand)]/40'
                 : 'theme-bg-overlay-md theme-text-faint border theme-border hover:theme-text-muted'
                 }`}
             >
@@ -895,14 +895,14 @@ function ConditionEditor({
         <button
           type="button"
           onClick={addRule}
-          className="flex items-center gap-1 text-[10px] text-purple-400/70 hover:text-purple-400 transition-colors hover:cursor-pointer"
+          className="flex items-center gap-1 text-[10px] text-[color:var(--brand)]/70 hover:text-[color:var(--brand)] transition-colors hover:cursor-pointer"
         >
           <Plus className="h-3 w-3" strokeWidth={2} /> Add rule
         </button>
       </div>
 
       {/* onFail action */}
-      <div className="flex flex-col gap-2 pt-1 border-t border-purple-500/10">
+      <div className="flex flex-col gap-2 pt-1 border-t border-[color:var(--brand)]/10">
         <div className="flex items-center gap-2">
           <span className="text-[10px] theme-text-faint shrink-0">If condition fails →</span>
           {(['abort', 'continue', 'switch'] as const).map(action => (
@@ -915,7 +915,7 @@ function ConditionEditor({
                   ? 'bg-red-500/20 text-red-400 border-red-500/40'
                   : action === 'continue'
                     ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                    : 'bg-blue-500/20 text-blue-400 border-blue-500/40'
+                    : 'bg-[color:var(--brand)]/20 text-[color:var(--brand)] border-[color:var(--brand)]/40'
                 : 'theme-bg-overlay-md theme-text-faint theme-border hover:theme-text-muted'
                 }`}
             >
@@ -938,9 +938,9 @@ function ConditionEditor({
               type="checkbox"
               checked={returnOnComplete}
               onChange={e => setReturnOnComplete(e.target.checked)}
-              className="rounded theme-border theme-bg-overlay-md text-purple-500 focus:ring-0"
+              className="rounded theme-border theme-bg-overlay-md text-[color:var(--brand)] focus:ring-0"
             />
-            <span>Return to main workflow after completing <code className="text-purple-400">{switchSlug || 'sub-workflow'}</code></span>
+            <span>Return to main workflow after completing <code className="text-[color:var(--brand)]">{switchSlug || 'sub-workflow'}</code></span>
           </label>
         )}
       </div>
@@ -951,7 +951,7 @@ function ConditionEditor({
           type="button"
           onClick={handleSave}
           disabled={rules.every(r => !r.left.trim())}
-          className="flex items-center gap-1 rounded-lg bg-purple-500/20 border border-purple-500/40 px-3 py-1 text-[10px] text-purple-400 hover:bg-purple-500/30 transition-colors disabled:opacity-40 hover:cursor-pointer"
+          className="flex items-center gap-1 rounded-lg bg-[color:var(--brand)]/20 border border-[color:var(--brand)]/40 px-3 py-1 text-[10px] text-[color:var(--brand)] hover:bg-[color:var(--brand)]/30 transition-colors disabled:opacity-40 hover:cursor-pointer"
         >
           <Check className="h-3 w-3" strokeWidth={2} /> Save Condition
         </button>
@@ -1009,7 +1009,7 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
     ? <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/15 text-amber-400" title="Waiting for your input — answer the dialog to resume"><User className="h-3 w-3 animate-pulse" strokeWidth={2} /></span>
     : {
       idle: <span className="flex h-5 w-5 items-center justify-center rounded-full border theme-border text-[9px] theme-text-faint">{index + 1}</span>,
-      running: <Loader2 className="h-5 w-5 text-blue-400 animate-spin" strokeWidth={2} />,
+      running: <Loader2 className="h-5 w-5 text-[color:var(--brand)] animate-spin" strokeWidth={2} />,
       passed: <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400"><Check className="h-3 w-3" strokeWidth={2} /></span>,
       failed: <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500/10 text-red-400"><AlertCircle className="h-3 w-3" strokeWidth={2} /></span>,
       skipped: <span className="h-5 w-5 rounded-full border theme-border theme-bg-overlay-md" />,
@@ -1045,7 +1045,7 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
           )}
           <span className="flex items-center gap-1">
             {hasInject && <span className="rounded bg-amber-500/10 px-1 py-0.5 text-[9px] text-amber-400">auth</span>}
-            {hasCapture && <span className="rounded bg-blue-500/10 px-1 py-0.5 text-[9px] text-blue-400">capture</span>}
+            {hasCapture && <span className="rounded bg-[color:var(--brand)]/10 px-1 py-0.5 text-[9px] text-[color:var(--brand)]">capture</span>}
             {humanKeys.length > 0 && (
               <span
                 title={`Needs human input at runtime: ${humanKeys.map(k => `{{human:${k}}}`).join(', ')}`}
@@ -1055,12 +1055,12 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
               </span>
             )}
             {hasCondition && (
-              <span className="rounded bg-purple-500/10 px-1 py-0.5 text-[9px] text-purple-400 flex items-center gap-0.5">
+              <span className="rounded bg-[color:var(--brand)]/10 px-1 py-0.5 text-[9px] text-[color:var(--brand)] flex items-center gap-0.5">
                 <Diamond className="h-2.5 w-2.5" strokeWidth={2} /> condition
               </span>
             )}
             {result?.conditionResult && (
-              <span className={`rounded px-1 py-0.5 text-[9px] ${result.conditionResult.passed ? 'bg-purple-500/10 text-purple-400' : 'bg-orange-500/10 text-orange-400'}`}>
+              <span className={`rounded px-1 py-0.5 text-[9px] ${result.conditionResult.passed ? 'bg-[color:var(--brand)]/10 text-[color:var(--brand)]' : 'bg-orange-500/10 text-orange-400'}`}>
                 ◇ {result.conditionResult.passed ? 'passed' : 'failed'}
               </span>
             )}
@@ -1093,7 +1093,7 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
                   {Object.entries(step.body!).map(([k, v]) => (
                     <div key={k} className="flex items-center gap-2 rounded-lg border theme-border theme-bg-overlay-md px-3 py-1.5">
                       <span className="font-mono text-[10px] theme-text">{k}</span>
-                      <span className="font-mono text-[10px] text-blue-400/80 truncate">{String(v)}</span>
+                      <span className="font-mono text-[10px] text-[color:var(--brand)]/80 truncate">{String(v)}</span>
                     </div>
                   ))}
                 </div>
@@ -1120,8 +1120,8 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
                 <p className="text-[10px] theme-text-faint mb-1 uppercase tracking-wider flex items-center gap-1"><Zap className="h-3 w-3" strokeWidth={2} /> Capture</p>
                 <div className="space-y-1">
                   {Object.entries(step.capture!).map(([k, v]) => (
-                    <div key={k} className="flex items-center gap-2 rounded-lg bg-blue-500/[0.05] border border-blue-500/15 px-3 py-1.5">
-                      <span className="font-mono text-[10px] text-blue-400">{k}</span>
+                    <div key={k} className="flex items-center gap-2 rounded-lg bg-[color:var(--brand)]/[0.05] border border-[color:var(--brand)]/15 px-3 py-1.5">
+                      <span className="font-mono text-[10px] text-[color:var(--brand)]">{k}</span>
                       <ArrowRight className="h-3 w-3 theme-text-faint shrink-0" strokeWidth={2} />
                       <span className="font-mono text-[10px] theme-text-muted">{v}</span>
                     </div>
@@ -1133,18 +1133,18 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
             {/* Condition section */}
             <div className="pt-1">
               {hasCondition && condSummary && !editingCondition && (
-                <div className="flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-500/[0.04] px-3 py-2 mb-2">
-                  <Diamond className="h-3 w-3 text-purple-400 shrink-0" strokeWidth={2} />
-                  <span className="text-[10px] text-purple-400 flex-1">{condSummary}</span>
+                <div className="flex items-center gap-2 rounded-lg border border-[color:var(--brand)]/20 bg-[color:var(--brand)]/[0.04] px-3 py-2 mb-2">
+                  <Diamond className="h-3 w-3 text-[color:var(--brand)] shrink-0" strokeWidth={2} />
+                  <span className="text-[10px] text-[color:var(--brand)] flex-1">{condSummary}</span>
                   {result?.conditionResult && (
-                    <span className={`text-[9px] font-medium ${result.conditionResult.passed ? 'text-purple-400' : 'text-orange-400'}`}>
+                    <span className={`text-[9px] font-medium ${result.conditionResult.passed ? 'text-[color:var(--brand)]' : 'text-orange-400'}`}>
                       {result.conditionResult.passed ? '✓ passed' : '✗ failed'}
                     </span>
                   )}
                   <button
                     type="button"
                     onClick={() => setEditingCondition(true)}
-                    className="shrink-0 theme-text-faint hover:text-purple-400 transition-colors hover:cursor-pointer"
+                    className="shrink-0 theme-text-faint hover:text-[color:var(--brand)] transition-colors hover:cursor-pointer"
                   >
                     <Edit2 className="h-3 w-3" strokeWidth={2} />
                   </button>
@@ -1165,7 +1165,7 @@ function StepRow({ step, index, total, status, result, allSteps, onConditionChan
                   <button
                     type="button"
                     onClick={() => setEditingCondition(true)}
-                    className="flex items-center gap-1.5 text-[10px] theme-text-faint hover:text-purple-400 transition-colors hover:cursor-pointer"
+                    className="flex items-center gap-1.5 text-[10px] theme-text-faint hover:text-[color:var(--brand)] transition-colors hover:cursor-pointer"
                   >
                     <Plus className="h-3 w-3" strokeWidth={2} />
                     <Diamond className="h-3 w-3" strokeWidth={2} />
@@ -1830,7 +1830,7 @@ function WorkflowCard({ workflow: initialWorkflow, onDelete, onViewTraces }: { w
           {/* Run summary pill */}
           {hasResult && (
             <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] shrink-0 ${runState.phase === 'done' && runState.failed === 0 ? 'bg-emerald-500/10 text-emerald-400' :
-              runState.phase === 'running' ? 'bg-blue-500/10 text-blue-400' :
+              runState.phase === 'running' ? 'bg-[color:var(--brand)]/10 text-[color:var(--brand)]' :
                 'bg-red-500/10 text-red-400'
               }`}>
               {runState.phase === 'running' && <Loader2 className="h-2.5 w-2.5 animate-spin" strokeWidth={2} />}

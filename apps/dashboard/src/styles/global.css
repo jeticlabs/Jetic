@@ -4,8 +4,12 @@
   --font-sans:
     'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
     Arial, sans-serif;
+  --font-mono:
+    'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 
-  /* Brand tokens — theme-aware via the custom properties defined below */
+  /* Brand tokens — theme-aware via the custom properties defined below.
+     Per design.md §5 the selection language is white-on-dark, so "brand" is
+     the active/selected fill (white in dark mode, near-black in light mode). */
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-secondary: var(--brand-secondary);
@@ -15,67 +19,94 @@
   --color-landing-foreground-200: var(--landing-foreground-200);
 }
 
-/* ─── Dark mode (default) ─────────────────────────────────────────── */
+/* ─── Dark mode (default) — Jetic product theme (design.md World 1) ───── */
 :root {
-  /* base surfaces — from my-styles.css's .dark fd-* tokens */
-  --bg-base:        var(--color-neutral-950);   /* fd-background (dark) */
-  --bg-surface:     hsl(0, 0%, 9.8%);           /* fd-card (dark) */
-  --bg-elevated:    hsl(0, 0%, 11.6%);          /* fd-popover (dark) */
-  --bg-overlay:     hsla(0, 0%, 40.9%, 0.12);   /* derived from fd-accent (dark) */
-  --bg-overlay-md:  hsla(0, 0%, 40.9%, 0.30);   /* fd-accent (dark) */
-  --border:         hsla(0, 0%, 40%, 0.20);     /* fd-border (dark) */
-  --border-md:      hsla(0, 0%, 40%, 0.35);     /* derived, stronger fd-border */
-  --text-primary:   hsl(0, 0%, 92%);            /* fd-foreground (dark) */
-  --text-secondary: hsl(0, 0%, 86.9%);          /* fd-popover-foreground (dark) */
-  --text-muted:     hsla(0, 0%, 70%, 0.8);      /* fd-muted-foreground (dark) */
-  --text-faint:     hsl(0, 0%, 38%);            /* derived, below muted */
-  --sidebar-bg:     hsla(0, 0%, 0%, 0.2);       /* fd-overlay */
-  --ring:           hsl(0, 0%, 54.9%);          /* fd-ring (dark) */
+  /* base surfaces — #111 page → #1a1a1a recess → #1e1e1e well (design.md §5) */
+  --bg-base:        #111111;              /* --jetic-bg     page background */
+  --bg-surface:     #1a1a1a;              /* --jetic-recess cards / panels */
+  --bg-elevated:    #1e1e1e;              /* --jetic-well   popovers / inputs */
+  --bg-overlay:     #1e1e1e;              /* hover wash     = --jetic-well */
+  --bg-overlay-md:  #222222;              /* active wash    = --jetic-button */
+  --border:         rgb(255 255 255 / 0.10);
+  --border-md:      rgb(255 255 255 / 0.20);
+  --text-primary:   #ffffff;
+  --text-secondary: #ededed;              /* --jetic-emphasis */
+  --text-muted:     #8a8a8a;              /* --jetic-muted */
+  --text-faint:     #555555;              /* --jetic-faint */
+  --sidebar-bg:     #1a1a1a;
+  --ring:           #4a4a4a;              /* --jetic-ring */
 
-  /* brand — from my-styles.css's .dark overrides */
-  --brand:                      #fff383;
-  --brand-foreground:           black;
-  --brand-secondary:            #fc7744;
-  --brand-secondary-foreground: #521700;
-  --brand-200:                  #fff7c8;
-  --landing-foreground:         #e4e2d0;
-  --landing-foreground-200:     #b7af7e;
+  /* action (primary button) — --jetic-button / --jetic-button-hover */
+  --action:         #222222;
+  --action-hover:   #2c2c2c;
+  --action-foreground: #ffffff;
+
+  /* focus rings (design.md §5: visible ring on every interactive element) */
+  --focus-ring:      rgb(255 255 255 / 0.30);
+  --focus-ring-soft: rgb(255 255 255 / 0.20);
+
+  /* scrollbars */
+  --scrollbar-thumb:       rgb(255 255 255 / 0.16);
+  --scrollbar-thumb-hover: rgb(255 255 255 / 0.30);
+  --scrollbar-track:       transparent;
+
+  /* selection language: white pill = active/selected (design.md §5 / §6.7) */
+  --brand:                      #ffffff;
+  --brand-foreground:           #111111;
+  --brand-secondary:            #ededed;
+  --brand-secondary-foreground: #111111;
+  --brand-200:                  #ffffff;
+  --landing-foreground:         #ededed;
+  --landing-foreground-200:     #8a8a8a;
 }
 
-/* ─── Light mode ──────────────────────────────────────────────────── */
+/* ─── Light mode — same roles, inverted ───────────────────────────────── */
 html.light {
-  --bg-base:        hsl(0, 0%, 96%);            /* fd-background */
-  --bg-surface:     hsl(0, 0%, 94.7%);          /* fd-card */
-  --bg-elevated:    hsl(0, 0%, 98%);            /* fd-popover */
-  --bg-overlay:     hsla(0, 0%, 82%, 0.20);     /* derived from fd-accent */
-  --bg-overlay-md:  hsla(0, 0%, 82%, 0.50);     /* fd-accent */
-  --border:         hsla(0, 0%, 80%, 0.50);     /* fd-border */
-  --border-md:      hsla(0, 0%, 80%, 0.75);     /* derived, stronger fd-border */
-  --text-primary:   hsl(0, 0%, 3.9%);           /* fd-foreground */
-  --text-secondary: hsl(0, 0%, 15.1%);          /* fd-popover-foreground */
-  --text-muted:     hsl(0, 0%, 45.1%);          /* fd-muted-foreground */
-  --text-faint:     hsl(0, 0%, 63.9%);          /* fd-ring, doubles as faint text */
-  --sidebar-bg:     hsl(0, 0%, 98%);            /* fd-popover */
-  --ring:           hsl(0, 0%, 63.9%);          /* fd-ring */
+  --bg-base:        #fafafa;
+  --bg-surface:     #ffffff;
+  --bg-elevated:    #ffffff;
+  --bg-overlay:     #f0f0f0;
+  --bg-overlay-md:  #e5e5e5;
+  --border:         rgb(0 0 0 / 0.10);
+  --border-md:      rgb(0 0 0 / 0.20);
+  --text-primary:   #111111;
+  --text-secondary: #262626;
+  --text-muted:     #6b6b6b;
+  --text-faint:     #9a9a9a;
+  --sidebar-bg:     #ffffff;
+  --ring:           #a3a3a3;
 
-  /* brand — from my-styles.css's default (light) values */
-  --brand:                      hsl(26, 73%, 51%);
-  --brand-foreground:           white;
-  --brand-secondary:            #c6bb58;
-  --brand-secondary-foreground: #97890c;
-  --brand-200:                  hsl(33, 100%, 50%);
-  --landing-foreground:         #59592a;
-  --landing-foreground-200:     #a8a866;
+  --action:         #171717;
+  --action-hover:   #000000;
+  --action-foreground: #ffffff;
+
+  --focus-ring:      rgb(0 0 0 / 0.30);
+  --focus-ring-soft: rgb(0 0 0 / 0.15);
+
+  /* scrollbars */
+  --scrollbar-thumb:       rgb(0 0 0 / 0.18);
+  --scrollbar-thumb-hover: rgb(0 0 0 / 0.32);
+  --scrollbar-track:       transparent;
+
+  /* selection language inverts: dark pill = active/selected */
+  --brand:                      #171717;
+  --brand-foreground:           #ffffff;
+  --brand-secondary:            #262626;
+  --brand-secondary-foreground: #ffffff;
+  --brand-200:                  #171717;
+  --landing-foreground:         #262626;
+  --landing-foreground-200:     #6b6b6b;
 }
 
 /* Apply base background to body */
 body {
   background-color: var(--bg-base);
   color: var(--text-secondary);
+  font-family: var(--font-sans);
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* ─── Theme-aware utility shims ───────────────────────────────────── */
+/* ─── Theme-aware utility shims ───────────────────────────────────────── */
 .theme-bg-base      { background-color: var(--bg-base); }
 .theme-bg-surface   { background-color: var(--bg-surface); }
 .theme-bg-elevated  { background-color: var(--bg-elevated); }
@@ -90,4 +121,211 @@ body {
 .theme-text-brand   { color: var(--brand); }
 .theme-bg-overlay   { background-color: var(--bg-overlay); }
 .theme-bg-overlay-md{ background-color: var(--bg-overlay-md); }
+
+/* ─── Product component catalog (design.md §6) ────────────────────────── */
+@layer components {
+  /* Page surface: Inter, base bg, primary text, antialiased. Pair with layout utilities. */
+  .jetic-surface {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .jetic-muted {
+    color: var(--text-muted);
+  }
+
+  .jetic-divider {
+    height: 1px;
+    flex: 1 1 0%;
+    background-color: var(--border);
+  }
+
+  .jetic-card {
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+
+  .jetic-input {
+    height: 45px;
+    width: 100%;
+    border-radius: 12px;
+    border: none;
+    background-color: var(--bg-elevated);
+    padding-left: 12px;
+    padding-right: 12px;
+    font-size: 15px;
+    color: var(--text-primary);
+  }
+  .jetic-input::placeholder {
+    color: var(--text-muted);
+  }
+  .jetic-input:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--focus-ring-soft);
+  }
+
+  .jetic-btn {
+    height: 45px;
+    width: 100%;
+    border-radius: 12px;
+    background-color: var(--action);
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 500;
+    transition: background-color 150ms ease;
+  }
+  .jetic-btn:hover:not(:disabled) {
+    background-color: var(--action-hover);
+  }
+  .jetic-btn:disabled {
+    cursor: not-allowed;
+    background-color: var(--bg-surface);
+    color: var(--text-faint);
+  }
+  .jetic-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--focus-ring);
+  }
+
+  /* Inverse action — white-on-dark (inverted in light mode via --brand). */
+  .jetic-btn-light {
+    height: 45px;
+    width: 100%;
+    border-radius: 12px;
+    background-color: var(--brand);
+    color: var(--brand-foreground);
+    font-size: 15px;
+    font-weight: 500;
+    transition: opacity 150ms ease;
+  }
+  .jetic-btn-light:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+  .jetic-btn-light:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--brand),
+      0 0 0 4px var(--bg-base);
+  }
+
+  .jetic-pill {
+    flex-shrink: 0;
+    border-radius: 9999px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+  }
+  .jetic-pill-pro {
+    background-color: var(--brand);
+    color: var(--brand-foreground);
+  }
+  .jetic-pill-hobby {
+    background-color: var(--bg-overlay-md);
+    color: var(--text-secondary);
+  }
+
+  /* Custom select trigger + dropdown menu. */
+  .jetic-select {
+    height: 45px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background-color: var(--bg-elevated);
+    padding-left: 12px;
+    padding-right: 12px;
+    font-size: 14px;
+    color: var(--text-primary);
+    text-align: left;
+    transition: border-color 150ms ease;
+  }
+  .jetic-select:hover {
+    border-color: var(--border-md);
+  }
+  .jetic-select:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--focus-ring-soft);
+  }
+
+  .jetic-menu {
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background-color: var(--bg-surface);
+    padding: 4px;
+    box-shadow: 0 16px 40px rgb(0 0 0 / 0.5);
+  }
+
+  .jetic-menu-item {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 14px;
+    color: var(--text-primary);
+    text-align: left;
+    transition: background-color 150ms ease;
+  }
+  .jetic-menu-item:hover,
+  .jetic-menu-item[aria-selected='true'] {
+    background-color: var(--bg-overlay-md);
+  }
+  .jetic-menu-item:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--focus-ring);
+  }
+}
+
+/* ─── Boot splash progress bar ────────────────────────────────────────── */
+@keyframes jetic-load {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.jetic-loader-bar {
+  animation: jetic-load 5s linear forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .jetic-loader-bar {
+    animation: none;
+    transform: scaleX(1);
+  }
+}
+
+/* ─── Custom scrollbars (theme-aware) ─────────────────────────────────── */
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* WebKit / Blink */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--scrollbar-thumb-hover);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 

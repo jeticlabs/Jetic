@@ -28,6 +28,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       root.classList.remove("light");
     }
     localStorage.setItem("jetic_theme", theme);
+
+    const favicon = document.getElementById("app-favicon") as HTMLLinkElement | null;
+    if (favicon) {
+      favicon.href = theme === "light" ? "/brand/jetic-black.svg" : "/brand/jetic.svg";
+    }
   }, [theme]);
 
   const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));

@@ -42,12 +42,12 @@ interface TracesProps {
 
 const MC: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   GET: { bg: '#052e16', text: '#4ade80', border: '#166534', dot: '#34d399' },
-  POST: { bg: '#172554', text: '#60a5fa', border: '#1e40af', dot: '#60a5fa' },
+  POST: { bg: 'var(--bg-overlay-md)', text: 'var(--text-primary)', border: 'var(--border-md)', dot: 'var(--text-primary)' },
   PUT: { bg: '#422006', text: '#fbbf24', border: '#92400e', dot: '#fbbf24' },
   PATCH: { bg: '#431407', text: '#fb923c', border: '#9a3412', dot: '#fb923c' },
   DELETE: { bg: '#3f0000', text: '#f87171', border: '#991b1b', dot: '#f87171' },
-  HEAD: { bg: '#18181b', text: 'var(--text-muted)', border: 'var(--text-faint)', dot: 'var(--text-muted)' },
-  OPTIONS: { bg: '#2e1065', text: '#c084fc', border: '#6b21a8', dot: '#c084fc' },
+  HEAD: { bg: 'var(--bg-overlay-md)', text: 'var(--text-muted)', border: 'var(--text-faint)', dot: 'var(--text-muted)' },
+  OPTIONS: { bg: 'var(--bg-overlay-md)', text: 'var(--text-primary)', border: 'var(--border-md)', dot: 'var(--text-primary)' },
 };
 function mc(m: string) { return MC[m.toUpperCase()] ?? MC['GET']; }
 
@@ -57,7 +57,7 @@ function mc(m: string) { return MC[m.toUpperCase()] ?? MC['GET']; }
 function StepNode({ data }: { data: any }) {
   const s = mc(data.method);
   const statusColor = data.passed ? '#34d399' : '#f87171';
-  const borderColor = data.selected ? '#60a5fa'
+  const borderColor = data.selected ? 'var(--brand)'
     : data.passed === true ? '#166534'
       : data.passed === false ? '#991b1b'
         : 'var(--text-faint)';
@@ -71,7 +71,7 @@ function StepNode({ data }: { data: any }) {
         borderRadius: 10,
         background: 'var(--bg-surface)',
         cursor: 'pointer',
-        boxShadow: data.selected ? '0 0 0 2px rgba(96,165,250,0.4)' : '0 2px 12px rgba(0,0,0,0.4)',
+        boxShadow: data.selected ? '0 0 0 2px color-mix(in srgb, var(--brand) 40%, transparent)' : '0 2px 12px rgba(0,0,0,0.4)',
         transition: 'box-shadow 0.15s ease',
         overflow: 'hidden',
       }}
@@ -82,7 +82,7 @@ function StepNode({ data }: { data: any }) {
       <div style={{ background: s.bg, borderBottom: `1px solid ${s.border}`, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{
           fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
-          color: s.text, background: `${s.dot}15`, border: `1px solid ${s.dot}40`,
+          color: s.text, background: `color-mix(in srgb, ${s.dot} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${s.dot} 25%, transparent)`,
           borderRadius: 4, padding: '2px 6px',
         }}>
           {data.method}
@@ -124,8 +124,8 @@ function StepNode({ data }: { data: any }) {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
             {Object.entries(data.injectSpec).map(([header, varName]: any) => (
               <span key={header} style={{
-                fontSize: 9, color: '#a78bfa', background: 'rgba(167,139,250,0.08)',
-                border: '1px solid rgba(167,139,250,0.2)', borderRadius: 4, padding: '1px 5px',
+                fontSize: 9, color: 'var(--brand)', background: 'color-mix(in srgb, var(--brand) 8%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--brand) 20%, transparent)', borderRadius: 4, padding: '1px 5px',
               }}>
                 📥 {header} ← {'{{'}{varName}{'}}'}
               </span>
@@ -138,9 +138,9 @@ function StepNode({ data }: { data: any }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
             <span style={{
               fontSize: 9, fontWeight: 600,
-              color: data.conditionResult ? (data.conditionResult.passed ? '#c084fc' : '#fb923c') : '#c084fc',
-              background: data.conditionResult?.passed === false ? 'rgba(251,146,60,0.1)' : 'rgba(192,132,252,0.1)',
-              border: `1px solid ${data.conditionResult?.passed === false ? 'rgba(251,146,60,0.3)' : 'rgba(192,132,252,0.3)'}`,
+              color: data.conditionResult ? (data.conditionResult.passed ? 'var(--brand)' : '#fb923c') : 'var(--brand)',
+              background: data.conditionResult?.passed === false ? 'rgba(251,146,60,0.1)' : 'color-mix(in srgb, var(--brand) 10%, transparent)',
+              border: `1px solid ${data.conditionResult?.passed === false ? 'rgba(251,146,60,0.3)' : 'color-mix(in srgb, var(--brand) 30%, transparent)'}`,
               borderRadius: 4, padding: '1px 5px',
               display: 'flex', alignItems: 'center', gap: 3
             }}>
@@ -170,23 +170,23 @@ function MemoryNode({ data }: { data: any }) {
   return (
     <div style={{
       width: 200,
-      border: '1.5px solid rgba(167,139,250,0.35)',
+      border: '1.5px solid color-mix(in srgb, var(--brand) 35%, transparent)',
       borderRadius: 10,
-      background: 'rgba(139,92,246,0.07)',
+      background: 'color-mix(in srgb, var(--brand) 7%, transparent)',
       padding: '8px 12px',
       backdropFilter: 'blur(4px)',
     }}>
       <Handle type="target" position={Position.Top} style={{ background: 'transparent', border: 'none' }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-        <Database style={{ width: 12, height: 12, color: '#a78bfa' }} />
-        <span style={{ fontSize: 10, fontWeight: 600, color: '#a78bfa', letterSpacing: '0.06em' }}>MEMORY</span>
+        <Database style={{ width: 12, height: 12, color: 'var(--brand)' }} />
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--brand)', letterSpacing: '0.06em' }}>MEMORY</span>
       </div>
       {entries.length === 0 && (
         <span style={{ fontSize: 9, color: 'var(--text-faint)' }}>No variables captured</span>
       )}
       {entries.map(([key, val]: any) => (
         <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-          <span style={{ fontSize: 10, color: '#c4b5fd', fontFamily: 'monospace' }}>{key}</span>
+          <span style={{ fontSize: 10, color: 'var(--brand)', fontFamily: 'monospace' }}>{key}</span>
           <ArrowRight style={{ width: 10, height: 10, color: 'var(--text-faint)', flexShrink: 0 }} />
           <span style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
             {String(val).length > 20 ? String(val).slice(0, 20) + '…' : val}
@@ -202,10 +202,10 @@ function MemoryNode({ data }: { data: any }) {
 function StartNode({ data }: { data: any }) {
   return (
     <div style={{
-      width: 120, border: '1.5px solid rgba(96,165,250,0.4)', borderRadius: 20,
-      background: 'rgba(96,165,250,0.08)', padding: '7px 14px', textAlign: 'center',
+      width: 120, border: '1.5px solid color-mix(in srgb, var(--brand) 40%, transparent)', borderRadius: 20,
+      background: 'color-mix(in srgb, var(--brand) 8%, transparent)', padding: '7px 14px', textAlign: 'center',
     }}>
-      <span style={{ fontSize: 11, fontWeight: 600, color: '#60a5fa', letterSpacing: '0.05em' }}>
+      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--brand)', letterSpacing: '0.05em' }}>
         {data.label}
       </span>
       <Handle type="source" position={Position.Bottom} style={{ background: 'transparent', border: 'none' }} />
@@ -232,7 +232,7 @@ function EndNode({ data }: { data: any }) {
 function ConditionNode({ data }: { data: any }) {
   const passed = data.conditionResult?.passed;
   const color = passed === undefined
-    ? '#c084fc'
+    ? 'var(--brand)'
     : passed ? '#4ade80' : '#fb923c';
   return (
     <div style={{ width: 44, height: 44, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -309,7 +309,7 @@ function edgeBase(color: string, opts: Partial<{ dashed: boolean; width: number;
     },
     markerEnd: { type: MarkerType.ArrowClosed, color, width: 16, height: 16 },
     labelStyle: { fill: color, fontSize: 9, fontWeight: 600, fontFamily: 'monospace' },
-    labelBgStyle: opts.labelBg === false ? { fill: 'transparent' } : { fill: 'var(--bg-base, #0a0a0a)', fillOpacity: 0.9 },
+    labelBgStyle: opts.labelBg === false ? { fill: 'transparent' } : { fill: 'var(--bg-base)', fillOpacity: 0.9 },
     labelBgPadding: [4, 2] as [number, number],
     labelBgBorderRadius: 4,
   };
@@ -400,7 +400,7 @@ function buildGraph(trace: TraceRecord, selectedStep: number | null, onSelectSte
         id: `e-mem-${i}`,
         source: `step-${i}`,
         target: `mem-${i}`,
-        ...edgeBase('#a78bfa', { dashed: true, width: 1.2 }),
+        ...edgeBase('var(--brand)', { dashed: true, width: 1.2 }),
         label: 'capture',
       });
       y += MEM_H + Y_GAP;
@@ -409,7 +409,7 @@ function buildGraph(trace: TraceRecord, selectedStep: number | null, onSelectSte
 
     // Condition diamond node after step — this is the fork point of the tree
     if (hasCond) {
-      const condColor = step.conditionResult?.passed === false ? '#fb923c' : '#c084fc';
+      const condColor = step.conditionResult?.passed === false ? '#fb923c' : 'var(--brand)';
       const condY = y;
       nodes.push({
         id: `cond-${i}`,
@@ -459,7 +459,7 @@ function buildGraph(trace: TraceRecord, selectedStep: number | null, onSelectSte
             source: `branch-${i}`,
             sourceHandle: 'return',
             target: nextMainId,
-            ...edgeBase('#60a5fa', { dashed: true, width: 1.2, labelBg: true }),
+            ...edgeBase('var(--brand)', { dashed: true, width: 1.2, labelBg: true }),
             label: 'resume',
           });
         }
@@ -503,7 +503,7 @@ function buildGraph(trace: TraceRecord, selectedStep: number | null, onSelectSte
     style: {
       width: 2,
       height: y,
-      background: 'linear-gradient(to bottom, rgba(96,165,250,0.18), rgba(167,139,250,0.12), rgba(74,222,128,0.18))',
+      background: 'linear-gradient(to bottom, color-mix(in srgb, var(--brand) 18%, transparent), color-mix(in srgb, var(--brand) 12%, transparent), rgba(74,222,128,0.18))',
       border: 'none',
       borderRadius: 2,
       pointerEvents: 'none',
@@ -561,9 +561,9 @@ function TraceGraph({ trace, selectedStep, onSelectStep }: {
       <Controls className='theme-bg-surface border theme-border rounded-lg' showInteractive={false} />
       <MiniMap
         nodeColor={n => {
-          if (n.type === 'memory') return 'rgba(167,139,250,0.5)';
+          if (n.type === 'memory') return 'color-mix(in srgb, var(--brand) 50%, transparent)';
           if (n.type === 'branch') return 'rgba(251,146,60,0.5)';
-          if (n.type === 'start' || n.type === 'end') return 'rgba(96,165,250,0.5)';
+          if (n.type === 'start' || n.type === 'end') return 'color-mix(in srgb, var(--brand) 50%, transparent)';
           if (n.id === 'spine-rail') return 'transparent';
           return (n.data?.passed ? 'rgba(74,222,128,0.5)' : 'rgba(248,113,113,0.5)');
         }}
@@ -642,8 +642,8 @@ function StepDetailDrawer({ step, onClose }: { step: TraceRecord['steps'][number
             style={{
               flex: 1, padding: '8px 4px', fontSize: 10, fontWeight: 600,
               letterSpacing: '0.05em', textTransform: 'capitalize',
-              color: tab === t ? '#60a5fa' : 'var(--text-muted)',
-              borderBottom: tab === t ? '2px solid #60a5fa' : '2px solid transparent',
+              color: tab === t ? 'var(--brand)' : 'var(--text-muted)',
+              borderBottom: tab === t ? '2px solid var(--brand)' : '2px solid transparent',
               background: 'transparent', cursor: 'pointer',
               transition: 'color 0.15s',
             }}
@@ -665,7 +665,7 @@ function StepDetailDrawer({ step, onClose }: { step: TraceRecord['steps'][number
               {step.description && <KV k="Description" v={step.description} />}
             </Section>
             <Section title="Timing">
-              <KV k="Duration" v={`${step.durationMs}ms`} accent="#60a5fa" />
+              <KV k="Duration" v={`${step.durationMs}ms`} accent="var(--brand)" />
               {step.expectStatus && <KV k="Expected status" v={String(step.expectStatus)} />}
               <KV k="Actual status" v={step.status > 0 ? String(step.status) : 'No response'} accent={step.passed ? '#4ade80' : '#f87171'} />
             </Section>
@@ -691,7 +691,7 @@ function StepDetailDrawer({ step, onClose }: { step: TraceRecord['steps'][number
             {step.injectSpec && Object.keys(step.injectSpec).length > 0 && (
               <Section title="Variable injection spec">
                 {Object.entries(step.injectSpec).map(([header, varName]) => (
-                  <KV key={header} k={header} v={`← {{${varName}}}`} mono accent="#a78bfa" />
+                  <KV key={header} k={header} v={`← {{${varName}}}`} mono accent="var(--brand)" />
                 ))}
               </Section>
             )}
@@ -738,7 +738,7 @@ function StepDetailDrawer({ step, onClose }: { step: TraceRecord['steps'][number
             {step.captureSpec && Object.keys(step.captureSpec).length > 0 && (
               <Section title="Capture spec (JSONPath)">
                 {Object.entries(step.captureSpec).map(([varName, path]) => (
-                  <KV key={varName} k={varName} v={path} mono accent="#a78bfa" />
+                  <KV key={varName} k={varName} v={path} mono accent="var(--brand)" />
                 ))}
               </Section>
             )}
@@ -777,7 +777,7 @@ function StepDetailDrawer({ step, onClose }: { step: TraceRecord['steps'][number
                 <KV k="Logic mode" v={step.conditionSpec.rules.all ? 'AND (all rules must pass)' : 'OR (any rule can pass)'} />
                 <KV k="Failure action" v={step.conditionSpec.onFail} accent="#fb923c" />
                 {step.conditionSpec.switchToWorkflow && (
-                  <KV k="Switch workflow" v={step.conditionSpec.switchToWorkflow} mono accent="#60a5fa" />
+                  <KV k="Switch workflow" v={step.conditionSpec.switchToWorkflow} mono accent="var(--brand)" />
                 )}
                 {step.conditionSpec.returnOnComplete !== undefined && (
                   <KV k="Return on complete" v={step.conditionSpec.returnOnComplete ? 'Yes (resumes main workflow)' : 'No (permanent switch)'} />
@@ -785,8 +785,8 @@ function StepDetailDrawer({ step, onClose }: { step: TraceRecord['steps'][number
                 <div style={{ marginTop: 6 }}>
                   <p style={{ fontSize: 9, color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: 4 }}>Rules list</p>
                   {(step.conditionSpec.rules.all ?? step.conditionSpec.rules.any ?? []).map((r, idx) => (
-                    <div key={idx} style={{ fontSize: 10, color: '#c4b5fd', fontFamily: 'monospace', background: 'var(--bg-overlay)', padding: '4px 8px', borderRadius: 4, marginBottom: 3 }}>
-                      {r.left} <span style={{ color: '#a78bfa' }}>{r.operator}</span> {r.right !== undefined ? r.right : ''}
+                    <div key={idx} style={{ fontSize: 10, color: 'var(--brand)', fontFamily: 'monospace', background: 'var(--bg-overlay)', padding: '4px 8px', borderRadius: 4, marginBottom: 3 }}>
+                      {r.left} <span style={{ color: 'var(--brand)' }}>{r.operator}</span> {r.right !== undefined ? r.right : ''}
                     </div>
                   ))}
                 </div>
@@ -953,8 +953,8 @@ function TraceListItem({ trace, selected, onClick, onDelete }: {
         padding: '10px 14px',
         borderBottom: '1px solid var(--border)',
         cursor: 'pointer',
-        backgroundColor: selected ? 'rgba(96,165,250,0.06)' : 'transparent',
-        borderLeft: selected ? '3px solid #60a5fa' : '3px solid transparent',
+        backgroundColor: selected ? 'color-mix(in srgb, var(--brand) 6%, transparent)' : 'transparent',
+        borderLeft: selected ? '3px solid var(--brand)' : '3px solid transparent',
         transition: 'background 0.1s',
         position: 'relative',
       }}
@@ -989,7 +989,7 @@ function TraceListItem({ trace, selected, onClick, onDelete }: {
               {trace.source === 'local-sim' ? 'sim' : 'api'}
             </span>
             {trace.steps.some(s => s.conditionSpec || s.conditionResult) && (
-              <span style={{ fontSize: 9, color: '#c084fc', background: 'rgba(192,132,252,0.08)', border: '1px solid rgba(192,132,252,0.2)', borderRadius: 4, padding: '1px 5px', display: 'flex', alignItems: 'center', gap: 2 }}>
+              <span style={{ fontSize: 9, color: 'var(--brand)', background: 'color-mix(in srgb, var(--brand) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--brand) 20%, transparent)', borderRadius: 4, padding: '1px 5px', display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Diamond style={{ width: 8, height: 8 }} /> cond
               </span>
             )}
@@ -1018,10 +1018,10 @@ function EmptyList() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '40px 20px', textAlign: 'center' }}>
       <div style={{ position: 'relative', width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(96,165,250,0.1)', filter: 'blur(8px)' }} />
+        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'color-mix(in srgb, var(--brand) 10%, transparent)', filter: 'blur(8px)' }} />
         <div style={{
           position: 'relative', width: 52, height: 52, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)', color: '#60a5fa',
+          border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)', color: 'var(--brand)',
         }}>
           <Activity className="h-6 w-6" />
         </div>
@@ -1038,10 +1038,10 @@ function EmptyViewer() {
   return (
     <div style={{ display: 'flex', flex: 1, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, textAlign: 'center', padding: 32 }}>
       <div style={{ position: 'relative', width: 64, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(167,139,250,0.1)', filter: 'blur(12px)' }} />
+        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'color-mix(in srgb, var(--brand) 10%, transparent)', filter: 'blur(12px)' }} />
         <div style={{
           position: 'relative', width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)', color: '#a78bfa',
+          border: '1px solid var(--border)', backgroundColor: 'var(--bg-overlay)', color: 'var(--brand)',
         }}>
           <Code2 className="h-8 w-8" />
         </div>
@@ -1067,7 +1067,7 @@ function EmptyViewer() {
           ['Step detail drawer', 'Click any node to see full request/response bodies, headers, and capture specs'],
         ].map(([title, desc]) => (
           <div key={title} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            <span style={{ color: '#60a5fa', flexShrink: 0, marginTop: 1 }}>→</span>
+            <span style={{ color: 'var(--brand)', flexShrink: 0, marginTop: 1 }}>→</span>
             <div>
               <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)' }}>{title}</span>
               <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>{desc}</p>
@@ -1251,13 +1251,13 @@ export function Traces({ initialFilter, onNavigate }: TracesProps) {
           <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10 }}>
             <button
               onClick={() => onNavigate('simulations')}
-              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#60a5fa', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
             >
               <Diamond className="h-3 w-3" /> Simulations <ExternalLink className="h-2.5 w-2.5" />
             </button>
             <button
               onClick={() => onNavigate('model')}
-              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#60a5fa', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
             >
               <Layers2 className="h-3 w-3" /> Model <ExternalLink className="h-2.5 w-2.5" />
             </button>
