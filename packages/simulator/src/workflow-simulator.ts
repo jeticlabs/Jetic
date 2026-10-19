@@ -57,9 +57,13 @@ export interface WorkflowStepResult {
   method: string;
   path: string;
   targetUrl: string;
+  /** Final request URL including the query string, exactly as sent (absent for skipped steps). */
+  resolvedUrl?: string;
   expectedStatus: number;
   actualStatus: number;
   durationMs: number;
+  startedAt: string;
+  finishedAt: string;
   passed: boolean;
   /** True when the step was skipped due to a condition not matching. */
   skipped: boolean;
@@ -71,12 +75,25 @@ export interface WorkflowStepResult {
   conditionResult?: { evaluated: string; matched: boolean };
   /** Set when a rules condition did not hold: what the runner did about it. */
   conditionOutcome?: 'abort' | 'continue' | 'switch';
+  /** Headers actually sent — includes the default Content-Type and the real Bearer value. */
   requestHeaders: Record<string, string>;
   requestBody: Record<string, any>;
   requestQuery?: Record<string, any>;
   responseBody: any;
+  /** True when the persisted response body was truncated for storage (full body stays in memory during the run). */
+  responseBodyTruncated?: boolean;
+  responseHeaders?: Record<string, string>;
   capturedMemory: string[];
   error?: string;
+}
+
+/** Live progress snapshot handed to `onStepResult` after every recorded step. */
+export interface SimulationProgress {
+  totalSteps: number;
+  executedSteps: number;
+  passedSteps: number;
+  failedSteps: number;
+  skippedSteps: number;
 }
 
 export interface PreflightProbe {
@@ -113,7 +130,8 @@ export interface WorkflowSimulationResult {
   abortReason?: string;
 }
 
-const CONNECTION_ERROR_CODES = new Set([
+/** Error codes treated as "the target is unreachable" (aborts the run early). */
+export const CONNECTION_ERROR_CODES = new Set([
   'ECONNREFUSED',
   'ECONNRESET',
   'ENOTFOUND',
@@ -125,7 +143,7 @@ const CONNECTION_ERROR_CODES = new Set([
   'UND_ERR_SOCKET',
 ]);
 
-function networkErrorCode(error: any): string | undefined {
+export function networkErrorCode(error: any): string | undefined {
   const raw = error?.cause?.code ?? error?.cause?.errno ?? error?.code ?? error?.errno;
   return typeof raw === 'string' ? raw : undefined;
 }
@@ -156,6 +174,12 @@ export interface SimulateWorkflowOptions {
   preflightTimeoutMs?: number;
   /** Default per-request timeout in ms (default 30000; 0 disables). */
   requestTimeoutMs?: number;
+  /**
+   * Called after every recorded step (passed, failed or skipped) with the step result and a
+   * live progress snapshot. Hosts use this to persist incremental run state (poll-able via
+   * jetic_get_run). Callback failures are swallowed — telemetry must never fail a run.
+   */
+  onStepResult?: (step: WorkflowStepResult, progress: SimulationProgress) => void | Promise<void>;
 }
 
 export interface WorkflowSimulatorRuntime {
@@ -202,7 +226,7 @@ export class WorkflowSimulator {
     const preflightMode = options?.preflight ?? 'off';
     const preflight =
       preflightMode !== 'off' && workflow.steps.length > 0
-        ? await this.runPreflight(this.environment.baseUrl, options?.preflightTimeoutMs ?? 3000)
+        ? await probeTarget(this.environment.baseUrl, options?.preflightTimeoutMs ?? 3000)
         : undefined;
 
     if (preflight && preflightMode === 'abort' && preflight.verdict === 'unreachable') {
@@ -274,6 +298,24 @@ export class WorkflowSimulator {
     // Conditions are guards: a missing value should make the condition false, not fail the step.
     const resolve = (value: string) => this.resolveTemplateString(value, false);
 
+    // Every recorded step is pushed AND emitted to the host's progress callback so hosts can
+    // persist incremental state (poll-able while the run is still in progress).
+    const record = async (result: WorkflowStepResult) => {
+      state.results.push(result);
+      if (!options?.onStepResult) return;
+      try {
+        await options.onStepResult(result, {
+          totalSteps: workflow.steps.length,
+          executedSteps: state.results.length,
+          passedSteps: state.results.filter((r) => r.passed).length,
+          failedSteps: state.results.filter((r) => !r.passed).length,
+          skippedSteps: state.results.filter((r) => r.skipped).length,
+        });
+      } catch {
+        // Progress telemetry is best-effort — never fail a run because a host callback threw.
+      }
+    };
+
     for (let i = 0; i < workflow.steps.length; i++) {
       const step = workflow.steps[i];
       const stepStartTime = Date.now();
@@ -285,7 +327,7 @@ export class WorkflowSimulator {
       // unchecked and the workflow could report green.
       if (kind === 'invalid') {
         const reason = describeInvalidCondition(step.condition);
-        state.results.push({
+        await record({
           stepIndex: i + 1,
           name: stepName,
           method: step.method,
@@ -294,6 +336,8 @@ export class WorkflowSimulator {
           expectedStatus: step.expectStatus ?? 200,
           actualStatus: 0,
           durationMs: Date.now() - stepStartTime,
+          startedAt: new Date(stepStartTime).toISOString(),
+          finishedAt: new Date().toISOString(),
           passed: false,
           skipped: false,
           retryCount: 0,
@@ -313,7 +357,7 @@ export class WorkflowSimulator {
       if (kind === 'legacy') {
         const condResult = await evaluateLegacyCondition(step.condition as any, resolve);
         if (!condResult.matched) {
-          state.results.push({
+          await record({
             stepIndex: i + 1,
             name: stepName,
             method: step.method,
@@ -322,6 +366,8 @@ export class WorkflowSimulator {
             expectedStatus: step.expectStatus ?? 200,
             actualStatus: 0,
             durationMs: Date.now() - stepStartTime,
+            startedAt: new Date(stepStartTime).toISOString(),
+            finishedAt: new Date().toISOString(),
             passed: true,
             skipped: true,
             retryCount: 0,
@@ -352,7 +398,7 @@ export class WorkflowSimulator {
         resolvedPath = await this.resolvePathParams(step.path, finalBody);
         fullUrl = `${baseUrl.replace(/\/$/, '')}${resolvedPath}`;
       } catch (err: any) {
-        state.results.push({
+        await record({
           stepIndex: i + 1,
           name: stepName,
           method: step.method,
@@ -361,6 +407,8 @@ export class WorkflowSimulator {
           expectedStatus: step.expectStatus ?? 200,
           actualStatus: 0,
           durationMs: Date.now() - stepStartTime,
+          startedAt: new Date(stepStartTime).toISOString(),
+          finishedAt: new Date().toISOString(),
           passed: false,
           skipped: false,
           retryCount: 0,
@@ -376,6 +424,37 @@ export class WorkflowSimulator {
       }
       const expectedStatus = step.expectStatus ?? 200;
 
+      // ── Final request URL (with query string) ────────────────────────────
+      // Computed once here: it does not change between retry attempts.
+      let requestUrl = fullUrl;
+      {
+        const upperMethod = step.method.toUpperCase();
+        const bodyAsQuery = ['GET', 'HEAD'].includes(upperMethod) && Object.keys(finalBody).length > 0;
+        if (Object.keys(resolvedQuery).length > 0 || bodyAsQuery) {
+          const params = new URLSearchParams();
+          const append = (source: Record<string, any>) => {
+            for (const [k, v] of Object.entries(source)) {
+              if (v === undefined || v === null) continue;
+              if (Array.isArray(v)) {
+                for (const item of v) params.append(k, typeof item === 'object' ? JSON.stringify(item) : String(item));
+              } else {
+                params.append(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
+              }
+            }
+          };
+          append(resolvedQuery);
+          if (bodyAsQuery) append(finalBody);
+          const qs = params.toString();
+          if (qs) requestUrl = `${fullUrl}${fullUrl.includes('?') ? '&' : '?'}${qs}`;
+        }
+      }
+
+      // Headers actually sent on every attempt (default Content-Type + injections/Bearer).
+      const actualRequestHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...injectedHeaders,
+      };
+
       // ── Retry loop ────────────────────────────────────────────────────────
       // Per-step retry takes precedence over the workflow-level global default.
       const maxAttempts = Math.max(1, step.retry?.times ?? workflow.retry?.times ?? 1);
@@ -384,6 +463,7 @@ export class WorkflowSimulator {
       let attempts = 0;
       let responseStatus = 0;
       let responseBody: any = null;
+      let responseHeaders: Record<string, string> | undefined;
       let stepPassed = false;
       let errorMsg: string | undefined;
       let connectionCode: string | undefined;
@@ -395,6 +475,7 @@ export class WorkflowSimulator {
         }
         responseStatus = 0;
         responseBody = null;
+        responseHeaders = undefined;
         errorMsg = undefined;
         connectionCode = undefined;
 
@@ -403,7 +484,7 @@ export class WorkflowSimulator {
           const upperMethod = step.method.toUpperCase();
           const fetchOptions: RequestInit = {
             method: upperMethod,
-            headers: { 'Content-Type': 'application/json', ...injectedHeaders },
+            headers: actualRequestHeaders,
           };
 
           if (!['GET', 'HEAD'].includes(upperMethod) && Object.keys(finalBody).length > 0) {
@@ -413,28 +494,9 @@ export class WorkflowSimulator {
             fetchOptions.signal = AbortSignal.timeout(timeoutMs);
           }
 
-          let finalUrl = fullUrl;
-          const bodyAsQuery = ['GET', 'HEAD'].includes(upperMethod) && Object.keys(finalBody).length > 0;
-          if (Object.keys(resolvedQuery).length > 0 || bodyAsQuery) {
-            const params = new URLSearchParams();
-            const append = (source: Record<string, any>) => {
-              for (const [k, v] of Object.entries(source)) {
-                if (v === undefined || v === null) continue;
-                if (Array.isArray(v)) {
-                  for (const item of v) params.append(k, typeof item === 'object' ? JSON.stringify(item) : String(item));
-                } else {
-                  params.append(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
-                }
-              }
-            };
-            append(resolvedQuery);
-            if (bodyAsQuery) append(finalBody);
-            const qs = params.toString();
-            if (qs) finalUrl = `${fullUrl}${fullUrl.includes('?') ? '&' : '?'}${qs}`;
-          }
-
-          const resp = await fetch(finalUrl, fetchOptions);
+          const resp = await fetch(requestUrl, fetchOptions);
           responseStatus = resp.status;
+          responseHeaders = Object.fromEntries(resp.headers.entries());
 
           const ct = resp.headers.get('content-type') || '';
           if (ct.includes('application/json')) {
@@ -477,16 +539,20 @@ export class WorkflowSimulator {
         method: step.method,
         path: step.path,
         targetUrl: fullUrl,
+        resolvedUrl: requestUrl,
         expectedStatus,
         actualStatus: responseStatus,
         durationMs: Date.now() - stepStartTime,
+        startedAt: new Date(stepStartTime).toISOString(),
+        finishedAt: new Date().toISOString(),
         passed: stepPassed,
         skipped: false,
         retryCount: attempts - 1,
-        requestHeaders: injectedHeaders,
+        requestHeaders: actualRequestHeaders,
         requestBody: finalBody,
         ...(Object.keys(resolvedQuery).length > 0 ? { requestQuery: resolvedQuery } : {}),
         responseBody,
+        ...(responseHeaders ? { responseHeaders } : {}),
         capturedMemory: stepPassed ? [...inputCaptured, ...responseCaptured] : [...inputCaptured],
         ...(stepPassed
           ? {}
@@ -495,7 +561,7 @@ export class WorkflowSimulator {
               error: errorMsg,
             }),
       };
-      state.results.push(result);
+      await record(result);
 
       if (!stepPassed) {
         state.allPassed = false;
@@ -786,35 +852,41 @@ export class WorkflowSimulator {
     return result;
   }
 
-  private async runPreflight(baseUrl: string, timeoutMs: number): Promise<PreflightProbe> {
-    const probe: PreflightProbe = { url: baseUrl, verdict: 'unreachable', message: '', aborted: false };
-    try {
-      const resp = await fetch(baseUrl, {
-        method: 'GET',
-        redirect: 'manual',
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      probe.status = resp.status;
-      if (resp.status >= 500) {
-        probe.verdict = 'server-error';
-        probe.message = `Server is reachable at ${baseUrl} but responded HTTP ${resp.status} — the app is likely failing (database/init error). Check the server logs before simulating.`;
-      } else {
-        probe.verdict = 'healthy';
-        probe.message = `Server reachable at ${baseUrl} (HTTP ${resp.status}).`;
-      }
-    } catch (err: any) {
-      const code = networkErrorCode(err);
-      probe.status = undefined;
-      if (err?.name === 'TimeoutError' || code === 'ETIMEDOUT') {
-        probe.message = `No response from ${baseUrl} within ${timeoutMs}ms — the server may be down or hanging.`;
-      } else if (code === 'ECONNREFUSED') {
-        probe.message = `Connection refused at ${baseUrl} — nothing is listening there. Start the app (check its PORT/.env) and retry.`;
-      } else if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
-        probe.message = `DNS lookup failed for ${baseUrl}${code ? ` (${code})` : ''} — check the host name.`;
-      } else {
-        probe.message = `Cannot reach ${baseUrl}${code ? ` (${code})` : ''}: ${err?.message || err}`;
-      }
+}
+
+/**
+ * Probes a target base URL once and classifies the outcome (used by the MCP preflight option
+ * and by CLI runners before executing steps). Distinguishes "nothing listening" (ECONNREFUSED),
+ * DNS failures and timeouts so the caller gets a real diagnostic instead of N bogus fetch errors.
+ */
+export async function probeTarget(baseUrl: string, timeoutMs = 3000): Promise<PreflightProbe> {
+  const probe: PreflightProbe = { url: baseUrl, verdict: 'unreachable', message: '', aborted: false };
+  try {
+    const resp = await fetch(baseUrl, {
+      method: 'GET',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    probe.status = resp.status;
+    if (resp.status >= 500) {
+      probe.verdict = 'server-error';
+      probe.message = `Server is reachable at ${baseUrl} but responded HTTP ${resp.status} — the app is likely failing (database/init error). Check the server logs before simulating.`;
+    } else {
+      probe.verdict = 'healthy';
+      probe.message = `Server reachable at ${baseUrl} (HTTP ${resp.status}).`;
     }
-    return probe;
+  } catch (err: any) {
+    const code = networkErrorCode(err);
+    probe.status = undefined;
+    if (err?.name === 'TimeoutError' || code === 'ETIMEDOUT') {
+      probe.message = `No response from ${baseUrl} within ${timeoutMs}ms — the server may be down or hanging.`;
+    } else if (code === 'ECONNREFUSED') {
+      probe.message = `Connection refused at ${baseUrl} — nothing is listening there. Start the app (check its PORT/.env) and retry.`;
+    } else if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
+      probe.message = `DNS lookup failed for ${baseUrl}${code ? ` (${code})` : ''} — check the host name.`;
+    } else {
+      probe.message = `Cannot reach ${baseUrl}${code ? ` (${code})` : ''}: ${err?.message || err}`;
+    }
   }
+  return probe;
 }

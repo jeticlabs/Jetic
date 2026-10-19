@@ -5,6 +5,30 @@ import type { WorkflowSimulationResult, WorkflowStepResult } from '@jetic/simula
 
 export type SimulationRunStatus = 'passed' | 'failed' | 'aborted' | 'running' | 'error';
 
+export type RunStepStatus = 'pending' | 'passed' | 'failed' | 'skipped';
+
+/**
+ * One line of live run progress. Present in the status file from the moment the run starts
+ * (status 'pending' for the planned steps) and updated as steps complete — this is what
+ * jetic_get_run polls while the simulation is still running.
+ */
+export interface RunStepProgress {
+  index: number;
+  name: string;
+  method: string;
+  path: string;
+  status: RunStepStatus;
+  expectedStatus?: number;
+  actualStatus?: number;
+  passed?: boolean;
+  skipped?: boolean;
+  retryCount?: number;
+  durationMs?: number;
+  startedAt?: string;
+  finishedAt?: string;
+  error?: string;
+}
+
 export interface SimulationRunStatusFile {
   type: 'simulation';
   runId: string;
@@ -23,6 +47,8 @@ export interface SimulationRunStatusFile {
     failedSteps: number;
     skippedSteps: number;
   };
+  /** Per-step progress — updated incrementally after every step completes. */
+  steps?: RunStepProgress[];
   reportPath: string;
 }
 
@@ -67,6 +93,70 @@ export function deriveRunStatus(result: WorkflowSimulationResult): SimulationRun
   return 'failed';
 }
 
+/** Projects a simulator step result onto the lightweight progress line stored in the status file. */
+export function stepToProgress(r: WorkflowStepResult): RunStepProgress {
+  return {
+    index: r.stepIndex,
+    name: r.name,
+    method: r.method,
+    path: r.path,
+    status: r.skipped ? 'skipped' : r.passed ? 'passed' : 'failed',
+    expectedStatus: r.expectedStatus,
+    ...(r.skipped ? {} : { actualStatus: r.actualStatus }),
+    passed: r.passed,
+    skipped: r.skipped,
+    ...(r.retryCount > 0 ? { retryCount: r.retryCount } : {}),
+    durationMs: r.durationMs,
+    startedAt: r.startedAt,
+    finishedAt: r.finishedAt,
+    ...(r.error ? { error: r.error } : {}),
+  };
+}
+
+/** Recomputes the stats block from the progress lines (pending steps count towards totals only). */
+export function statsFromSteps(steps: RunStepProgress[]) {
+  const completed = steps.filter((s) => s.status !== 'pending');
+  return {
+    totalSteps: steps.length,
+    executedSteps: completed.length,
+    passedSteps: completed.filter((s) => s.status === 'passed' || s.status === 'skipped').length,
+    failedSteps: completed.filter((s) => s.status === 'failed').length,
+    skippedSteps: completed.filter((s) => s.status === 'skipped').length,
+  };
+}
+
+/**
+ * Max characters of a single persisted response body. Bodies above this are stored as a
+ * truncated preview with a flag — the run report is meant to be readable (and pollable via
+ * jetic_get_run), not a data dump.
+ */
+export const MAX_PERSISTED_BODY_CHARS = 16_384;
+
+/**
+ * Deep-clones a simulation result and truncates oversized response bodies so the persisted
+ * report stays small and curl-readable. Captures into memory already happened before this.
+ */
+export function truncateResultForStorage(
+  result: WorkflowSimulationResult,
+  maxChars = MAX_PERSISTED_BODY_CHARS
+): WorkflowSimulationResult {
+  const clone: WorkflowSimulationResult = JSON.parse(JSON.stringify(result));
+  for (const step of clone.results) {
+    if (step.responseBody === undefined || step.responseBody === null) continue;
+    const serialized =
+      typeof step.responseBody === 'string' ? step.responseBody : JSON.stringify(step.responseBody);
+    if (serialized.length <= maxChars) continue;
+
+    const removed = serialized.length - maxChars;
+    step.responseBody =
+      typeof step.responseBody === 'string'
+        ? `${step.responseBody.slice(0, maxChars)}\n…[truncated: ${removed} more characters]`
+        : { _truncated: true, preview: serialized.slice(0, maxChars), fullLengthChars: serialized.length };
+    step.responseBodyTruncated = true;
+  }
+  return clone;
+}
+
 /**
  * Persists a finished simulation run: full report + compact status file.
  * Returns the run's directory and report path.
@@ -91,7 +181,7 @@ export function writeSimulationRun(
     startedAt: meta.startedAt,
     finishedAt: meta.finishedAt,
     durationMs,
-    result,
+    result: truncateResultForStorage(result),
   };
   const rPath = reportPath(jeticDir, runId);
   writeJsonSync(rPath, report);
@@ -114,6 +204,7 @@ export function writeSimulationRun(
       failedSteps: result.stats?.failedSteps ?? 0,
       skippedSteps: result.results.filter((r) => r.skipped).length,
     },
+    steps: result.results.map(stepToProgress),
     reportPath: rPath,
   };
   writeJsonSync(sPath, statusDoc);
@@ -130,12 +221,28 @@ export function readRunStatus(jeticDir: string, runId: string): SimulationRunSta
   return readJsonSync<SimulationRunStatusFile>(statusPath(jeticDir, runId));
 }
 
-/** Marks a run as started (used by async simulation before the first response). */
+/**
+ * Marks a run as started (used by async simulation before the first response).
+ * Planned steps are seeded as `pending` so jetic_get_run can show the full route immediately.
+ */
 export function writeRunningStatus(
   jeticDir: string,
   runId: string,
-  meta: { workflowName: string; environment: string; baseUrl: string; startedAt: string }
+  meta: {
+    workflowName: string;
+    environment: string;
+    baseUrl: string;
+    startedAt: string;
+    steps?: Array<{ name: string; method: string; path: string }>;
+  }
 ): void {
+  const steps: RunStepProgress[] | undefined = meta.steps?.map((s, i) => ({
+    index: i + 1,
+    name: s.name,
+    method: s.method,
+    path: s.path,
+    status: 'pending' as const,
+  }));
   const doc: SimulationRunStatusFile = {
     type: 'simulation',
     runId,
@@ -144,9 +251,31 @@ export function writeRunningStatus(
     baseUrl: meta.baseUrl,
     status: 'running',
     startedAt: meta.startedAt,
-    stats: { totalSteps: 0, executedSteps: 0, passedSteps: 0, failedSteps: 0, skippedSteps: 0 },
+    stats: {
+      totalSteps: steps?.length ?? 0,
+      executedSteps: 0,
+      passedSteps: 0,
+      failedSteps: 0,
+      skippedSteps: 0,
+    },
+    ...(steps ? { steps } : {}),
     reportPath: reportPath(jeticDir, runId),
   };
+  writeJsonSync(statusPath(jeticDir, runId), doc);
+}
+
+/**
+ * Read-modify-write of the status file while a run is in progress. Used by the simulator's
+ * onStepResult callback to persist per-step progress. No-op when the file is gone.
+ */
+export function updateRunStatus(
+  jeticDir: string,
+  runId: string,
+  update: (doc: SimulationRunStatusFile) => void
+): void {
+  const doc = readJsonSync<SimulationRunStatusFile>(statusPath(jeticDir, runId));
+  if (!doc) return;
+  update(doc);
   writeJsonSync(statusPath(jeticDir, runId), doc);
 }
 

@@ -92,6 +92,21 @@ describe('Tier 2 — jetic simulate workflow', () => {
     const trace = project.readJson('.jetic', 'traces', traces[0]);
     expect(trace).toMatchObject({ workflowName: 'happy-checkout', passed: 4, failed: 0, baseUrl: api.url });
     expect(trace.steps.map((s: any) => s.name)).toEqual(['Register', 'Login', 'Create order', 'Get order']);
+
+    // The persisted step payloads are curl-complete: resolved URL, real headers (actual Bearer),
+    // response headers/status — and the request body holds resolved values, not {{templates}}.
+    const login = trace.steps[1];
+    expect(JSON.stringify(login.requestBody)).not.toContain('{{');
+    expect(login.requestBody.email).toContain('@');
+    expect(login.resolvedUrl).toBe(`${api.url}/api/auth/login`);
+    expect(login.requestHeaders['Content-Type']).toBe('application/json');
+    expect(login.responseHeaders['content-type']).toContain('application/json');
+    expect(login.responseStatus).toBe(200);
+    expect(Date.parse(login.startedAt)).toBeLessThanOrEqual(Date.parse(login.finishedAt));
+
+    const getOrder = trace.steps[3];
+    expect(getOrder.resolvedUrl).toContain(`/api/orders/ord_`); // path param filled from memory
+    expect(getOrder.requestHeaders.Authorization).toMatch(/^Bearer tok_/);
   });
 
   test('SMK-203 a negative workflow passes when the API refuses, and a broken one fails', async () => {

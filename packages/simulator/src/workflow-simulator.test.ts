@@ -360,6 +360,77 @@ describe('WorkflowSimulator', () => {
     });
   });
 
+  describe('per-step payload capture & progress', () => {
+    it('records the resolved URL, the headers actually sent and the response headers', async () => {
+      const result = await sim.simulateWorkflow(
+        workflow('trace', [
+          { ...login, capture: { 'workflow:token': 'data.token' } },
+          {
+            name: 'Me',
+            method: 'GET',
+            path: '/me',
+            query: { q: 'x y' },
+            inject: { 'header:Authorization': '{{workflow:token}}' },
+          },
+        ])
+      );
+
+      expect(result.success).toBe(true);
+      const step = result.results[1];
+      expect(step.resolvedUrl).toBe(`${stub.baseUrl}/me?q=x+y`);
+      expect(step.requestHeaders).toMatchObject({
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer tok_seeded',
+      });
+      expect(step.responseHeaders?.['content-type']).toContain('application/json');
+      expect(Date.parse(step.startedAt)).toBeLessThanOrEqual(Date.parse(step.finishedAt));
+    });
+
+    it('onStepResult fires after every recorded step (passed, skipped, failed) with live progress', async () => {
+      const seen: Array<{ name: string; status: string; executed: number; total: number }> = [];
+      const result = await sim.simulateWorkflow(
+        workflow('progress', [
+          login,
+          { name: 'Admin', method: 'GET', path: '/admin', condition: { if: '{{workflow:role}}', equals: 'admin' } },
+          { name: 'Missing', method: 'GET', path: '/missing', onFailure: 'continue' },
+          { name: 'Me', method: 'GET', path: '/me' },
+        ]),
+        {
+          onStepResult: (step, progress) => {
+            seen.push({
+              name: step.name,
+              status: step.skipped ? 'skipped' : step.passed ? 'passed' : 'failed',
+              executed: progress.executedSteps,
+              total: progress.totalSteps,
+            });
+          },
+        }
+      );
+
+      expect(result.success).toBe(false); // /missing 404 fails the run, but onFailure "continue" keeps going
+      expect(seen).toEqual([
+        { name: 'Login', status: 'passed', executed: 1, total: 4 },
+        { name: 'Admin', status: 'skipped', executed: 2, total: 4 },
+        { name: 'Missing', status: 'failed', executed: 3, total: 4 },
+        { name: 'Me', status: 'passed', executed: 4, total: 4 },
+      ]);
+    });
+
+    it('a throwing onStepResult callback never fails the run (telemetry is best-effort)', async () => {
+      const result = await sim.simulateWorkflow(
+        workflow('cb', [{ name: 'Ok', method: 'GET', path: '/ok' }]),
+        {
+          onStepResult: () => {
+            throw new Error('host callback broke');
+          },
+        }
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.results[0].passed).toBe(true);
+    });
+  });
+
   describe('resilience', () => {
     it('preflight aborts before step 1 when nothing is listening', async () => {
       const dead = new WorkflowSimulator(

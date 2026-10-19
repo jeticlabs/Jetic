@@ -666,6 +666,8 @@ function StepDetailDrawer({ step, onClose }: { step: TraceRecord['steps'][number
             </Section>
             <Section title="Timing">
               <KV k="Duration" v={`${step.durationMs}ms`} accent="var(--brand)" />
+              {step.startedAt && <KV k="Started" v={new Date(step.startedAt).toLocaleTimeString()} />}
+              {step.finishedAt && <KV k="Finished" v={new Date(step.finishedAt).toLocaleTimeString()} />}
               {step.expectStatus && <KV k="Expected status" v={String(step.expectStatus)} />}
               <KV k="Actual status" v={step.status > 0 ? String(step.status) : 'No response'} accent={step.passed ? '#4ade80' : '#f87171'} />
             </Section>
@@ -681,12 +683,25 @@ function StepDetailDrawer({ step, onClose }: { step: TraceRecord['steps'][number
 
         {tab === 'request' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {Object.keys(step.injected ?? {}).length > 0 && (
-              <Section title="Headers (injected)">
-                {Object.entries(step.injected ?? {}).map(([k, v]) => (
+            {step.resolvedUrl && (
+              <Section title="Request URL">
+                <KV k={step.method} v={step.resolvedUrl} mono />
+              </Section>
+            )}
+            {step.requestHeaders && Object.keys(step.requestHeaders).length > 0 ? (
+              <Section title="Headers (sent)">
+                {Object.entries(step.requestHeaders).map(([k, v]) => (
                   <KV key={k} k={k} v={String(v)} mono />
                 ))}
               </Section>
+            ) : (
+              Object.keys(step.injected ?? {}).length > 0 && (
+                <Section title="Headers (injected)">
+                  {Object.entries(step.injected ?? {}).map(([k, v]) => (
+                    <KV key={k} k={k} v={String(v)} mono />
+                  ))}
+                </Section>
+              )
             )}
             {step.injectSpec && Object.keys(step.injectSpec).length > 0 && (
               <Section title="Variable injection spec">
@@ -714,8 +729,15 @@ function StepDetailDrawer({ step, onClose }: { step: TraceRecord['steps'][number
 
         {tab === 'response' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {step.responseHeaders && Object.keys(step.responseHeaders).length > 0 && (
+              <Section title="Response headers">
+                {Object.entries(step.responseHeaders).map(([k, v]) => (
+                  <KV key={k} k={k} v={String(v)} mono />
+                ))}
+              </Section>
+            )}
             {step.responseBody !== undefined ? (
-              <Section title={`Response body · HTTP ${step.status}`}>
+              <Section title={`Response body · HTTP ${step.responseStatus ?? step.status}`}>
                 <pre style={{
                   fontSize: 10, color: 'var(--text-secondary)', fontFamily: 'monospace',
                   background: 'var(--bg-overlay)', border: '1px solid var(--border)',

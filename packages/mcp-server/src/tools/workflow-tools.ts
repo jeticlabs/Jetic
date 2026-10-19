@@ -8,6 +8,9 @@ import {
   compactSimulationResult,
   deriveRunStatus,
   newRunId,
+  statsFromSteps,
+  stepToProgress,
+  updateRunStatus,
   writeRunError,
   writeRunningStatus,
   writeSimulationRun,
@@ -270,11 +273,17 @@ export async function handleSimulateWorkflow(args: z.infer<typeof simulateWorkfl
 
   const runId = newRunId();
   const startedAt = new Date().toISOString();
+  const plannedSteps = workflowDef.steps.map((s) => ({
+    name: s.name || `${s.method} ${s.path}`,
+    method: s.method,
+    path: s.path,
+  }));
   const runMeta = {
     workflowName: workflowDef.name || selectedItem.name,
     environment: effectiveEnv.name,
     baseUrl: effectiveEnv.baseUrl,
     startedAt,
+    steps: plannedSteps,
   };
 
   const execute = async () => {
@@ -284,6 +293,17 @@ export async function handleSimulateWorkflow(args: z.infer<typeof simulateWorkfl
       strictTemplates: args.strictTemplates ?? true,
       preflight: args.preflight ?? 'abort',
       requestTimeoutMs: args.requestTimeoutMs ?? 30000,
+      // Persist per-step progress so jetic_get_run can be polled while the run is in flight.
+      onStepResult: (step) => {
+        updateRunStatus(jeticDir, runId, (doc) => {
+          if (!doc.steps) doc.steps = [];
+          const progress = stepToProgress(step);
+          const at = doc.steps.findIndex((s) => s.index === step.stepIndex && s.name === step.name);
+          if (at >= 0) doc.steps[at] = progress;
+          else doc.steps.push(progress);
+          doc.stats = statsFromSteps(doc.steps);
+        });
+      },
     });
     const finishedAt = new Date().toISOString();
     const { reportPath } = writeSimulationRun(jeticDir, runId, result, {

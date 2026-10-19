@@ -3,6 +3,7 @@ export { DataGenerator } from './data-generator';
 export { ResponseValidator, ValidationResult, FieldValidation } from './response-validator';
 export {
   WorkflowSimulator, WorkflowDef, WorkflowStepDef, WorkflowStepResult, WorkflowSimulationResult,
-  SimulateWorkflowOptions, WorkflowSimulatorRuntime,
+  SimulateWorkflowOptions, WorkflowSimulatorRuntime, SimulationProgress, PreflightProbe,
+  probeTarget, networkErrorCode, CONNECTION_ERROR_CODES,
 } from './workflow-simulator';
 export * from './conditions';

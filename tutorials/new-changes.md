@@ -1,4 +1,4 @@
-# New Changes — WS1 + WS2 ("Stop silently wrong requests" + "Fail fast & observe everything")
+# New Changes — WS1 + WS2 + WS3 ("Stop silently wrong requests" + "Fail fast & observe everything" + "Complete run observability")
 
 This document describes the changes implemented in this work cycle. They came out of real
 usage feedback (`feedback/user-1.md`): an AI agent driving Jetic over MCP kept producing
@@ -6,12 +6,19 @@ workflows that *silently sent wrong requests* (empty Authorization headers, unre
 templates, empty path params) and the failure/observability experience was weak (violations
 only visible after the whole journey ran, no run persistence, giant tool outputs).
 
-Two workstreams were implemented:
+A second feedback round (`feedback/user_2.md`) showed the run model still fell short for
+debugging: a running run exposed no per-step progress and stored reports lacked the actual
+requests that were sent (WS3, see [section 8](#8-ws3--complete-run-observability)).
+
+Three workstreams were implemented:
 
 - **WS1 — Never send a silently wrong request.** Fix the request-building and validation
   pipeline so mistakes fail loudly and locally instead of hitting the server wrong.
 - **WS2 — Fail fast, observe everything.** Preflight + early abort, timeouts, run
   persistence, compact tool outputs, async runs, and run-inspection tools.
+- **WS3 — Complete run observability.** Per-step payload capture (curl-style), live
+  `pending → passed/failed` progress while a run is in flight, capped-but-complete stored
+  bodies, and distinct connection diagnostics everywhere (MCP + CLI + dashboard).
 
 ---
 
@@ -24,6 +31,7 @@ Two workstreams were implemented:
 5. [Defaults & compatibility](#5-defaults--compatibility)
 6. [File map](#6-file-map)
 7. [Verification](#7-verification)
+8. [WS3 — Complete run observability](#8-ws3--complete-run-observability)
 
 ---
 
@@ -46,6 +54,10 @@ Two workstreams were implemented:
 | Run persistence | None | Every run saved to `.jetic/runs/<runId>/` (report + status file) |
 | Run inspection | None | `jetic_get_run`, `jetic_list_runs` |
 | Long runs | Block until finished | `async: true` returns a `runId` immediately; poll with `jetic_get_run` |
+| Stored step detail (WS3) | Step name/status/timing only | Full curl-style payload per step: `resolvedUrl`, `requestHeaders` (actual sent set), `requestBody`, `responseStatus`, `responseHeaders`, `responseBody` (capped), `startedAt`/`finishedAt` |
+| Polling detail (WS3) | Status file said `running` — no step info | `jetic_get_run` shows the planned route with per-step `pending → passed/failed/skipped` while it runs |
+| Unreachable backend (WS3) | "fetch failed" per step (×N) | One classified preflight abort (`ECONNREFUSED`/`ENOTFOUND`/…); runs report `status: 'aborted'`, `executedSteps: 0` |
+| CLI trace payloads (WS3) | Names + statuses | Full resolved request/response payloads incl. actual `Authorization`, final URL, response headers, connection-error flag |
 
 ---
 
@@ -278,27 +290,118 @@ Compatibility notes:
 
 | File | What changed |
 |---|---|
-| `packages/simulator/src/workflow-simulator.ts` | Bearer prefix; strict/deep templates; brace-aware `findPlaceholders`; faker guardrails; `query`; path-param sources; `timeoutMs`; preflight; early abort (`UND_ERR_SOCKET`); `WorkflowStepDef` additions |
-| `packages/simulator/src/workflow-simulator.test.ts` | New `request building` + `resilience` suites (Bearer, strict templates, faker, path/query, preflight, timeouts, mid-run drop) |
+| `packages/simulator/src/workflow-simulator.ts` | Bearer prefix; strict/deep templates; brace-aware `findPlaceholders`; faker guardrails; `query`; path-param sources; `timeoutMs`; preflight; early abort (`UND_ERR_SOCKET`); `WorkflowStepDef` additions; WS3: per-step payload fields (`resolvedUrl`, `requestHeaders`, `responseHeaders`, `startedAt`/`finishedAt`), `onStepResult`, standalone `probeTarget`/`networkErrorCode`/`CONNECTION_ERROR_CODES` |
+| `packages/simulator/src/workflow-simulator.test.ts` | New `request building` + `resilience` suites (Bearer, strict templates, faker, path/query, preflight, timeouts, mid-run drop); WS3: `per-step payload capture & progress` suite |
 | `packages/mcp-server/src/tools/workflow-authoring-tools.ts` | Validator: query/GET-body/faker/path-param rules, brace-aware refs, `CONTINUE_WITH_CAPTURE` conditional; schema: `query`, `timeoutMs` |
 | `packages/mcp-server/src/tools/workflow-step-validation.test.ts` | New unit tests for the above (+ KG-31 path-param sources) |
 | `packages/mcp-server/src/tools/workflow-designer-tools.ts` | Scaffold: path `:param` mapping + query param emission |
 | `packages/mcp-server/src/response-envelope.ts` (+ test) | Real error messages, 500-char cap, custom hints, zod issue summaries |
-| `packages/mcp-server/src/run-store.ts` | New: run persistence, status files, list, compact result |
-| `packages/mcp-server/src/tools/run-tools.ts` | New: `jetic_get_run`, `jetic_list_runs` |
-| `packages/mcp-server/src/tools/workflow-tools.ts` | Simulate schema (`includeStepResults`, `async`, `preflight`, `strictTemplates`, `requestTimeoutMs`) + run persistence/compact/async handler |
+| `packages/mcp-server/src/run-store.ts` | New: run persistence, status files, list, compact result; WS3: planned-step seeding (`pending`), `updateRunStatus`/`stepToProgress`/`statsFromSteps`, 16,384-char body truncation |
+| `packages/mcp-server/src/run-store.test.ts` | New (WS3): pending seeding, incremental updates, truncation, step projections |
+| `packages/mcp-server/src/tools/run-tools.ts` | New: `jetic_get_run`, `jetic_list_runs`; WS3: uniform top-level `steps` for running + finished runs |
+| `packages/mcp-server/src/tools/workflow-tools.ts` | Simulate schema (`includeStepResults`, `async`, `preflight`, `strictTemplates`, `requestTimeoutMs`) + run persistence/compact/async handler; WS3: `onStepResult` → live step progress |
 | `packages/mcp-server/src/server.ts` | Tool registration (26), STEP 4g instructions, run tools |
+| `apps/cli/src/commands/simulate-workflow.ts` | WS3: deep template resolution, Bearer auto-prefix, `probeTarget` health check, 30 s timeouts, per-step payload capture in results + traces, connection-error early abort |
+| `apps/dashboard/src/lib/traceStore.ts` + `apps/dashboard/src/pages/Observability/Traces.tsx` | WS3: trace type extended; drawer shows sent headers, request URL, response headers/status, started/finished |
 | `tests/smoke/specs/t4-mcp-model.smoke.ts` | Catalog 24 → 26 tools; KG-08 converted to a normal test |
-| `tests/smoke/specs/t4-mcp-workflows.smoke.ts` | SMK-408b–e rewritten/added: `includeStepResults`, compact aliases, preflight abort, async + polling + persistence; KG-31 converted to a normal test |
+| `tests/smoke/specs/t4-mcp-workflows.smoke.ts` | SMK-408b–e rewritten/added; WS3: SMK-408f (pollable progress + curl-style stored payloads); KG-31 converted to a normal test |
+| `tests/smoke/specs/t2-workflows.smoke.ts` | WS3: SMK-202 also asserts the trace's resolved request/response payloads |
 
 ---
 
 ## 7. Verification
 
-- Unit tests (`pnpm test`, all workspaces): scanner 5, simulator 68 (incl. new request
-  building/resilience suites), mcp-server 31 (envelope + condition validation + step
-  validation), cli 4 — all green.
-- Full smoke suite (`pnpm --filter @jetic/smoke run smoke`): 17 suites, 161 passed,
+- Unit tests (`pnpm test`, all workspaces): scanner 5, simulator 71 (incl. new request
+  building/resilience and per-step payload/progress suites), mcp-server 35 (envelope +
+  condition validation + step validation + run-store), cli 4 — all green.
+- Full smoke suite (`pnpm --filter @jetic/smoke run smoke`): 17 suites, 162 passed,
   6 skipped (pre-existing parity-vector skips), 0 failed.
 - `pnpm build`: all 19 workspace projects build (mcp-server via `tsc`, CLI via `tsup`,
   dashboard bundled into the CLI dist).
+
+---
+
+## 8. WS3 — Complete run observability
+
+A second feedback round (`feedback/user_2.md`) drove this: the async run + run-store added in
+WS2 gave a `runId` and a status, but a *running* run exposed no per-step progress, and the
+stored report only had step names/statuses/timing — not the actual requests that were sent.
+Debugging a failed journey still required re-running it.
+
+### 8.1 Per-step payload capture (`packages/simulator`)
+
+`WorkflowStepResult` now carries the complete curl-style picture for every step:
+
+| Field | Meaning |
+|---|---|
+| `resolvedUrl` | Final URL **including query string** (what was actually fetched, retry-stable) |
+| `requestHeaders` | The actual sent header set: `Content-Type` + every injected header (`Authorization` holds the real Bearer value) — not the injection spec |
+| `requestBody` | The resolved request body (templates already substituted) |
+| `responseStatus` / `responseHeaders` | HTTP status + full response header map |
+| `responseBody` | Parsed response body (uncapped in memory) |
+| `startedAt` / `finishedAt` | ISO timestamps per attempt (the recorded attempt, not wall-clock wander) |
+| `responseBodyTruncated` | Present (`true`) when a persistence layer capped the body |
+
+A new `onStepResult` callback (`SimulateWorkflowOptions`) fires after **every** recorded step —
+passed, failed, or skipped — so hosts can persist progress incrementally. Callback errors are
+swallowed on purpose: a broken observer must never fail a run.
+
+### 8.2 Incremental progress in the run store (`packages/mcp-server/src/run-store.ts`)
+
+- When an async run starts, the `running` status file is now **seeded with the planned route**:
+  every step as `{ index, name, status: 'pending' }`.
+- Each completed step updates its entry in place (`updateRunStatus`, read-modify-write), so a
+  poll of `jetic_get_run` shows a live `pending → passed/failed/skipped` progression plus
+  recomputed stats (`statsFromSteps`).
+- Finished runs expose the same uniform top-level `steps` array (derived via
+  `stepToProgress`), so clients can read one shape for both states.
+- Report bodies are capped at persistence time: `MAX_PERSISTED_BODY_CHARS = 16_384`. A long
+  string body is sliced with a `…[truncated: N more characters]` marker; a structured body is
+  stored as `{ _truncated: true, preview, fullLengthChars }`; both set
+  `responseBodyTruncated: true`. The in-memory result stays complete — only the stored files
+  are capped.
+
+### 8.3 Distinct connection diagnostics (`probeTarget`, `networkErrorCode`)
+
+- `probeTarget(baseUrl, timeoutMs)` is now an exported standalone preflight probe returning
+  `{ verdict: 'healthy' | 'server-error' | 'unreachable', status?, message, code? }` with the
+  real network error code (`ECONNREFUSED`, `ENOTFOUND`, `ETIMEDOUT`, `UND_ERR_SOCKET`, …).
+- `CONNECTION_ERROR_CODES` + `networkErrorCode(err)` are exported so hosts can classify the
+  same way. An unreachable backend is one clear abort reason — not N identical
+  "fetch failed" step failures.
+
+### 8.4 CLI parity (`apps/cli/src/commands/simulate-workflow.ts`)
+
+The CLI runner had drifted from the library simulator; it now matches:
+
+- **Deep template resolution** — arrays/objects nested in `body` are resolved, not just
+  top-level strings (`resolveDeepValue`/`resolveBodyTemplates`).
+- **Bearer auto-prefix** — raw `Authorization` values get `Bearer ` (explicit schemes pass
+  through), exactly like the simulator rule.
+- **`probeTarget` health check** — unreachable → abort with exit 1 and the classified reason;
+  `server-error` → warn and continue; healthy → proceed.
+- **Enriched step results + traces** — `StepResult` and the stored trace
+  (`.jetic/traces/trace_<id>.json`) now include `requestHeaders` (actual), `requestBody`
+  (resolved) + `requestBodySpec`, `resolvedUrl`, `responseStatus`, `responseHeaders`,
+  `startedAt`/`finishedAt`, `connectionError`; response bodies are capped at the same 16,384
+  chars. Per-request timeout: 30 s (`AbortSignal.timeout`), and a connection error aborts the
+  remaining steps immediately.
+
+### 8.5 Dashboard trace viewer (`apps/dashboard`)
+
+`StepDetailDrawer` renders the new fields: Request **URL** + **Headers (sent)** (falling back
+to the injected spec for old traces), **Response headers**, the step's `responseStatus`, and
+**Started/Finished** timestamps in the Timing section.
+
+### 8.6 Tests
+
+- `packages/simulator/src/workflow-simulator.test.ts` — new "per-step payload capture &
+  progress" suite: payload fields (URL/headers/timestamps), `onStepResult` fire order incl.
+  skipped and `onFailure: 'continue'` steps, and a throwing callback never failing the run.
+- `packages/mcp-server/src/run-store.test.ts` (new) — pending-step seeding + incremental
+  updates, no-op updates on a missing file, truncation + final status steps, `stepToProgress`
+  projections.
+- Smoke: `SMK-408f` (async run is pollable; first poll shows the 4-step plan; finished report
+  steps carry `resolvedUrl`, real `Bearer` values, response headers, timestamps) and extended
+  `SMK-202` (CLI trace payload assertions: resolved body, no `{{templates}}`, response
+  status/headers, actual `Authorization`).

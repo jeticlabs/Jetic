@@ -13,6 +13,9 @@ import {
   evaluateLegacyCondition,
   evaluateRules,
   isRulesCondition,
+  probeTarget,
+  networkErrorCode,
+  CONNECTION_ERROR_CODES,
 } from '@jetic/simulator';
 import { faker } from '@faker-js/faker';
 
@@ -133,6 +136,21 @@ function deepGet(obj: any, dotPath: string): any {
   return current;
 }
 
+// ─── Trace body truncation ────────────────────────────────────────────────────
+// Persisted traces are meant to be readable (curl-like), not data dumps: oversized
+// response bodies are stored as a truncated preview with a marker.
+
+const TRACE_BODY_CAP = 16_384;
+
+function truncateTraceBody(value: any): any {
+  if (value === undefined || value === null) return value;
+  const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+  if (serialized.length <= TRACE_BODY_CAP) return value;
+  return typeof value === 'string'
+    ? `${value.slice(0, TRACE_BODY_CAP)}\n…[truncated: ${serialized.length - TRACE_BODY_CAP} more characters]`
+    : { _truncated: true, preview: serialized.slice(0, TRACE_BODY_CAP), fullLengthChars: serialized.length };
+}
+
 // ─── Condition Evaluator ──────────────────────────────────────────────────────
 // Resolves {{scope:key}} refs from JeticMemory; the operators live in @jetic/simulator.
 
@@ -157,7 +175,21 @@ async function evaluateStepCondition(
 async function preStepCondition(step: WorkflowStepDef): Promise<StepResult | null> {
   if (!step.condition) return null;
   const label = step.name || `${step.method} ${step.path}`;
-  const base = { step, status: 0, responseBody: null, durationMs: 0, captured: [], injected: {} };
+  const now = new Date().toISOString();
+  const base: StepResult = {
+    step,
+    status: 0,
+    responseBody: null,
+    durationMs: 0,
+    startedAt: now,
+    finishedAt: now,
+    passed: false,
+    captured: [],
+    injected: {},
+    requestHeaders: {},
+    requestBody: {},
+    resolvedUrl: '',
+  };
 
   const kind = conditionKind(step.condition);
   if (kind === 'invalid') {
@@ -324,7 +356,22 @@ async function resolveTemplateString(value: string, context?: string): Promise<s
   return result;
 }
 
-// ─── Resolve {{faker.*}} and {{scope:*}} templates in body values ─────────────
+// ─── Resolve {{faker.*}} and {{scope:*}} templates in body values (deep) ──────
+
+async function resolveDeepValue(value: any, context?: string): Promise<any> {
+  if (typeof value === 'string') return resolveTemplateString(value, context);
+  if (Array.isArray(value)) {
+    const out: any[] = [];
+    for (const item of value) out.push(await resolveDeepValue(item, context));
+    return out;
+  }
+  if (value && typeof value === 'object') {
+    const out: Record<string, any> = {};
+    for (const [key, item] of Object.entries(value)) out[key] = await resolveDeepValue(item, context);
+    return out;
+  }
+  return value;
+}
 
 async function resolveBodyTemplates(
   body: Record<string, any>,
@@ -332,9 +379,7 @@ async function resolveBodyTemplates(
 ): Promise<Record<string, any>> {
   const resolved: Record<string, any> = {};
   for (const [key, value] of Object.entries(body)) {
-    resolved[key] = typeof value === 'string'
-      ? await resolveTemplateString(value, context)
-      : value;
+    resolved[key] = await resolveDeepValue(value, context);
   }
   return resolved;
 }
@@ -369,6 +414,23 @@ async function resolveInjections(
       const value = await scopedMemory.get(key);
       if (value === null) continue;
       strValue = typeof value === 'string' ? value : JSON.stringify(value);
+    }
+
+    // Same auto-prefix rule as the MCP/library simulator: a bare token put into an
+    // Authorization header becomes "Bearer <token>"; values already carrying any
+    // auth scheme ("Bearer x", "Basic y", …) are left untouched.
+    const headerName = target.startsWith('header:')
+      ? target.slice(7)
+      : target.startsWith('body:')
+        ? null
+        : target;
+    if (
+      headerName &&
+      headerName.toLowerCase() === 'authorization' &&
+      strValue &&
+      !/^[A-Za-z][A-Za-z0-9-]*\s/.test(strValue)
+    ) {
+      strValue = `Bearer ${strValue}`;
     }
 
     if (target.startsWith('body:')) {
@@ -450,14 +512,28 @@ interface StepResult {
   status: number;
   responseBody: any;
   durationMs: number;
+  startedAt: string;
+  finishedAt: string;
   passed: boolean;
   captured: string[];
   error?: string;
   injected: Record<string, string>;
+  /** Headers actually sent (Content-Type default + injections, incl. the real Bearer value). */
+  requestHeaders: Record<string, string>;
+  /** Resolved request body (templates replaced) — what was really sent. */
+  requestBody: Record<string, any>;
+  /** Final URL including query string, exactly as requested. */
+  resolvedUrl: string;
+  responseHeaders?: Record<string, string>;
+  /** The failure was a network-level connection error (target unreachable). */
+  connectionError?: boolean;
   conditionResult?: { passed: boolean; reason: string };
   /** A legacy guard did not match, so the step was not run. */
   skipped?: boolean;
 }
+
+/** Default per-request timeout, matching the MCP/library simulator. */
+const REQUEST_TIMEOUT_MS = 30_000;
 
 async function executeStep(
   step: WorkflowStepDef,
@@ -465,6 +541,7 @@ async function executeStep(
   defaultBody: Record<string, any>,
 ): Promise<StepResult> {
   const startTime = Date.now();
+  const startedAt = new Date(startTime).toISOString();
 
   // Resolve memory injections
   const memory = new JeticMemory({ scope: 'workflow' });
@@ -486,14 +563,13 @@ async function executeStep(
   const url = `${baseUrl.replace(/\/$/, '')}${resolvedPath}`;
 
   const expectedStatus = step.expectStatus ?? 200;
+  const requestHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...headers };
 
   try {
     const fetchOptions: RequestInit = {
       method: step.method.toUpperCase(),
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers,
-      },
+      headers: requestHeaders,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     };
 
     // Only add body for non-GET/HEAD requests
@@ -534,20 +610,39 @@ async function executeStep(
       status: response.status,
       responseBody,
       durationMs,
+      startedAt,
+      finishedAt: new Date().toISOString(),
       passed,
       captured: [...inputCaptured, ...captured],
       injected: headers,
+      requestHeaders,
+      requestBody,
+      resolvedUrl: finalUrl,
+      responseHeaders: Object.fromEntries(response.headers.entries()),
     };
   } catch (err: any) {
+    const code = networkErrorCode(err);
+    let message = err.message || String(err);
+    if (err?.name === 'TimeoutError' || code === 'ETIMEDOUT') {
+      message = `Request timed out after ${REQUEST_TIMEOUT_MS}ms (${step.method} ${resolvedPath}).`;
+    } else if (code === 'ECONNREFUSED') {
+      message = `Connection refused (ECONNREFUSED) at ${baseUrl} — the server is not accepting connections.`;
+    }
     return {
       step,
       status: 0,
       responseBody: null,
       durationMs: Date.now() - startTime,
+      startedAt,
+      finishedAt: new Date().toISOString(),
       passed: false,
       captured: inputCaptured,
-      error: err.message || String(err),
+      error: message,
       injected: headers,
+      requestHeaders,
+      requestBody,
+      resolvedUrl: url,
+      connectionError: code ? CONNECTION_ERROR_CODES.has(code) : false,
     };
   }
 }
@@ -855,17 +950,24 @@ export const simulateWorkflowCommand = new Command('workflow')
     }
 
     // ── Check Backend Health ──────────────────────────────────────────────────
+    // A single classified probe: "nothing listening" aborts with a real diagnostic
+    // instead of every step failing with a generic "fetch failed".
     const checkSpinner = new Spinner();
     checkSpinner.start(`Checking if backend is active at ${baseUrl}...`);
-    try {
-      await fetch(baseUrl);
-      checkSpinner.stop(`  ${c.green}✓${c.reset} Backend is active`);
-      console.log('');
-    } catch (e) {
+    const probe = await probeTarget(baseUrl, 3000);
+    if (probe.verdict === 'unreachable') {
       checkSpinner.stop();
       console.log(`  ${c.red}✗${c.reset} Backend is unreachable at ${c.bold}${baseUrl}${c.reset}`);
-      console.log(`  ${c.yellow}⚠${c.reset} Please run/initialize your backend project and try again.\n`);
+      console.log(`  ${c.red}${probe.message}${c.reset}`);
+      console.log(`  ${c.yellow}⚠${c.reset} Start your backend project and try again.\n`);
       process.exit(1);
+    }
+    if (probe.verdict === 'server-error') {
+      checkSpinner.stop(`  ${c.yellow}⚠${c.reset} Backend reachable but failing (HTTP ${probe.status}) at ${baseUrl}`);
+      console.log(`  ${c.yellow}${probe.message}${c.reset}\n`);
+    } else {
+      checkSpinner.stop(`  ${c.green}✓${c.reset} Backend is active (HTTP ${probe.status})`);
+      console.log('');
     }
 
     // ── Render workflow graph ──────────────────────────────────────────────────
@@ -990,6 +1092,14 @@ export const simulateWorkflowCommand = new Command('workflow')
 
       renderStepResult(result, i, workflow.steps.length);
 
+      // A connection error means the target died mid-run: stop here instead of
+      // emitting dozens of bogus "fetch failed" step failures.
+      if (result.connectionError) {
+        console.log(`  ${c.red}${c.bold}⚠ Target unreachable — aborting early.${c.reset}\n`);
+        stopOnFailure = true;
+        break;
+      }
+
       // An unrecognized condition is a hard failure: do not run the rest of a workflow built on it.
       if (!result.passed && result.error && !result.status && conditionKind(step.condition) === 'invalid') {
         console.log(`  ${c.red}${c.bold}⚠ Unrecognized condition — stopping workflow.${c.reset}\n`);
@@ -1057,12 +1167,19 @@ export const simulateWorkflowCommand = new Command('workflow')
           path: r.step?.path,
           description: r.step?.description,
           status: r.status,
+          responseStatus: r.status,
           passed: r.passed,
           durationMs: r.durationMs,
+          startedAt: r.startedAt,
+          finishedAt: r.finishedAt,
+          resolvedUrl: r.resolvedUrl,
+          requestHeaders: r.requestHeaders,
+          requestBody: r.requestBody,
+          requestBodySpec: r.step?.body,
+          responseHeaders: r.responseHeaders,
+          responseBody: truncateTraceBody(r.responseBody),
           captured: Object.fromEntries((r.captured ?? []).map((cap: string) => [cap, '(captured)'])),
           injected: r.injected ?? {},
-          requestBody: r.step?.body,
-          responseBody: r.responseBody,
           error: r.error ?? null,
           expectStatus: r.step?.expectStatus,
           captureSpec: r.step?.capture,

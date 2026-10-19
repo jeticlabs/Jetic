@@ -40,14 +40,21 @@ export interface TraceStepRecord {
   description?: string;
   // Result
   status: number;
+  responseStatus?: number;
   passed: boolean;
   durationMs: number;
+  startedAt?: string;   // ISO
+  finishedAt?: string;  // ISO
+  // Request / response wire detail (curl-like view)
+  resolvedUrl?: string;               // final URL incl. query string
+  requestHeaders?: Record<string, string>;
+  requestBody?: any;                  // resolved payload actually sent
+  requestBodySpec?: any;              // raw template spec from the workflow file
+  responseHeaders?: Record<string, string>;
+  responseBody?: any;
   // Vars
   captured: Record<string, string>;   // varName → value
   injected: Record<string, string>;   // header → value
-  // Bodies
-  requestBody?: any;
-  responseBody?: any;
   error: string | null;
   // Step definition extras (from workflow file)
   expectStatus?: number;

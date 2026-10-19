@@ -219,6 +219,48 @@ describe('Tier 4 — live execution', () => {
     expect(missing.isError).toBe(true);
     expect(missing.text).toContain('not found');
   });
+
+  test('SMK-408f progress is pollable and every stored step carries the curl-style payload', async () => {
+    api.reset();
+    const started = await session.call('jetic_simulate_workflow', {
+      workflow: 'checkout-memory-id',
+      async: true,
+      clearMemory: true,
+    });
+    const runId = started.data.runId as string;
+
+    // The planned route is visible from the first poll — pending until each step completes.
+    const first = await session.call('jetic_get_run', { runId });
+    expect(first.data.found).toBe(true);
+    expect(first.data.steps).toHaveLength(4);
+    expect(first.data.steps.map((s: any) => s.status)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^(pending|passed|failed|skipped)$/)])
+    );
+
+    let status = first.data.status as string;
+    for (let i = 0; i < 50 && status === 'running'; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      status = (await session.call('jetic_get_run', { runId })).data.status;
+    }
+    expect(status).toBe('passed');
+
+    const done = await session.call('jetic_get_run', { runId });
+    expect(done.data.steps.map((s: any) => [s.index, s.status])).toEqual([
+      [1, 'passed'], [2, 'passed'], [3, 'passed'], [4, 'passed'],
+    ]);
+
+    const [, loginStep, createStep, getStep] = done.data.result.results;
+    // Request side: final URL, real headers (Content-Type + the actual Bearer value).
+    expect(loginStep.resolvedUrl).toBe(`${api.url}/api/auth/login`);
+    expect(loginStep.requestHeaders['Content-Type']).toBe('application/json');
+    expect(loginStep.requestHeaders.Authorization).toBeUndefined();
+    expect(createStep.requestHeaders.Authorization).toMatch(/^Bearer tok_/);
+    expect(getStep.resolvedUrl).toMatch(/\/api\/orders\/[^/]+$/);
+    expect(getStep.resolvedUrl).not.toContain(':id');
+    // Response side + timing.
+    expect(loginStep.responseHeaders['content-type']).toContain('application/json');
+    expect(Date.parse(loginStep.startedAt)).toBeLessThanOrEqual(Date.parse(loginStep.finishedAt));
+  });
 });
 
 describe('Tier 4 — environments, agents and change tracking', () => {

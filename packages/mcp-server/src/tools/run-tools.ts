@@ -2,7 +2,7 @@ import { z } from 'zod';
 import * as path from 'path';
 import { loadConfig, readJsonSync } from '@jetic/core';
 import { resolveProjectInput } from '../types';
-import { listRuns, readRunStatus, readSimulationRun } from '../run-store';
+import { listRuns, readRunStatus, readSimulationRun, stepToProgress } from '../run-store';
 
 export const getRunSchema = z.object({
   projectPath: z.string().optional().describe('Path to project root or .jetic folder'),
@@ -21,7 +21,14 @@ export function handleGetRun(args: z.infer<typeof getRunSchema>) {
   const config = loadConfig(projectRoot);
 
   const report = readSimulationRun(config.jeticDir, args.runId);
-  if (report) return { found: true, ...report };
+  if (report) {
+    // Uniform top-level step list (same shape as the running status) + full per-step payload in `result`.
+    return {
+      found: true,
+      ...report,
+      steps: report.result?.results ? report.result.results.map(stepToProgress) : [],
+    };
+  }
 
   // No report yet: the run may still be in progress (async mode) or have failed before finishing.
   const status = readRunStatus(config.jeticDir, args.runId);
@@ -37,6 +44,7 @@ export function handleGetRun(args: z.infer<typeof getRunSchema>) {
       startedAt: status.startedAt,
       finishedAt: status.finishedAt,
       stats: status.stats,
+      ...(status.steps ? { steps: status.steps } : {}),
       reportPath: status.reportPath,
       ...(status.error ? { error: status.error } : {}),
       ...(status.status === 'running' ? { message: 'Run still in progress — poll again shortly.' } : {}),
