@@ -14,7 +14,7 @@ Scan your backend, model endpoints, author workflows, and simulate stateful API 
 
 <img src="screenshots/demo_video.gif" alt="Jetic demo" width="100%">
 
-[Website](https://cli.jetic.space) · [Docs](https://docs.jetic.space) · [Contributing](CONTRIBUTING.md)
+[Website](https://www.jetic.space/cli) · [Docs](https://docs.jetic.space) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
