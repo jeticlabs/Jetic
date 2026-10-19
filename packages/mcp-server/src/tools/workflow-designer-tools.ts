@@ -257,6 +257,58 @@ export function handleScaffoldWorkflow(args: z.infer<typeof scaffoldWorkflowSche
       if (Object.keys(inject).length > 0) step.inject = inject;
     }
 
+    // ── path :params ───────────────────────────────────────────────────────
+    const pathParams = [...new Set(endpoint.path.match(/:([a-zA-Z_][a-zA-Z0-9_]*)/g) || [])].map((p) => p.slice(1));
+    for (const pname of pathParams) {
+      const inBody = step.body && typeof step.body === 'object' && pname in step.body;
+      if (inBody) continue; // the simulator resolves :params from the request body
+      const memKey = [...producedKeys].find(
+        (k) => (k.split(':').pop() || '').toLowerCase() === pname.toLowerCase()
+      );
+      if (memKey) {
+        step.path = step.path.split(`:${pname}`).join(`{{${memKey}}}`);
+      } else {
+        missing.push(
+          `Path param ":${pname}" has no source — add a body field "${pname}", capture a memory key named ` +
+            `"${pname}" in an earlier step, or inline {{workflow:${pname}}} in the path.`
+        );
+      }
+    }
+
+    // ── query params ────────────────────────────────────────────────────────
+    const queryParams = (endpoint.parameters || []).filter((p) => p.in === 'query');
+    if (queryParams.length > 0) {
+      const query: Record<string, any> = {};
+      for (const p of queryParams) {
+        const memKey = [...producedKeys].find(
+          (k) => (k.split(':').pop() || '').toLowerCase() === p.name.toLowerCase()
+        );
+        if (memKey) {
+          query[p.name] = `{{${memKey}}}`;
+          continue;
+        }
+        if (p.required !== true) continue; // optional — let the server default apply
+        const val = fieldToFakerValue(p.name, {
+          type: p.type || 'string',
+          format: p.format,
+          min: p.min,
+          max: p.max,
+          enum: (p as any).enum,
+        } as FieldDefinition);
+        if (val !== null) {
+          query[p.name] = val;
+        } else {
+          query[p.name] = `{{human:${p.name}}}`;
+          allHumanKeys.add(p.name);
+          missing.push(
+            `Query param "${p.name}" (required, type: ${p.type || 'string'}) — no auto-mapping. ` +
+              `Using {{human:${p.name}}} (will pause for interactive input at runtime).`
+          );
+        }
+      }
+      if (Object.keys(query).length > 0) step.query = query;
+    }
+
     // ── capture (endpoint.produces + token producers) ─────────────────────
     const capture: Record<string, string> = {};
 

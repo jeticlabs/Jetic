@@ -67,12 +67,22 @@ export const workflowStepSchema = z.object({
   path: z
     .string()
     .min(1)
-    .describe('Route path; :params resolve from body/memory (NOT from {{templates}} — those only work in body/inject)'),
+    .describe('Route path. :params resolve from a body field, or a memory key of the same name; {{templates}} are also resolved in the path.'),
   description: z.string().optional().describe('What this step does'),
   body: z
     .record(z.any())
     .optional()
-    .describe('Request payload. Values support {{faker.*}}, {{scope:key}}, {{workflow:key}} and {{human:key}} templates'),
+    .describe('Request payload (nested objects/arrays are templated too). Values support {{faker.*}}, {{scope:key}}, {{workflow:key}} and {{human:key}} templates'),
+  query: z
+    .record(z.any())
+    .optional()
+    .describe('URL query parameters (deep-resolved templates). Use this instead of a body on GET/HEAD steps.'),
+  timeoutMs: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('Per-step request timeout in ms (overrides the run default, which is 30000; max 120000).'),
   inject: z
     .record(z.string())
     .optional()
@@ -139,11 +149,10 @@ export interface WorkflowValidationReport {
   humanKeys: string[];
 }
 
-const TEMPLATE_RE = /\{\{\s*([^}]+?)\s*\}\}/g;
 const KNOWN_WORKFLOW_KEYS = new Set(['name', 'description', 'environment', 'steps', 'generatedAt', 'retry']);
 const KNOWN_STEP_KEYS = new Set([
   'name', 'method', 'path', 'description', 'inject', 'capture',
-  'captureInput', 'expectStatus', 'body', 'condition',
+  'captureInput', 'expectStatus', 'body', 'query', 'timeoutMs', 'condition',
   'onFailure', 'continueOnStatus', 'retry',
 ]);
 // Keys from the OTHER (model-embedded) workflow dialect — always a mistake here.
@@ -182,11 +191,43 @@ function readMemoryKeys(projectRoot: string): Set<string> {
   return keys;
 }
 
+/**
+ * Collects the `{{...}}` refs in a value (recursing through objects/arrays).
+ *
+ * Brace-aware: an inner `{` raises the depth so parameterized faker expressions
+ * (`{{faker.number.int({min:1,max:5})}}`) stay one ref — a naive `[^}]+` regex
+ * cannot see them at all, which would hide exactly the unsupported cases.
+ */
 function collectTemplateRefs(value: unknown, out: string[]): void {
   if (typeof value === 'string') {
-    TEMPLATE_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = TEMPLATE_RE.exec(value)) !== null) out.push(m[1].trim());
+    let i = 0;
+    while (i < value.length) {
+      const open = value.indexOf('{{', i);
+      if (open === -1) break;
+      let depth = 0;
+      let end = -1;
+      for (let j = open + 2; j < value.length; j++) {
+        const ch = value[j];
+        if (ch === '{') {
+          depth++;
+        } else if (ch === '}') {
+          if (depth > 0) {
+            depth--;
+          } else if (value[j + 1] === '}') {
+            end = j;
+            break;
+          } else {
+            break; // lone `}` — not a closing pair
+          }
+        }
+      }
+      if (end === -1) {
+        i = open + 2;
+        continue;
+      }
+      out.push(value.slice(open + 2, end).trim());
+      i = end + 2;
+    }
   } else if (Array.isArray(value)) {
     for (const v of value) collectTemplateRefs(v, out);
   } else if (value && typeof value === 'object') {
@@ -327,6 +368,25 @@ export function validateWorkflowDefinition(
   const defined = new Set<string>(); // scope:key available from earlier steps
   const humanKeys = new Set<string>(); // {{human:key}} refs (runtime interactive input)
 
+  // Every scope:key referenced anywhere in the workflow. Lets warnings be precise —
+  // e.g. only flag a continue-step capture when a downstream step actually consumes it.
+  const refsUsedAnywhere = new Set<string>();
+  for (const rawStep of wf.steps) {
+    const stepRefs: string[] = [];
+    collectTemplateRefs((rawStep as any)?.body, stepRefs);
+    collectTemplateRefs((rawStep as any)?.query, stepRefs);
+    collectTemplateRefs((rawStep as any)?.path, stepRefs);
+    const inject = (rawStep as any)?.inject;
+    if (inject && typeof inject === 'object' && !Array.isArray(inject)) {
+      for (const v of Object.values(inject)) collectTemplateRefs(v, stepRefs);
+    }
+    for (const ref of stepRefs) {
+      if (ref.startsWith('faker.') || !ref.includes(':')) continue;
+      const { scope, key } = splitMemKey(ref);
+      if (key) refsUsedAnywhere.add(`${scope}:${key}`);
+    }
+  }
+
   wf.steps.forEach((rawStep, i) => {
     const stepNo = i + 1;
     const sName = typeof rawStep?.name === 'string' ? rawStep.name : undefined;
@@ -349,7 +409,7 @@ export function validateWorkflowDefinition(
       } else if (!KNOWN_STEP_KEYS.has(key)) {
         warn(warnings, stepNo, sName, 'UNKNOWN_STEP_KEY',
           `Step ${stepNo} has unknown key "${key}" which the simulator ignores.`,
-          'Remove it or check the field name (valid: name, method, path, description, body, inject, capture, captureInput, expectStatus).');
+          'Remove it or check the field name (valid: name, method, path, description, body, query, timeoutMs, inject, capture, captureInput, expectStatus, condition, onFailure, continueOnStatus, retry).');
       }
     }
     // ── Condition validation ───────────────────────────────────────────────────────────
@@ -442,21 +502,39 @@ export function validateWorkflowDefinition(
       }
     }
 
-    // Body checks.
+    // Body + query checks.
     if (step.body !== undefined && (typeof step.body !== 'object' || step.body === null || Array.isArray(step.body))) {
       err(errors, stepNo, sName, 'BAD_BODY', `Step ${stepNo} "body" must be an object of field -> value.`, 'Use { "email": "{{faker.internet.email}}" }.');
     }
-    if ((method === 'GET' || method === 'HEAD') && step.body && Object.keys(step.body).length > 0) {
-      warn(warnings, stepNo, sName, 'GET_WITH_BODY',
-        `Step ${stepNo} is ${method} with a body — it will be sent as URL query params, not a JSON body.`,
-        'This is usually what you want for filters; otherwise switch to POST.');
+    if (step.query !== undefined && (typeof step.query !== 'object' || step.query === null || Array.isArray(step.query))) {
+      err(errors, stepNo, sName, 'BAD_QUERY', `Step ${stepNo} "query" must be an object of param -> value.`, 'Use { "query": { "page": 1, "search": "{{workflow:term}}" } }.');
     }
-    if (endpoint?.requestBody?.fields && step.body && typeof step.body === 'object') {
+    if ((method === 'GET' || method === 'HEAD') && step.body && typeof step.body === 'object' && !Array.isArray(step.body)) {
+      const nested = Object.values(step.body).some((v) => v !== null && typeof v === 'object');
+      if (nested) {
+        warn(warnings, stepNo, sName, 'GET_WITH_BODY',
+          `Step ${stepNo} is ${method} with nested body values — they are stringified into the URL query string.`,
+          'Move flat filters to the "query" field instead.');
+      }
+    }
+    if (endpoint?.requestBody?.fields && step.body && typeof step.body === 'object' && method !== 'GET' && method !== 'HEAD') {
       for (const field of Object.keys(step.body)) {
         if (!(field in endpoint.requestBody.fields)) {
           warn(warnings, stepNo, sName, 'UNKNOWN_BODY_FIELD',
             `Step ${stepNo} sends body field "${field}" not declared on ${method} ${wfPath}.`,
             'Check the spelling, or extend the endpoint with jetic_update_endpoint.');
+        }
+      }
+    }
+    if (step.query && typeof step.query === 'object' && !Array.isArray(step.query) && endpoint) {
+      const declaredQuery = (endpoint.parameters || []).filter((p) => p.in === 'query');
+      if (declaredQuery.length > 0) {
+        for (const param of Object.keys(step.query)) {
+          if (!declaredQuery.some((p) => p.name === param)) {
+            warn(warnings, stepNo, sName, 'UNKNOWN_QUERY_PARAM',
+              `Step ${stepNo} sends query param "${param}" not declared on ${method} ${wfPath}.`,
+              'Check the spelling, or extend the endpoint with jetic_update_endpoint.');
+          }
         }
       }
     }
@@ -468,23 +546,24 @@ export function validateWorkflowDefinition(
     for (const p of pathParams) {
       const pname = p.substring(1);
       const inBody = step.body && typeof step.body === 'object' && pname in step.body;
+      // inject "body:<name>" is merged into the request body before path resolution.
+      const inInjectBody =
+        step.inject && typeof step.inject === 'object' && !Array.isArray(step.inject) &&
+        Object.keys(step.inject).includes(`body:${pname}`);
       const inMemory = [...defined].some((d) => d.split(':')[1] === pname) ||
         [...persistedMemory].some((d) => d.split(':')[1] === pname);
-      if (!inBody && !inMemory) {
+      if (!inBody && !inInjectBody && !inMemory) {
         err(errors, stepNo, sName, 'UNRESOLVED_PATH_PARAM',
           `Path param ":${pname}" in step ${stepNo} has no body field or memory source — the URL will literally contain ":${pname}" and fail.`,
-          `Add "${pname}" to this step's body, or capture it as memory in an earlier step (capture: { "workflow:${pname}": "data.${pname}" }).`);
+          `Add "${pname}" to this step's body (or inject { "body:${pname}": "<scope:key>" }), capture it as memory in an earlier step (capture: { "workflow:${pname}": "data.${pname}" }), or inline it as "/users/{{workflow:${pname}}}".`);
       }
     }
-    if (/\{\{[^}]+\}\}/.test(wfPath)) {
-      warn(warnings, stepNo, sName, 'PATH_TEMPLATE',
-        `Step ${stepNo} path contains a {{template}} — paths only resolve :params, templates work in body/inject.`,
-        'Use "/api/users/:id" with an "id" body field or captured memory key.');
-    }
-
-    // Template reference analysis (body + inject values).
+    // Template reference analysis (body + query + path + inject values).
     const refs: string[] = [];
     collectTemplateRefs(step.body, refs);
+    collectTemplateRefs(step.query, refs);
+    // Path templates are supported by the simulator; check their refs too.
+    collectTemplateRefs(step.path, refs);
     if (step.inject && typeof step.inject === 'object') {
       for (const v of Object.values(step.inject)) collectTemplateRefs(v, refs);
     }
@@ -494,6 +573,12 @@ export function validateWorkflowDefinition(
           warn(warnings, stepNo, sName, 'SUSPICIOUS_FAKER',
             `"{{${ref}}}" looks like an incomplete faker path.`,
             'Use full paths like {{faker.internet.email}} or {{faker.string.uuid}}.');
+        } else if (ref.includes('(') || ref.includes('{') || ref.includes('[')) {
+          // Parameterized faker expressions cannot be evaluated at runtime (the
+          // simulator only calls parameterless faker paths).
+          err(errors, stepNo, sName, 'UNSUPPORTED_FAKER_CALL',
+            `"{{${ref}}}" in step ${stepNo} passes arguments — the simulator only supports parameterless faker paths.`,
+            'Use a plain path like {{faker.internet.email}} or {{faker.number.int}}, or hard-code the value.');
         }
         continue;
       }
@@ -567,9 +652,17 @@ export function validateWorkflowDefinition(
           'Use "abort" (default, stops the workflow) or "continue" (logs failure, proceeds).');
       }
       if (step.onFailure === 'continue' && step.capture && Object.keys(step.capture).length > 0) {
-        warn(warnings, stepNo, sName, 'CONTINUE_WITH_CAPTURE',
-          `Step ${stepNo} uses onFailure:"continue" but has captures — captures are only saved when the step passes.`,
-          'This is usually fine for optional captures; ensure later steps handle missing memory gracefully.');
+        // Only warn when a downstream step actually consumes something this step
+        // captures — otherwise the capture is deliberately optional and silent.
+        const consumedDownstream = Object.keys(step.capture).some((k) => {
+          const { scope, key } = splitMemKey(k);
+          return key && refsUsedAnywhere.has(`${scope}:${key}`);
+        });
+        if (consumedDownstream) {
+          warn(warnings, stepNo, sName, 'CONTINUE_WITH_CAPTURE',
+            `Step ${stepNo} uses onFailure:"continue" but later steps depend on its captures — if the request fails, those captures are skipped and downstream steps will fail or be skipped.`,
+            'Make the run conditional on the capture, or move the capture to a step that must pass.');
+        }
       }
     }
 

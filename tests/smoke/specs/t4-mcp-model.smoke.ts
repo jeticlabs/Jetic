@@ -38,6 +38,8 @@ const CATALOG: Record<string, { readOnly: boolean; destructive?: boolean; openWo
   jetic_delete_workflow: { readOnly: false, destructive: true },
   jetic_list_agents: { readOnly: true },
   jetic_run_agent: { readOnly: false },
+  jetic_get_run: { readOnly: true },
+  jetic_list_runs: { readOnly: true },
 };
 
 const ERROR_CODES = ['NOT_INITIALIZED', 'MODEL_STALE', 'APP_BOOT_FAILED', 'BUSY', 'TIMEOUT', 'FORBIDDEN_ENV', 'INVALID_INPUT', 'NOT_FOUND', 'WRITE_DISABLED', 'INTERNAL'];
@@ -58,7 +60,7 @@ describe('Tier 4 — handshake and catalog', () => {
     expect(session.instructions).toContain('"rules"');
   });
 
-  test('SMK-402 exactly the expected 24 tools, each documented, with accurate safety annotations', () => {
+  test('SMK-402 exactly the expected 26 tools, each documented, with accurate safety annotations', () => {
     expect(tools.map((t) => t.name).sort()).toEqual(Object.keys(CATALOG).sort());
 
     for (const tool of tools) {
@@ -240,10 +242,9 @@ describe('Tier 4 — error envelopes', () => {
     expect(badEnum.text).toContain('Input validation error');
   });
 
-  // Handlers throw descriptive errors ("Must specify either id or method+path…", "Endpoint not found…"),
-  // but the envelope replaces every one with "Tool execution failed." and code INTERNAL, so the model
-  // calling the tool cannot learn what to fix.
-  test.failing('KG-08 an error tells the caller what went wrong', async () => {
+  // Handlers throw descriptive errors ("Must specify either id or method+path…", "Endpoint not found…").
+  // The envelope must preserve the real message so the model calling the tool can self-correct (KG-08).
+  test('KG-08 an error tells the caller what went wrong', async () => {
     const failures = await Promise.all([
       session.call('jetic_get_endpoint', {}),
       session.call('jetic_update_endpoint', { id: 'GET /missing', updates: { description: 'x' } }),

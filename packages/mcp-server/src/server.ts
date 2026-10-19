@@ -64,6 +64,7 @@ import {
   runAgentSchema,
   handleRunAgent,
 } from './tools/agent-tools';
+import { getRunSchema, handleGetRun, listRunsSchema, handleListRuns } from './tools/run-tools';
 
 export const JETIC_MCP_SERVER_NAME = 'jetic-mcp-server';
 
@@ -166,6 +167,9 @@ export const JETIC_MCP_INSTRUCTIONS = [
   '',
   'STEP 4g — RUN',
   '  jetic_simulate_workflow { "workflow": "<slug>" }',
+  '  It preflights the target first and fails fast with a clear reason when the app is unreachable.',
+  '  The response is a compact summary + runId. Full step detail: jetic_get_run { "runId": "..." };',
+  '  recent runs: jetic_list_runs. For long journeys pass async:true, then poll jetic_get_run.',
   '',
   '━━ GENERAL RULES ━━',
   'No AI-provider setup is needed: never ask for OpenRouter/OpenAI keys and never use `jetic config ai`.',
@@ -402,6 +406,24 @@ export function createJeticMcpServer(): McpServer {
     simulateWorkflowSchema.shape,
     READ_LIVE,
     handleSimulateWorkflow
+  );
+
+  register(
+    'jetic_get_run',
+    'Get run report',
+    'Returns the full stored report of a previous run — every step\'s request, response, captures and errors — from .jetic/runs/<runId>/. Use the runId returned by jetic_simulate_workflow or jetic_list_runs.',
+    getRunSchema.shape,
+    READ_ONLY,
+    handleGetRun
+  );
+
+  register(
+    'jetic_list_runs',
+    'List runs',
+    'Lists recent simulation and agent runs from .jetic/runs/, newest first, with status, step counts and duration. Use jetic_get_run for the full report of one run.',
+    listRunsSchema.shape,
+    READ_ONLY,
+    handleListRuns
   );
 
   register(

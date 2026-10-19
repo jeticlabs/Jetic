@@ -24,6 +24,10 @@ export interface WorkflowStepDef {
   captureInput?: Record<string, string>;
   expectStatus?: number;
   body?: Record<string, any>;
+  /** Explicit URL query parameters (deep-resolved templates). Prefer this over a GET body. */
+  query?: Record<string, any>;
+  /** Per-step request timeout in ms (overrides the run-level default; 0 disables). */
+  timeoutMs?: number;
   /**
    * Rules condition (canonical): evaluated after the step; `onFail` controls the flow.
    * Legacy `{ if, equals… }` guard: evaluated before the step; a miss skips it.
@@ -69,9 +73,19 @@ export interface WorkflowStepResult {
   conditionOutcome?: 'abort' | 'continue' | 'switch';
   requestHeaders: Record<string, string>;
   requestBody: Record<string, any>;
+  requestQuery?: Record<string, any>;
   responseBody: any;
   capturedMemory: string[];
   error?: string;
+}
+
+export interface PreflightProbe {
+  url: string;
+  verdict: 'healthy' | 'server-error' | 'unreachable';
+  status?: number;
+  message: string;
+  /** True when the run was stopped before step 1 because of this probe. */
+  aborted: boolean;
 }
 
 export interface WorkflowSimulationResult {
@@ -93,6 +107,27 @@ export interface WorkflowSimulationResult {
     totalTimeMs: number;
   };
   results: WorkflowStepResult[];
+  /** Present when a target health probe ran before the workflow. */
+  preflight?: PreflightProbe;
+  /** Why the run stopped before executing every step (e.g. unreachable target). */
+  abortReason?: string;
+}
+
+const CONNECTION_ERROR_CODES = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ETIMEDOUT',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_SOCKET',
+]);
+
+function networkErrorCode(error: any): string | undefined {
+  const raw = error?.cause?.code ?? error?.cause?.errno ?? error?.code ?? error?.errno;
+  return typeof raw === 'string' ? raw : undefined;
 }
 
 function deepGet(obj: any, dotPath: string): any {
@@ -110,6 +145,17 @@ export interface SimulateWorkflowOptions {
   clearMemory?: boolean;
   /** Resolves another workflow (by slug or name) for `onFail: "switch"` conditions. */
   loadWorkflow?: (slugOrName: string) => WorkflowDef | null | Promise<WorkflowDef | null>;
+  /**
+   * When true (default), a template or path parameter that resolves to nothing fails the step
+   * before any request is sent, instead of silently sending an empty value.
+   */
+  strictTemplates?: boolean;
+  /** Probe the target before step 1. Default 'off'; MCP simulation opts into 'abort'. */
+  preflight?: 'abort' | 'warn' | 'off';
+  /** Health-probe timeout in ms (default 3000). */
+  preflightTimeoutMs?: number;
+  /** Default per-request timeout in ms (default 30000; 0 disables). */
+  requestTimeoutMs?: number;
 }
 
 export interface WorkflowSimulatorRuntime {
@@ -128,6 +174,9 @@ interface RunState {
 }
 
 export class WorkflowSimulator {
+  private strictTemplates = true;
+  private requestTimeoutMs = 30_000;
+
   constructor(
     private model: BehavioralModel,
     private environment: Environment,
@@ -146,7 +195,42 @@ export class WorkflowSimulator {
       JeticMemory.clearAllMemory(this.runtime.projectRoot);
     }
 
+    this.strictTemplates = options?.strictTemplates ?? true;
+    this.requestTimeoutMs = options?.requestTimeoutMs ?? 30_000;
+
     const startTime = Date.now();
+    const preflightMode = options?.preflight ?? 'off';
+    const preflight =
+      preflightMode !== 'off' && workflow.steps.length > 0
+        ? await this.runPreflight(this.environment.baseUrl, options?.preflightTimeoutMs ?? 3000)
+        : undefined;
+
+    if (preflight && preflightMode === 'abort' && preflight.verdict === 'unreachable') {
+      preflight.aborted = true;
+      return {
+        success: false,
+        workflow: {
+          name: workflow.name,
+          description: workflow.description,
+          stepsCount: workflow.steps.length,
+        },
+        environment: {
+          name: this.environment.name,
+          baseUrl: this.environment.baseUrl,
+        },
+        stats: {
+          totalSteps: workflow.steps.length,
+          executedSteps: 0,
+          passedSteps: 0,
+          failedSteps: 0,
+          totalTimeMs: Date.now() - startTime,
+        },
+        results: [],
+        preflight,
+        abortReason: preflight.message,
+      };
+    }
+
     const state: RunState = { results: [], allPassed: true, halted: false };
     await this.runSteps(workflow, options, state, [workflow.name]);
     const stepResults = state.results;
@@ -171,6 +255,7 @@ export class WorkflowSimulator {
         totalTimeMs,
       },
       results: stepResults,
+      ...(preflight ? { preflight } : {}),
     };
   }
 
@@ -186,7 +271,8 @@ export class WorkflowSimulator {
     lineage: string[]
   ): Promise<'done' | 'stop'> {
     const baseUrl = this.environment.baseUrl;
-    const resolve = (value: string) => this.resolveTemplateString(value);
+    // Conditions are guards: a missing value should make the condition false, not fail the step.
+    const resolve = (value: string) => this.resolveTemplateString(value, false);
 
     for (let i = 0; i < workflow.steps.length; i++) {
       const step = workflow.steps[i];
@@ -250,12 +336,44 @@ export class WorkflowSimulator {
       }
 
       // ── Resolve templates once before any retry attempts ─────────────────
-      const { headers: injectedHeaders, body: injectedBody } = await this.resolveInjections(step.inject);
-      const resolvedBody = await this.resolveBodyTemplates(step.body || {});
-      const finalBody = { ...injectedBody, ...resolvedBody };
-      const inputCaptured = await this.captureInputToMemory(step.captureInput, finalBody);
-      const resolvedPath = await this.resolvePathParams(step.path, finalBody);
-      const fullUrl = `${baseUrl.replace(/\/$/, '')}${resolvedPath}`;
+      let injectedHeaders: Record<string, string> = {};
+      let finalBody: Record<string, any> = {};
+      let resolvedQuery: Record<string, any> = {};
+      let resolvedPath = step.path;
+      let fullUrl = '';
+      let inputCaptured: string[] = [];
+      try {
+        const injections = await this.resolveInjections(step.inject);
+        injectedHeaders = injections.headers;
+        const resolvedBody = await this.resolveBodyTemplates(step.body || {});
+        finalBody = { ...injections.body, ...resolvedBody };
+        resolvedQuery = await this.resolveBodyTemplates(step.query || {});
+        inputCaptured = await this.captureInputToMemory(step.captureInput, finalBody);
+        resolvedPath = await this.resolvePathParams(step.path, finalBody);
+        fullUrl = `${baseUrl.replace(/\/$/, '')}${resolvedPath}`;
+      } catch (err: any) {
+        state.results.push({
+          stepIndex: i + 1,
+          name: stepName,
+          method: step.method,
+          path: step.path,
+          targetUrl: '',
+          expectedStatus: step.expectStatus ?? 200,
+          actualStatus: 0,
+          durationMs: Date.now() - stepStartTime,
+          passed: false,
+          skipped: false,
+          retryCount: 0,
+          requestHeaders: {},
+          requestBody: {},
+          responseBody: null,
+          capturedMemory: [],
+          error: `Step ${i + 1} "${stepName}": ${err?.message || err}`,
+        });
+        state.allPassed = false;
+        state.halted = true;
+        return 'stop';
+      }
       const expectedStatus = step.expectStatus ?? 200;
 
       // ── Retry loop ────────────────────────────────────────────────────────
@@ -268,6 +386,7 @@ export class WorkflowSimulator {
       let responseBody: any = null;
       let stepPassed = false;
       let errorMsg: string | undefined;
+      let connectionCode: string | undefined;
 
       while (attempts < maxAttempts) {
         attempts++;
@@ -277,24 +396,41 @@ export class WorkflowSimulator {
         responseStatus = 0;
         responseBody = null;
         errorMsg = undefined;
+        connectionCode = undefined;
 
+        const timeoutMs = step.timeoutMs ?? this.requestTimeoutMs;
         try {
+          const upperMethod = step.method.toUpperCase();
           const fetchOptions: RequestInit = {
-            method: step.method.toUpperCase(),
+            method: upperMethod,
             headers: { 'Content-Type': 'application/json', ...injectedHeaders },
           };
 
-          if (!['GET', 'HEAD'].includes(step.method.toUpperCase()) && Object.keys(finalBody).length > 0) {
+          if (!['GET', 'HEAD'].includes(upperMethod) && Object.keys(finalBody).length > 0) {
             fetchOptions.body = JSON.stringify(finalBody);
+          }
+          if (timeoutMs > 0) {
+            fetchOptions.signal = AbortSignal.timeout(timeoutMs);
           }
 
           let finalUrl = fullUrl;
-          if (['GET', 'HEAD'].includes(step.method.toUpperCase()) && Object.keys(finalBody).length > 0) {
+          const bodyAsQuery = ['GET', 'HEAD'].includes(upperMethod) && Object.keys(finalBody).length > 0;
+          if (Object.keys(resolvedQuery).length > 0 || bodyAsQuery) {
             const params = new URLSearchParams();
-            for (const [k, v] of Object.entries(finalBody)) {
-              if (v !== undefined && v !== null) params.set(k, String(v));
-            }
-            finalUrl = `${fullUrl}?${params.toString()}`;
+            const append = (source: Record<string, any>) => {
+              for (const [k, v] of Object.entries(source)) {
+                if (v === undefined || v === null) continue;
+                if (Array.isArray(v)) {
+                  for (const item of v) params.append(k, typeof item === 'object' ? JSON.stringify(item) : String(item));
+                } else {
+                  params.append(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
+                }
+              }
+            };
+            append(resolvedQuery);
+            if (bodyAsQuery) append(finalBody);
+            const qs = params.toString();
+            if (qs) finalUrl = `${fullUrl}${fullUrl.includes('?') ? '&' : '?'}${qs}`;
           }
 
           const resp = await fetch(finalUrl, fetchOptions);
@@ -317,7 +453,14 @@ export class WorkflowSimulator {
           if (stepPassed) break; // success — stop retrying
         } catch (err: any) {
           stepPassed = false;
-          errorMsg = err.message || String(err);
+          connectionCode = networkErrorCode(err);
+          if (err?.name === 'TimeoutError' || connectionCode === 'ETIMEDOUT') {
+            errorMsg = `Request timed out after ${timeoutMs}ms (${step.method} ${resolvedPath}).`;
+          } else if (connectionCode === 'ECONNREFUSED') {
+            errorMsg = `Connection refused (ECONNREFUSED) at ${baseUrl} — the server is not accepting connections.`;
+          } else {
+            errorMsg = err?.message || String(err);
+          }
         }
       }
 
@@ -342,6 +485,7 @@ export class WorkflowSimulator {
         retryCount: attempts - 1,
         requestHeaders: injectedHeaders,
         requestBody: finalBody,
+        ...(Object.keys(resolvedQuery).length > 0 ? { requestQuery: resolvedQuery } : {}),
         responseBody,
         capturedMemory: stepPassed ? [...inputCaptured, ...responseCaptured] : [...inputCaptured],
         ...(stepPassed
@@ -355,6 +499,15 @@ export class WorkflowSimulator {
 
       if (!stepPassed) {
         state.allPassed = false;
+        if (connectionCode && CONNECTION_ERROR_CODES.has(connectionCode)) {
+          const remaining = workflow.steps.length - (i + 1);
+          result.failureHandling = 'aborted';
+          result.error = `${result.error || 'Connection failed'}; aborting early because the target is unreachable${
+            remaining > 0 ? ` (${remaining} step(s) not executed)` : ''
+          }.`;
+          state.halted = true;
+          return 'stop';
+        }
         if (onFailure === 'abort') {
           state.halted = true;
           return 'stop';
@@ -401,63 +554,126 @@ export class WorkflowSimulator {
     return 'done';
   }
 
-  private async resolveTemplateString(value: string): Promise<string> {
-    const templateRe = /\{\{([^}]+)\}\}/g;
-    let match: RegExpExecArray | null;
-    const replacements: Array<{ placeholder: string; resolved: string }> = [];
-
-    while ((match = templateRe.exec(value)) !== null) {
-      const expr = match[1].trim();
-
-      if (expr.includes(':') && !expr.startsWith('faker.')) {
-        const colonIdx = expr.indexOf(':');
-        const scope = expr.slice(0, colonIdx);
-        const key = expr.slice(colonIdx + 1);
-        if (scope === 'human') {
-          // Interactive value: JETIC_HUMAN_<KEY> env or pre-seeded `human:key`
-          // memory (see `jetic memory set human:<key>`). Non-interactive
-          // runners (like this one) never prompt — unset resolves to ''.
-          const envVal = process.env[`JETIC_HUMAN_${key.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`];
-          if (envVal !== undefined && envVal !== '') {
-            replacements.push({ placeholder: match[0], resolved: envVal });
-            continue;
+  private findPlaceholders(value: string): Array<{ raw: string; expr: string; index: number }> {
+    const placeholders: Array<{ raw: string; expr: string; index: number }> = [];
+    let i = 0;
+    while (i < value.length - 1) {
+      if (value[i] !== '{' || value[i + 1] !== '{') {
+        i++;
+        continue;
+      }
+      let depth = 0;
+      let closed = -1;
+      let j = i + 2;
+      while (j < value.length) {
+        const ch = value[j];
+        if (ch === '{') depth++;
+        else if (ch === '}') {
+          if (depth > 0) depth--;
+          else if (value[j + 1] === '}') {
+            closed = j;
+            break;
           }
         }
-        const mem = this.memory(scope);
-        const memVal = await mem.get(key);
-        replacements.push({ placeholder: match[0], resolved: memVal != null ? String(memVal) : '' });
-        continue;
+        j++;
       }
+      if (closed === -1) break;
+      placeholders.push({ raw: value.slice(i, closed + 2), expr: value.slice(i + 2, closed).trim(), index: i });
+      i = closed + 2;
+    }
+    return placeholders;
+  }
 
-      if (expr.startsWith('faker.')) {
-        const parts = expr.split('.');
-        try {
-          let fn: any = faker;
-          for (const part of parts.slice(1)) fn = fn[part];
-          const generated = typeof fn === 'function' ? fn() : fn;
-          replacements.push({ placeholder: match[0], resolved: String(generated) });
-        } catch {
-          replacements.push({ placeholder: match[0], resolved: expr });
-        }
-        continue;
-      }
+  private async resolveTemplateString(value: string, strict = this.strictTemplates): Promise<string> {
+    const placeholders = this.findPlaceholders(value);
+    if (placeholders.length === 0) return value;
 
-      replacements.push({ placeholder: match[0], resolved: match[0] });
+    let result = '';
+    let cursor = 0;
+    for (const placeholder of placeholders) {
+      result += value.slice(cursor, placeholder.index);
+      result += await this.resolveExpression(placeholder.expr, strict, placeholder.raw);
+      cursor = placeholder.index + placeholder.raw.length;
+    }
+    return result + value.slice(cursor);
+  }
+
+  private async resolveExpression(expr: string, strict: boolean, raw: string): Promise<string> {
+    if (expr.startsWith('faker.')) {
+      return this.resolveFakerExpression(expr, strict, raw);
     }
 
-    let result = value;
-    for (const { placeholder, resolved } of replacements) {
-      result = result.replace(placeholder, resolved);
+    if (expr.includes(':')) {
+      const colonIdx = expr.indexOf(':');
+      const scope = expr.slice(0, colonIdx);
+      const key = expr.slice(colonIdx + 1);
+      const envKey = `JETIC_HUMAN_${key.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+
+      if (scope === 'human') {
+        const envVal = process.env[envKey];
+        if (envVal !== undefined && envVal !== '') return envVal;
+      }
+      const memVal = await this.memory(scope).get(key);
+      if (memVal !== null && memVal !== undefined) {
+        return typeof memVal === 'string' ? memVal : JSON.stringify(memVal);
+      }
+      if (!strict) return '';
+      if (scope === 'human') {
+        throw new Error(
+          `missing human input ${raw} — set ${envKey} or seed "human:${key}" memory (non-interactive runners cannot prompt)`
+        );
+      }
+      throw new Error(
+        `unresolved template ${raw} — no value for "${scope}:${key}"; capture it in an earlier step or seed it first`
+      );
     }
-    return result;
+
+    return raw;
+  }
+
+  private resolveFakerExpression(expr: string, strict: boolean, raw: string): string {
+    if (/[({]/.test(expr)) {
+      if (!strict) return raw;
+      throw new Error(
+        `unsupported faker expression ${raw} — parameterized calls are not supported; use a parameterless path like {{faker.internet.email}} or a literal value`
+      );
+    }
+    let fn: any = faker;
+    for (const part of expr.split('.').slice(1)) fn = fn?.[part];
+    if (typeof fn !== 'function') {
+      if (!strict) return raw;
+      throw new Error(
+        `unknown faker path ${raw} — use a complete parameterless path like {{faker.internet.email}} or {{faker.string.uuid}}`
+      );
+    }
+    try {
+      return String(fn());
+    } catch (err: any) {
+      if (!strict) return raw;
+      throw new Error(
+        `faker expression ${raw} failed: ${err?.message || err} — this faker path needs arguments; parameterized faker calls are not supported`
+      );
+    }
   }
 
   private async resolveBodyTemplates(body: Record<string, any>): Promise<Record<string, any>> {
-    const resolved: Record<string, any> = {};
-    for (const [key, value] of Object.entries(body)) {
-      resolved[key] = typeof value === 'string' ? await this.resolveTemplateString(value) : value;
+    const resolved = await this.resolveDeep(body);
+    return resolved && typeof resolved === 'object' && !Array.isArray(resolved) ? resolved : {};
+  }
+
+  private async resolveDeep(value: any): Promise<any> {
+    if (typeof value === 'string') return this.resolveTemplateString(value);
+    if (Array.isArray(value)) {
+      const out: any[] = [];
+      for (const item of value) out.push(await this.resolveDeep(item));
+      return out;
     }
-    return resolved;
+    if (value && typeof value === 'object') {
+      const out: Record<string, any> = {};
+      for (const [key, item] of Object.entries(value)) out[key] = await this.resolveDeep(item);
+      return out;
+    }
+    return value;
   }
 
   private async resolveInjections(inject: Record<string, string> | undefined) {
@@ -475,8 +691,29 @@ export class WorkflowSimulator {
           : ['workflow', memKeyOrTemplate];
         const scopedMemory = this.memory(scope);
         const value = await scopedMemory.get(key);
-        if (value === null) continue;
+        if (value === null || value === undefined) {
+          if (this.strictTemplates) {
+            throw new Error(
+              `inject target "${target}" references "${scope}:${key}", which is not in memory — capture it earlier or seed it first`
+            );
+          }
+          continue;
+        }
         strValue = typeof value === 'string' ? value : JSON.stringify(value);
+      }
+
+      const headerName = target.startsWith('header:')
+        ? target.slice('header:'.length)
+        : target.startsWith('body:')
+          ? null
+          : target;
+      if (
+        headerName &&
+        headerName.toLowerCase() === 'authorization' &&
+        strValue &&
+        !/^[A-Za-z][A-Za-z0-9-]*\s/.test(strValue)
+      ) {
+        strValue = `Bearer ${strValue}`;
       }
 
       if (target.startsWith('body:')) {
@@ -526,22 +763,58 @@ export class WorkflowSimulator {
   }
 
   private async resolvePathParams(urlPath: string, body: Record<string, any>): Promise<string> {
-    let result = urlPath;
-    const paramMatches = urlPath.match(/:([a-zA-Z_][a-zA-Z0-9_]*)/g);
+    let result = await this.resolveTemplateString(urlPath);
+    const paramMatches = result.match(/:([a-zA-Z_][a-zA-Z0-9_]*)/g);
     if (!paramMatches) return result;
 
-    for (const p of paramMatches) {
+    for (const p of [...new Set(paramMatches)].sort((a, b) => b.length - a.length)) {
       const paramName = p.substring(1);
-      if (body[paramName] !== undefined) {
-        result = result.replace(p, String(body[paramName]));
-      } else {
-        const memory = this.memory('workflow');
-        const memVal = await memory.get(paramName);
-        if (memVal !== null) {
-          result = result.replace(p, String(memVal));
-        }
+      let value: any = body[paramName];
+      if (value === undefined || value === null) {
+        value = await this.memory('workflow').get(paramName);
+      }
+      if (value !== undefined && value !== null) {
+        result = result.split(p).join(typeof value === 'string' ? value : String(value));
+        continue;
+      }
+      if (this.strictTemplates) {
+        throw new Error(
+          `unresolved path parameter "${p}" in "${urlPath}" — provide it through a body field, a {{template}}, or a memory key named "${paramName}"`
+        );
       }
     }
     return result;
+  }
+
+  private async runPreflight(baseUrl: string, timeoutMs: number): Promise<PreflightProbe> {
+    const probe: PreflightProbe = { url: baseUrl, verdict: 'unreachable', message: '', aborted: false };
+    try {
+      const resp = await fetch(baseUrl, {
+        method: 'GET',
+        redirect: 'manual',
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      probe.status = resp.status;
+      if (resp.status >= 500) {
+        probe.verdict = 'server-error';
+        probe.message = `Server is reachable at ${baseUrl} but responded HTTP ${resp.status} — the app is likely failing (database/init error). Check the server logs before simulating.`;
+      } else {
+        probe.verdict = 'healthy';
+        probe.message = `Server reachable at ${baseUrl} (HTTP ${resp.status}).`;
+      }
+    } catch (err: any) {
+      const code = networkErrorCode(err);
+      probe.status = undefined;
+      if (err?.name === 'TimeoutError' || code === 'ETIMEDOUT') {
+        probe.message = `No response from ${baseUrl} within ${timeoutMs}ms — the server may be down or hanging.`;
+      } else if (code === 'ECONNREFUSED') {
+        probe.message = `Connection refused at ${baseUrl} — nothing is listening there. Start the app (check its PORT/.env) and retry.`;
+      } else if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
+        probe.message = `DNS lookup failed for ${baseUrl}${code ? ` (${code})` : ''} — check the host name.`;
+      } else {
+        probe.message = `Cannot reach ${baseUrl}${code ? ` (${code})` : ''}: ${err?.message || err}`;
+      }
+    }
+    return probe;
   }
 }

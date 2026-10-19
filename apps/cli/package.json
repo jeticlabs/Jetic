@@ -1,13 +1,14 @@
 {
   "name": "jetic-cli",
-  "version": "0.2.6",
-  "description": "Code-aware, deterministic API toolkit for Node.js",
+  "version": "0.2.7",
+  "description": "Code-aware, deterministic API toolkit",
   "main": "dist/index.js",
   "bin": {
     "jetic": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "public"
   ],
   "scripts": {
     "build": "tsup && node -e \"try { const fs = require('fs'); fs.rmSync('./dist/dashboard', { recursive: true, force: true }); fs.cpSync('../dashboard/dist', './dist/dashboard', { recursive: true }); console.log('Bundled dashboard into dist/dashboard'); } catch (e) { console.warn('Could not bundle dashboard dist (build @jetic/dashboard first):', e.message); }\"",
@@ -30,7 +31,7 @@
   ],
   "author": "Jetic Labs",
   "license": "ISC",
-  "homepage": "https://jetic-web.onrender.com",
+  "homepage": "https://docs.jetic.space",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jeticlabs/jetic.git",

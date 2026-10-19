@@ -16,6 +16,8 @@ apps/web/dist
 apps/web/build
 apps/web/coverage
 
+
+tutorials/
 # Jetic directories
 .jetic/
 

@@ -4,6 +4,14 @@ import * as path from 'path';
 import { loadModel, projectRootOfModel } from '../types';
 import { listWorkflowFiles, loadWorkflowByName, readWorkflowDefinitionFile } from '@jetic/model';
 import { WorkflowSimulator, WorkflowDef } from '@jetic/simulator';
+import {
+  compactSimulationResult,
+  deriveRunStatus,
+  newRunId,
+  writeRunError,
+  writeRunningStatus,
+  writeSimulationRun,
+} from '../run-store';
 
 export const listWorkflowsSchema = z.object({
   projectPath: z.string().optional().describe('Path to project root or .jetic folder'),
@@ -119,6 +127,34 @@ export const simulateWorkflowSchema = z.object({
   envName: z.string().optional().describe('Target environment name (e.g., local, staging)'),
   baseUrl: z.string().optional().describe('Override target base URL (e.g. http://localhost:3000)'),
   clearMemory: z.boolean().optional().default(false).describe('If true, clears Jetic memory before execution'),
+  includeStepResults: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe('Return every step\'s full request/response detail (large payload). Default false returns a compact per-step summary plus a runId — use jetic_get_run for full detail.'),
+  async: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe('Start the run in the background and return immediately with a runId. Poll it with jetic_get_run or jetic_list_runs.'),
+  preflight: z
+    .enum(['abort', 'warn', 'off'])
+    .optional()
+    .default('abort')
+    .describe('Probe the target baseUrl before step 1. "abort" (default) fails fast when the server is unreachable; "warn" records the probe and continues; "off" skips it.'),
+  strictTemplates: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe('Fail a step before sending when a {{template}} or :path param has no value (default true). Set false to restore legacy empty-string behaviour.'),
+  requestTimeoutMs: z
+    .number()
+    .int()
+    .positive()
+    .max(120000)
+    .optional()
+    .default(30000)
+    .describe('Per-request timeout in ms (default 30000, max 120000).'),
 });
 
 export async function handleSimulateWorkflow(args: z.infer<typeof simulateWorkflowSchema>) {
@@ -228,15 +264,73 @@ export async function handleSimulateWorkflow(args: z.infer<typeof simulateWorkfl
   // Memory and switch targets belong to the project being served, which is not necessarily the
   // server's working directory (e.g. `jetic mcp --project X`).
   const projectRoot = projectRootOfModel(filePath);
-  const workflowsDir = path.join(path.dirname(filePath), 'workflows');
+  const jeticDir = path.dirname(filePath);
+  const workflowsDir = path.join(jeticDir, 'workflows');
   const simulator = new WorkflowSimulator(model, effectiveEnv, { projectRoot });
-  const result = await simulator.simulateWorkflow(workflowDef, {
-    clearMemory: args.clearMemory ?? false,
-    loadWorkflow: (slugOrName) => loadWorkflowByName<WorkflowDef>(workflowsDir, slugOrName),
-  });
 
+  const runId = newRunId();
+  const startedAt = new Date().toISOString();
+  const runMeta = {
+    workflowName: workflowDef.name || selectedItem.name,
+    environment: effectiveEnv.name,
+    baseUrl: effectiveEnv.baseUrl,
+    startedAt,
+  };
+
+  const execute = async () => {
+    const result = await simulator.simulateWorkflow(workflowDef, {
+      clearMemory: args.clearMemory ?? false,
+      loadWorkflow: (slugOrName) => loadWorkflowByName<WorkflowDef>(workflowsDir, slugOrName),
+      strictTemplates: args.strictTemplates ?? true,
+      preflight: args.preflight ?? 'abort',
+      requestTimeoutMs: args.requestTimeoutMs ?? 30000,
+    });
+    const finishedAt = new Date().toISOString();
+    const { reportPath } = writeSimulationRun(jeticDir, runId, result, {
+      startedAt,
+      finishedAt,
+      workflowFile: selectedItem!.filePath,
+    });
+    return { result, reportPath };
+  };
+
+  // 5. Async mode: persist a "running" marker, hand the runId back immediately,
+  //    and record the outcome when the background run finishes.
+  if (args.async) {
+    writeRunningStatus(jeticDir, runId, runMeta);
+    execute()
+      .then(() => undefined)
+      .catch((err) => {
+        try {
+          writeRunError(jeticDir, runId, err, runMeta);
+        } catch {
+          // Status file is best-effort — never surface an unhandled rejection.
+        }
+      });
+    return {
+      status: 'running',
+      runId,
+      workflowName: runMeta.workflowName,
+      environment: { name: effectiveEnv.name, baseUrl: effectiveEnv.baseUrl },
+      message: `Run started in the background against ${effectiveEnv.baseUrl}. Poll with jetic_get_run { "runId": "${runId}" } or jetic_list_runs.`,
+    };
+  }
+
+  const { result, reportPath } = await execute();
+
+  // 6. Compact by default (one line per step); full bodies only on request.
+  if (args.includeStepResults) {
+    return {
+      runId,
+      status: deriveRunStatus(result),
+      reportPath,
+      filePath,
+      workflowFile: selectedItem.filePath,
+      ...result,
+    };
+  }
   return {
-    ...result,
+    ...compactSimulationResult(result, runId, reportPath),
     filePath,
     workflowFile: selectedItem.filePath,
   };

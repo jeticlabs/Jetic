@@ -1,212 +1,124 @@
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/brand/jetic.svg">
+  <img src="public/brand/jetic-black.svg" alt="Jetic" width="64">
+</picture>
+
+# Jetic CLI
+
+**Code-aware. Deterministic. Zero setup.**  
+Scan your backend, model endpoints, author workflows, and simulate stateful API flows — straight from your terminal.
+
+<br/>
+
 <p align="center">
-  <img src="public/jetic_logo.png" alt="Jetic Banner" width="140">
-</p>
-
-<h1 align="center">Jetic CLI</h1>
-
-
-<p align="center">
-  <a href="#-quickstart">Quickstart</a> •
-  <a href="#-the-4-phase-workflow">4-Phase Workflow</a> •
-  <a href="#-ai-ide-integration-mcp">AI IDE Setup</a> •
-  <a href="#-cli-commands">CLI Reference</a> •
-  <a href="#-jetic-studio">Jetic Studio</a>
-</p>
-
-<p align="center">
-  <a href="https://www.npmjs.com/package/jetic-cli"><img src="https://img.shields.io/npm/v/jetic-cli.svg" alt="NPM Version"></a>
+  <a href="https://www.npmjs.com/package/jetic-cli"><img src="https://img.shields.io/npm/v/jetic-cli.svg" alt="Latest NPM Version"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen" alt="Node Version">
-  <img src="https://img.shields.io/badge/AST-ts--morph-blueviolet" alt="ts-morph">
   <img src="https://img.shields.io/badge/license-ISC-green.svg" alt="License">
 </p>
 
+[Website](https://www.jetic.space/cli) · [Docs](https://docs.jetic.space) · [Contributing](https://github.com/jeticlabs/Jetic/blob/main/CONTRIBUTING.md)
+
+</div>
+
 ---
 
-## ⚡ Quickstart
+## Install
 
-Get started in under **60 seconds** — **no AI keys or third-party provider setup required**.
-
-### 1. Install globally
 ```bash
 npm install -g jetic-cli
 ```
 
-### 2. Initialize & Scan your backend
-Navigate to your backend project directory (e.g., Express + TypeScript):
+> Or run without installing: `npx jetic-cli --help`
+
+---
+
+## Quickstart
+
 ```bash
-# Scaffold .jetic/ directory
+# 1. Initialize your project
 jetic init
 
-# Static AST scan of backend source code to build .jetic/model.json
+# 2. Scan Express/TypeScript routes (auto-discovers endpoints)
 jetic scan
-```
 
-### 3. Launch Jetic Studio or connect your AI IDE
-```bash
-# Option A: Launch the visual developer dashboard (http://localhost:8787)
+# 3. Launch Jetic Studio
 jetic dev
-
-# Option B: Run MCP server for AI IDE assistant (Cursor, Antigravity, VS Code, opencode)
-jetic mcp
 ```
+
+For all other stacks, connect via MCP and let your AI editor model the API for you — no scanner needed.
 
 ---
 
-## 🔄 The 4-Phase Workflow
+## MCP Setup (Recommended)
 
-Jetic operates on a strict, predictable 4-phase lifecycle for total model fidelity:
+Connect Jetic to your AI editor (Cursor, Claude Code, VS Code, Windsurf, opencode) in seconds:
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│ 1. INITIALIZE   │ ──► │ 2. SCAN & MODEL │ ──► │ 3. VERIFY       │ ──► │ 4. SIMULATE     │
-│ (jetic init)    │     │ (jetic scan)    │     │ (jetic verify)  │     │ (jetic simulate)│
-└─────────────────┘     └─────────────────┘     └─────────────────┘     └─────────────────┘
-```
-
-1. **Phase 1 — Initialize (`jetic init`)**: Scaffolds the `.jetic/` directory and empty `model.json` in your project root.
-2. **Phase 2 — Scan & Model (`jetic scan`)**: Static AST analysis discovers Express routes, nested paths, path parameters, source locations, and recognizable middleware. It does not infer request/response schemas or business constraints. Other frameworks can be modeled manually or via MCP.
-3. **Phase 3 — Verify (`jetic_verify_model`)**: Validates model structure and ensures all fields (descriptions, tags, parameter/response details) are complete and error-free.
-4. **Phase 4 — Simulate (`jetic simulate`)**: Executes multi-step workflows with dynamic state capture (`captureInput` / `capture`) and header injection (`Authorization: Bearer {{workflow:token}}`).
-
----
-
-## 🤖 AI IDE Integration (MCP)
-
-Jetic comes with a built-in **Model Context Protocol (MCP)** server so your editor's AI assistant (opencode, Antigravity, Cursor, Claude Code, VS Code) can manage your API model directly — **using your editor's own model with no API keys**.
-
-### Setup (e.g. `opencode.json` or Cursor `mcp.json`):
 ```json
 {
   "mcp": {
     "jetic": {
       "type": "local",
-      "command": ["jetic", "mcp"],
+      "command": ["cmd", "/c", "jetic", "mcp"],
+      "cwd": "C:/path/to/your-backend",
       "enabled": true
     }
   }
 }
 ```
-*(On Windows, use `"command": ["cmd", "/c", "jetic", "mcp"]`)*
 
-### 💬 Example Prompts for AI IDE
+> macOS/Linux: replace `["cmd", "/c", "jetic", "mcp"]` with `["jetic", "mcp"]`.
 
-Use these prompt templates with your editor's AI assistant (opencode, Antigravity, Cursor, Claude Code, VS Code) to manage initialization, model creation, and workflow simulation:
-
-#### 🚀 Phase 1: Initialize Project (`init`)
-> **Session Health & Quickstart:**  
-> *"Call `jetic_get_session_phase`. If the model is not initialized, run `jetic_init` to scaffold `.jetic/` and guide me through setting up the API."*
-
-> **Fresh Repository Scaffold:**  
-> *"Initialize Jetic in this workspace (`jetic_init`), configure project metadata for our TypeScript backend, and verify that `.jetic/model.json` exists."*
-
-#### 📐 Phase 2 & 3: Create & Verify Model (`create model`)
-> **Automated AST Scan & Verification:**  
-> *"Scan our backend codebase (`jetic_scan`) to populate endpoints. Then run `jetic_verify_model` to highlight any missing descriptions, schemas, or tags."*
-
-> **Model Completeness & Audit:**  
-> *"Run `jetic_verify_model`. Update every endpoint with missing descriptions or tags using `jetic_update_endpoint`, and re-verify until the model status is 100% complete and valid."*
-
-> **Selective AI Re-Modelling via Change Log (`changes.json`):**  
-> *"Check recent file changes (`jetic_get_changes`). Re-analyse ONLY those modified files to update `.jetic/model.json` instead of reading the entire codebase, then clear the change log (`jetic_clear_changes`)."*
-
-#### ⚡ Phase 4: Create & Run Workflows (`create workflow`)
-> **Scaffold & Create Workflow:**  
-> *"Scaffold a user onboarding workflow (`jetic_scaffold_workflow`) with `POST /api/auth/register` and `GET /api/users/me`. Automatically inject the auth token, validate the workflow, and save it to `.jetic/workflows/user-onboarding.json`."*
-
-> **Advanced Workflow with Conditions & Retry Logic:**  
-> *"Build an order fulfillment workflow. Step 1: Login. Step 2: Create Order. Step 3: Payment (add step condition `if {{workflow:userRole}} equals "admin"` and `retry` up to 3 times on failure). Validate (`jetic_validate_workflow`) and save it."*
-
-> **Human Input Workflow (2FA / OTP):**  
-> *"Build a sensitive transfer workflow that requires human 2FA. Scaffold the steps, use `{{human:otp_code}}` for the verification payload, set `retry: { "times": 2, "delayMs": 1000 }`, and save to `.jetic/workflows/transfer.json`."*
-
-#### 🎯 All-in-One Master Prompt
-> *"Run `jetic_get_session_phase` and follow the Jetic 4-Phase protocol: 1. Initialize `.jetic/` if missing. 2. Scan the source code and verify the model until all endpoint descriptions are complete. 3. Ask me what integration scenario I want to test, then scaffold, validate, and save the workflow."*
+Full MCP setup guide → [docs.jetic.space](https://docs.jetic.space)
 
 ---
 
-## 💻 CLI Commands
+## CLI Reference
 
 | Command | Description |
-|---|---|
-| `jetic init` | Scaffold `.jetic/` folder without provider or API-key configuration |
-| `jetic scan` | Static Express/TypeScript route analysis |
-| `jetic inspect` | Inspect summary metrics or specific endpoint schemas in terminal |
-| `jetic simulate endpoint` | Test live HTTP endpoints against local/staging server |
-| `jetic simulate workflow` | Execute multi-step stateful workflows from `.jetic/workflows/` |
-| `jetic dev` | Launch local **Jetic Studio** dashboard UI on port `8787` with real-time SSE file watcher & `changes.json` live stream |
-| `jetic model list` / `jetic model export --yaml` | List model endpoints, or export `model.json` into the split YAML layout (`.jetic/model/api.yaml` + `paths/*.yaml` + `security/*.yaml`) |
-| `jetic adapter list` / `jetic adapter inspect <id>` | List/inspect framework scanner adapters (currently: Express) |
-| `jetic agent list` / `jetic agent run <id>` | List/run deterministic agents (`model-watcher`, `workflow-impact`); writes a report to `.jetic/runs/<runId>/agent-report.json` |
-| `jetic doctor` | Diagnose setup problems (Node version, config, adapter detection, model/workflow validity, port availability) |
-| `jetic activity list` | List endpoint added/removed events detected by `jetic scan` |
-| `jetic memory` | View, set, or clear runtime variable memory (`.jetic/memory.json`) |
-| `jetic mcp` | Start stdio MCP server for AI IDE integration (includes `jetic_get_changes` & `jetic_clear_changes`) |
+| :--- | :--- |
+| `jetic init` | Scaffold `.jetic/` workspace — no AI keys or provider setup |
+| `jetic scan` | AST-scan Express/TS routes → `model.json` |
+| `jetic inspect` | Inspect endpoints, schemas and model summary |
+| `jetic simulate endpoint` | Simulate single or all endpoints against a live server |
+| `jetic simulate workflow` | Execute a saved multi-step workflow |
+| `jetic dev` | Launch Jetic Studio (port 8787) |
+| `jetic mcp` | Start MCP server over stdio |
+| `jetic memory` | View/manage runtime state (`memory.json`) |
+| `jetic model` | List or export the behavioral model (`--yaml`) |
+| `jetic adapter` | List/inspect framework scanner adapters |
+| `jetic agent` | Run deterministic model agents |
+| `jetic activity` | List endpoint added/removed events from scans |
+| `jetic tool` | List tools declared in `jetic.tools.ts` |
+| `jetic doctor` | Diagnose setup issues |
+| `jetic upgrade` | Check and upgrade dependencies |
+
+Full command reference → [docs.jetic.space](https://docs.jetic.space)
 
 ---
 
-## 🖥️ Jetic Studio
+## Jetic Studio
 
-Run `jetic dev` to open the local web developer studio:
+`jetic dev` opens a local web IDE with:
 
-- **Behavioral Model (`/model`)**: Explore endpoints, request/response schemas, and AST source code lines.
-- **Simulations (`/simulations`)**: Saved workflow runner with real-time SSE execution logs.
-- **Files Changes (`/changes`)**: Real-time SSE stream observer for `.jetic/changes.json` — track modified source files live without browser reloads.
-- **Memory Inspector (`/memory`)**: Edit captured tokens, fake test data, and session variables.
-- **Visual Traces (`/traces`)**: Interactive node-graph execution visualizer powered by ReactFlow.
-
----
-
-## 📄 Artifact Schemas
-
-### `.jetic/model.json` (Behavioral Model)
-
-```json
-{
-  "version": "0.3",
-  "project": { "name": "my-api", "language": "typescript", "framework": "express" },
-  "environments": [{ "name": "local", "baseUrl": "http://localhost:3000" }],
-  "endpoints": [
-    {
-      "id": "post-api-auth-login",
-      "method": "POST",
-      "path": "/api/auth/login",
-      "description": "User authentication endpoint",
-      "tags": ["auth"],
-      "requestBody": {
-        "fields": {
-          "email": { "type": "string", "format": "email", "required": true },
-          "password": { "type": "string", "minLength": 8, "required": true }
-        }
-      },
-      "responses": {
-        "200": { "description": "Returns JWT token", "schema": { "token": "string" } }
-      }
-    }
-  ]
-}
-```
-
-### `.jetic/changes.json` (File Changes Tracking Log)
-
-```json
-{
-  "version": 1,
-  "watchedSince": "2026-09-18T10:00:00.000Z",
-  "projectRoot": "C:/projects/my-api",
-  "changes": [
-    {
-      "filePath": "src/routes/user.routes.ts",
-      "absolutePath": "C:/projects/my-api/src/routes/user.routes.ts",
-      "changedAt": "2026-09-18T14:20:00.000Z",
-      "eventType": "change"
-    }
-  ]
-}
-```
+- **Model Explorer** — browse, search, and manually add endpoints
+- **Endpoint Inspect** — AST source viewer, schema explorer, live REST client
+- **Workflow Simulations** — multi-step runner with SSE live streaming
+- **Memory Inspector** — view and edit runtime state (`memory.json`)
+- **Execution Traces** — ReactFlow node-graph observability
+- **File Changes** — real-time source change tracker with MCP integration
 
 ---
 
-<p align="center">
-  <i>Built with ❤️ by the Jetic Team.</i>
-</p>
+## Contributing
 
+See [CONTRIBUTING.md](https://github.com/jeticlabs/Jetic/blob/main/CONTRIBUTING.md) for setup instructions and PR guidelines.
+
+---
+
+## License
+
+[ISC](https://github.com/jeticlabs/Jetic/blob/main/LICENSE)
+
+<p align="center"><i>Built with care by the Jetic Team. Star us on GitHub if Jetic helps you.</i></p>

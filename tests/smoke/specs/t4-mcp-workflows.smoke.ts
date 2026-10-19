@@ -114,9 +114,9 @@ describe('Tier 4 — workflow authoring', () => {
     expect(unrecognized.isError).toBe(true); // rejected before the handler: matches neither accepted shape
   });
 
-  // The validator tells authors to capture the id into memory and rely on it for `/orders/:id` — and
-  // refuses the other style, `inject: { "body:id": … }`, that every runner handles.
-  test.failing('KG-31 the validator accepts a path param supplied through inject "body:<name>"', async () => {
+  // Both styles are valid: a memory key matching the param name (`workflow:id`) or a body injection
+  // (`inject: { "body:id": "workflow:orderId" }`), which every runner merges before path resolution.
+  test('KG-31 the validator accepts a path param supplied through inject "body:<name>"', async () => {
     const result = await session.call('jetic_validate_workflow', { definition: happyCheckout });
     expect(result.data.valid).toBe(true);
   });
@@ -142,35 +142,82 @@ describe('Tier 4 — live execution', () => {
   });
 
   test('SMK-408b simulate_workflow runs the saved workflow end to end; the alias behaves the same', async () => {
-    const run = await session.call('jetic_simulate_workflow', { workflow: 'checkout-memory-id' });
+    const run = await session.call('jetic_simulate_workflow', { workflow: 'checkout-memory-id', includeStepResults: true });
     expect(run.data).toMatchObject({ success: true, stats: { totalSteps: 4, executedSteps: 4, passedSteps: 4, failedSteps: 0 } });
     expect(run.data.results.map((r: any) => [r.name, r.actualStatus])).toEqual([['Register', 201], ['Login', 200], ['Create order', 201], ['Get order', 200]]);
+    expect(run.data.runId).toBeTruthy();
+    expect(run.data.reportPath).toContain('simulation-report.json');
     expect({ users: api.userCount(), orders: api.orderCount() }).toEqual({ users: 1, orders: 1 });
     expect(project.readJson('.jetic', 'memory.json').workflow.accessToken.value).toMatch(/^tok_/);
 
     api.reset();
+    // Default (no includeStepResults): compact summary — steps, no full result bodies.
     const alias = await session.call('jetic_simulate', { workflow: 'checkout-memory-id', clearMemory: true });
     expect(alias.data).toMatchObject({ success: true, stats: { passedSteps: 4 } });
+    expect(alias.data.results).toBeUndefined();
+    expect(alias.data.steps.map((s: any) => s.status)).toEqual(['passed', 'passed', 'passed', 'passed']);
     expect({ users: api.userCount(), orders: api.orderCount() }).toEqual({ users: 1, orders: 1 });
+
+    // The compact runId leads to the full stored report.
+    const stored = await session.call('jetic_get_run', { runId: alias.data.runId });
+    expect(stored.data).toMatchObject({ found: true, type: 'simulation', status: 'passed' });
+    expect(stored.data.result.results[0].requestBody.email).toBeTruthy();
   });
 
   test('SMK-408c a failing run reports success:false with the failing step; unknown workflows are errors', async () => {
     const failing = { name: 'failing', steps: [{ name: 'Missing', method: 'GET', path: '/api/nope', expectStatus: 200 }] };
     await session.call('jetic_create_workflow', { ...failing, allowUnknownEndpoints: true });
-    const run = await session.call('jetic_simulate_workflow', { workflow: 'failing' });
+    const run = await session.call('jetic_simulate_workflow', { workflow: 'failing', includeStepResults: true });
     expect(run.ok).toBe(true); // the tool worked; the workflow did not
-    expect(run.data).toMatchObject({ success: false, stats: { failedSteps: 1 } });
+    expect(run.data).toMatchObject({ success: false, status: 'failed', stats: { failedSteps: 1 } });
     expect(run.data.results[0]).toMatchObject({ actualStatus: 404, passed: false });
 
     expect((await session.call('jetic_simulate_workflow', { workflow: 'does-not-exist' })).isError).toBe(true);
   });
 
-  test('SMK-408d an unreachable server fails the run instead of throwing', async () => {
+  test('SMK-408d an unreachable server is detected up front — no requests, clear reason', async () => {
     const dead = `http://127.0.0.1:${await getFreePort()}`;
+    api.reset();
     const run = await session.call('jetic_simulate_workflow', { workflow: 'checkout-memory-id', baseUrl: dead });
-    expect(run.data.success).toBe(false);
-    expect(run.data.results[0]).toMatchObject({ passed: false, actualStatus: 0 });
-    expect(run.data.results[0].error).toMatch(/fetch failed|ECONNREFUSED/i);
+    expect(run.ok).toBe(true); // the run failed; the tool call itself did not throw
+    expect(run.data).toMatchObject({ success: false, status: 'aborted', stats: { executedSteps: 0 } });
+    expect(run.data.preflight).toMatchObject({ verdict: 'unreachable', aborted: true });
+    expect(run.data.abortReason).toMatch(/refused|listening|Cannot reach/i);
+    expect(run.data.steps).toEqual([]); // stopped before step 1
+
+    const stored = await session.call('jetic_get_run', { runId: run.data.runId });
+    expect(stored.data.status).toBe('aborted');
+  });
+
+  test('SMK-408e runs persist under .jetic/runs/ and can be listed; async mode returns immediately', async () => {
+    api.reset();
+    const started = await session.call('jetic_simulate_workflow', {
+      workflow: 'checkout-memory-id',
+      async: true,
+      clearMemory: true,
+    });
+    expect(started.data).toMatchObject({ status: 'running' });
+    const runId = started.data.runId as string;
+    expect(runId).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    // Poll the persisted status until the background run finishes.
+    let status = 'running';
+    for (let i = 0; i < 50 && status === 'running'; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      status = (await session.call('jetic_get_run', { runId })).data.status;
+    }
+    expect(status).toBe('passed');
+
+    const full = await session.call('jetic_get_run', { runId });
+    expect(full.data.result.results.map((r: any) => r.name)).toEqual(['Register', 'Login', 'Create order', 'Get order']);
+    expect(project.readJson('.jetic', 'runs', runId, 'simulation-status.json').status).toBe('passed');
+
+    const listed = await session.call('jetic_list_runs', {});
+    expect(listed.data.runs[0]).toMatchObject({ runId, type: 'simulation', status: 'passed' });
+
+    const missing = await session.call('jetic_get_run', { runId: 'no-such-run' });
+    expect(missing.isError).toBe(true);
+    expect(missing.text).toContain('not found');
   });
 });
 
