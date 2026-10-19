@@ -210,12 +210,14 @@ describe('Tier 2 — jetic test', () => {
     expect(report(once.stdout).results[0].failures[0]).toMatchObject({ step: 'Flaky call', status: 503 });
   });
 
-  test('SMK-210b an unreachable server fails the workflow with the connection error, not a hang', async () => {
+  test('SMK-210b an unreachable server fails the workflow once, at the preflight, not a hang', async () => {
     const project = await createShopProject({ baseUrl: `http://127.0.0.1:${await getFreePort()}`, workflows: { 'happy-checkout': happyCheckout } });
     const result = await cli(project, ['test', '--ci'], 1);
     const body = report(result.stdout);
     expect(body.failed).toBe(1);
-    expect(body.results[0].failures[0].error).toMatch(/fetch failed|ECONNREFUSED/i);
+    expect(body.results[0].failures).toEqual([
+      { step: 'preflight', status: 0, error: expect.stringMatching(/ECONNREFUSED/) },
+    ]);
   });
 
   // 201 is expected, the API answers 200; "any 2xx passes when expecting 2xx" hides that.

@@ -101,6 +101,8 @@ export interface PreflightProbe {
   verdict: 'healthy' | 'server-error' | 'unreachable';
   status?: number;
   message: string;
+  /** Set on a 5xx whose body names an infrastructure failure (e.g. the database is down). */
+  cause?: string;
   /** True when the run was stopped before step 1 because of this probe. */
   aborted: boolean;
 }
@@ -146,6 +148,26 @@ export const CONNECTION_ERROR_CODES = new Set([
 export function networkErrorCode(error: any): string | undefined {
   const raw = error?.cause?.code ?? error?.cause?.errno ?? error?.code ?? error?.errno;
   return typeof raw === 'string' ? raw : undefined;
+}
+
+/**
+ * Signatures of a backend whose own dependencies are down (database, cache), as they appear in
+ * a 5xx body. Every later step would fail for the same reason, so such a response is reported
+ * as an infrastructure failure rather than an API defect.
+ */
+const INFRA_FAILURE_PATTERNS: Array<[RegExp, string]> = [
+  [/\bP1001\b|Can't reach database server/i, 'the database is unreachable (Prisma P1001)'],
+  [/PrismaClientInitializationError/, 'the Prisma client failed to initialize (database connection)'],
+  [/Sequelize\w*Connection\w*Error/, 'the database connection failed (Sequelize)'],
+  [/MongoNetworkError|MongoServerSelectionError/, 'MongoDB is unreachable'],
+  [/ECONNREFUSED[^"'\n]*:(5432|3306|1433|27017|6379)\b/, 'a database/cache connection was refused'],
+];
+
+/** Names the infrastructure failure a 5xx body points at, or undefined when it looks like an ordinary API error. */
+export function detectInfraFailure(body: unknown): string | undefined {
+  if (body === undefined || body === null) return undefined;
+  const text = typeof body === 'string' ? body : JSON.stringify(body);
+  return INFRA_FAILURE_PATTERNS.find(([re]) => re.test(text))?.[1];
 }
 
 function deepGet(obj: any, dotPath: string): any {
@@ -229,7 +251,7 @@ export class WorkflowSimulator {
         ? await probeTarget(this.environment.baseUrl, options?.preflightTimeoutMs ?? 3000)
         : undefined;
 
-    if (preflight && preflightMode === 'abort' && preflight.verdict === 'unreachable') {
+    if (preflight && preflightMode === 'abort' && (preflight.verdict === 'unreachable' || preflight.cause)) {
       preflight.aborted = true;
       return {
         success: false,
@@ -574,6 +596,18 @@ export class WorkflowSimulator {
           state.halted = true;
           return 'stop';
         }
+        // A 5xx caused by the backend's own database/cache being down: the remaining steps would
+        // fail identically, so stop here even under onFailure: continue.
+        const infraCause = responseStatus >= 500 ? detectInfraFailure(responseBody) : undefined;
+        if (infraCause) {
+          const remaining = workflow.steps.length - (i + 1);
+          result.failureHandling = 'aborted';
+          result.error = `HTTP ${responseStatus}: ${infraCause}; aborting early because the target is unhealthy${
+            remaining > 0 ? ` (${remaining} step(s) not executed)` : ''
+          }.`;
+          state.halted = true;
+          return 'stop';
+        }
         if (onFailure === 'abort') {
           state.halted = true;
           return 'stop';
@@ -870,7 +904,11 @@ export async function probeTarget(baseUrl: string, timeoutMs = 3000): Promise<Pr
     probe.status = resp.status;
     if (resp.status >= 500) {
       probe.verdict = 'server-error';
-      probe.message = `Server is reachable at ${baseUrl} but responded HTTP ${resp.status} — the app is likely failing (database/init error). Check the server logs before simulating.`;
+      const body = await resp.text().catch(() => '');
+      probe.cause = detectInfraFailure(body.slice(0, 16_384));
+      probe.message = probe.cause
+        ? `Server is reachable at ${baseUrl} but responded HTTP ${resp.status}: ${probe.cause}. Fix the backend's infrastructure before simulating.`
+        : `Server is reachable at ${baseUrl} but responded HTTP ${resp.status} — the app is likely failing (database/init error). Check the server logs before simulating.`;
     } else {
       probe.verdict = 'healthy';
       probe.message = `Server reachable at ${baseUrl} (HTTP ${resp.status}).`;
@@ -881,7 +919,7 @@ export async function probeTarget(baseUrl: string, timeoutMs = 3000): Promise<Pr
     if (err?.name === 'TimeoutError' || code === 'ETIMEDOUT') {
       probe.message = `No response from ${baseUrl} within ${timeoutMs}ms — the server may be down or hanging.`;
     } else if (code === 'ECONNREFUSED') {
-      probe.message = `Connection refused at ${baseUrl} — nothing is listening there. Start the app (check its PORT/.env) and retry.`;
+      probe.message = `Connection refused (ECONNREFUSED) at ${baseUrl} — nothing is listening there. Start the app (check its PORT/.env) and retry.`;
     } else if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
       probe.message = `DNS lookup failed for ${baseUrl}${code ? ` (${code})` : ''} — check the host name.`;
     } else {

@@ -34,6 +34,14 @@ Missing `config.ai` — run `jetic config ai` or use MCP path (no key needed).
 
 ---
 
+## 🧪 `jetic_simulate_workflow` Aborts Before Step 1, or Replies `status: "running"`
+
+- **`aborted`, preflight `unreachable`** — nothing is listening on the environment `baseUrl`. Start the app (check its `PORT`), or check whether it crashed on boot, often because its database is unreachable.
+- **`aborted`, preflight `server-error` with a `cause`** — the app is up but its database is down (e.g. Prisma `P1001`). Fix the database connection, then rerun.
+- **`status: "running"`** — the run is longer than `waitMs` (45s by default) and continues in the background. Poll `jetic_get_run { "runId": "..." }` instead of starting it again; a second run on the same project is refused until the first finishes.
+
+---
+
 ## 🔄 Changes.json Never Clears
 
 After `jetic_get_changes` patch, call `jetic_clear_changes` — or `Clear Changes` button in `/changes`.

@@ -55,10 +55,15 @@ export const testCommand = new Command('test')
       const simulator = new WorkflowSimulator(model, targetEnv, { projectRoot: config.projectRoot });
       const result = await simulator.simulateWorkflow(workflow, {
         loadWorkflow: (slugOrName) => loadWorkflowByName<WorkflowDef>(config.workflowsDir, slugOrName),
+        // An unreachable or unhealthy target is reported once, not as a failure on every step.
+        preflight: 'abort',
       });
       const failures = result.results
         .filter((r) => !r.passed)
         .map((r) => ({ step: r.name, status: r.actualStatus, error: r.error }));
+      if (result.preflight?.aborted) {
+        failures.push({ step: 'preflight', status: result.preflight.status ?? 0, error: result.preflight.message });
+      }
       results.push({ name: workflow.name, passed: result.success, durationMs: result.stats.totalTimeMs, failures });
 
       if (result.success) {
