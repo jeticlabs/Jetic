@@ -962,6 +962,12 @@ export const simulateWorkflowCommand = new Command('workflow')
       console.log(`  ${c.yellow}⚠${c.reset} Start your backend project and try again.\n`);
       process.exit(1);
     }
+    if (probe.cause) {
+      checkSpinner.stop();
+      console.log(`  ${c.red}✗${c.reset} Backend is unhealthy (HTTP ${probe.status}) at ${c.bold}${baseUrl}${c.reset}`);
+      console.log(`  ${c.red}${probe.message}${c.reset}\n`);
+      process.exit(1);
+    }
     if (probe.verdict === 'server-error') {
       checkSpinner.stop(`  ${c.yellow}⚠${c.reset} Backend reachable but failing (HTTP ${probe.status}) at ${baseUrl}`);
       console.log(`  ${c.yellow}${probe.message}${c.reset}\n`);

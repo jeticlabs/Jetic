@@ -43,6 +43,18 @@ Full fidelity: `middleware` in order, `parameters` with `min/max`, `requestBody`
 | `jetic_update_workflow` |
 | `jetic_delete_workflow` |
 | `jetic_test_endpoint` / `jetic_simulate_workflow` (+ alias `jetic_simulate`) — live HTTP |
+| `jetic_get_run` — full stored report (or live progress) of one run, by `runId` |
+| `jetic_list_runs` — recent simulation and agent runs, newest first |
+
+### Running a simulation
+
+`jetic_simulate_workflow { workflow, envName?, baseUrl?, clearMemory?, preflight?, requestTimeoutMs?, waitMs?, async?, includeStepResults? }`
+
+- **Preflight** (`preflight: abort|warn|off`, default `abort`): probes `baseUrl` before step 1. Nothing listening (`ECONNREFUSED`, DNS failure, timeout), or a 5xx whose body names a database failure (Prisma `P1001`, Sequelize, MongoDB), stops the run with one `abortReason` and no step requests.
+- **Mid-run**: a dropped connection or a database-down 5xx stops the run even when steps use `onFailure: continue` — those steps would all fail for the same infrastructure reason.
+- **Every run is saved** to `.jetic/runs/<runId>/` (`simulation-status.json` updated after each step, `simulation-report.json` at the end).
+- **Long runs** (`waitMs`, default 45000): the call waits up to `waitMs`. A run still going replies `{ status: "running", runId, progress }` and keeps running in the background — poll `jetic_get_run` until `status` is not `running`. `async: true` replies immediately.
+- **One run at a time per project**: runs share `.jetic/memory.json`, so a second call while one is running is an error that names the active `runId`.
 
 ---
 

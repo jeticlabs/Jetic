@@ -3,7 +3,7 @@ import * as http from 'http';
 import * as os from 'os';
 import * as path from 'path';
 import { AddressInfo } from 'net';
-import { WorkflowDef, WorkflowSimulator } from './workflow-simulator';
+import { detectInfraFailure, WorkflowDef, WorkflowSimulator } from './workflow-simulator';
 
 interface Stub {
   baseUrl: string;
@@ -30,6 +30,14 @@ function startStub(): Promise<Stub> {
       }
       res.setHeader('Content-Type', 'application/json');
       if (req.url === '/login') return void res.end(JSON.stringify({ data: { role: 'user', token: 'tok_seeded' } }));
+      if (req.url === '/dbdown') {
+        res.statusCode = 500;
+        return void res.end(JSON.stringify({ error: "PrismaClientInitializationError: Can't reach database server at db:5432 (P1001)" }));
+      }
+      if (req.url === '/boom') {
+        res.statusCode = 500;
+        return void res.end(JSON.stringify({ error: 'TypeError: cannot read properties of undefined' }));
+      }
       if (req.url === '/missing') {
         res.statusCode = 404;
         return void res.end(JSON.stringify({ error: 'nope' }));
@@ -464,6 +472,69 @@ describe('WorkflowSimulator', () => {
 
       expect(result.success).toBe(false);
       expect(result.results[0].error).toMatch(/timed out after 60ms/);
+    });
+
+    it('preflight aborts when the server answers 5xx because its database is down', async () => {
+      const prismaDown = http.createServer((_req, res) => {
+        res.statusCode = 500;
+        res.end('PrismaClientInitializationError: P1001');
+      });
+      await new Promise<void>((r) => prismaDown.listen(0, '127.0.0.1', () => r()));
+      try {
+        const baseUrl = `http://127.0.0.1:${(prismaDown.address() as AddressInfo).port}`;
+        const unhealthy = new WorkflowSimulator({ endpoints: [] } as any, { name: 'db-down', baseUrl }, { projectRoot });
+        const result = await unhealthy.simulateWorkflow(workflow('db', [{ name: 'Step', method: 'GET', path: '/x' }]), {
+          preflight: 'abort',
+        });
+
+        expect(result.stats.executedSteps).toBe(0);
+        expect(result.preflight).toMatchObject({ verdict: 'server-error', aborted: true, status: 500 });
+        expect(result.preflight?.cause).toMatch(/P1001/);
+        expect(result.abortReason).toMatch(/database is unreachable/);
+      } finally {
+        await new Promise((r) => prismaDown.close(() => r(undefined)));
+      }
+    });
+
+    it('a database-down 5xx mid-run aborts even under onFailure: continue', async () => {
+      const result = await sim.simulateWorkflow(
+        workflow('db-mid', [
+          { name: 'Db', method: 'GET', path: '/dbdown', onFailure: 'continue' },
+          { name: 'Never', method: 'GET', path: '/never', onFailure: 'continue' },
+        ])
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0]).toMatchObject({ actualStatus: 500, failureHandling: 'aborted' });
+      expect(result.results[0].error).toMatch(/database is unreachable.*target is unhealthy \(1 step\(s\) not executed\)/);
+      expect(stub.hits).toEqual(['GET /dbdown']);
+    });
+
+    it('an ordinary 5xx still honours onFailure: continue', async () => {
+      const result = await sim.simulateWorkflow(
+        workflow('boom', [
+          { name: 'Boom', method: 'GET', path: '/boom', onFailure: 'continue' },
+          { name: 'Ok', method: 'GET', path: '/ok' },
+        ])
+      );
+
+      expect(result.results.map((r) => r.passed)).toEqual([false, true]);
+      expect(result.results[0].failureHandling).toBe('continued');
+    });
+
+    it.each([
+      ["Can't reach database server at `db.neon.tech:5432`", /P1001/],
+      [{ name: 'SequelizeConnectionRefusedError' }, /Sequelize/],
+      ['MongoServerSelectionError: connect ECONNREFUSED', /MongoDB/],
+      ['Error: connect ECONNREFUSED 127.0.0.1:6379', /database\/cache/],
+    ])('detectInfraFailure recognises %p', (body, expected) => {
+      expect(detectInfraFailure(body)).toMatch(expected);
+    });
+
+    it('detectInfraFailure ignores ordinary errors', () => {
+      expect(detectInfraFailure({ error: 'Validation failed' })).toBeUndefined();
+      expect(detectInfraFailure(null)).toBeUndefined();
     });
 
     it('aborts the remaining steps when the connection drops mid-run', async () => {

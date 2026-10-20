@@ -3,6 +3,8 @@
  * live execution against the fixture API, environments, agents, and change tracking.
  */
 import * as fs from 'fs';
+import * as http from 'http';
+import { AddressInfo } from 'net';
 import { McpSession } from '../harness/mcp';
 import { checkoutWithMemoryId, happyCheckout } from '../fixtures/workflows';
 import { startShopApi, ShopApi } from '../harness/shop-api';
@@ -218,6 +220,44 @@ describe('Tier 4 — live execution', () => {
     const missing = await session.call('jetic_get_run', { runId: 'no-such-run' });
     expect(missing.isError).toBe(true);
     expect(missing.text).toContain('not found');
+  });
+
+  test('SMK-408g a run outlasting waitMs is handed off instead of timing out; one run at a time per project', async () => {
+    // Answers "/" at once (preflight) and every other path after 800ms.
+    const slow = http.createServer((req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url === '/') return void res.end('{"ok":true}');
+      setTimeout(() => res.end('{"ok":true}'), 800);
+    });
+    await new Promise<void>((r) => slow.listen(0, '127.0.0.1', () => r()));
+    const slowUrl = `http://127.0.0.1:${(slow.address() as AddressInfo).port}`;
+    try {
+      const slowWorkflow = { name: 'slow', steps: [{ name: 'Slow', method: 'GET', path: '/api/slow', expectStatus: 200 }] };
+      await session.call('jetic_create_workflow', { ...slowWorkflow, allowUnknownEndpoints: true });
+
+      const started = await session.call('jetic_simulate_workflow', { workflow: 'slow', baseUrl: slowUrl, waitMs: 100 });
+      expect(started.ok).toBe(true);
+      expect(started.data).toMatchObject({ status: 'running', progress: { totalSteps: 1, executedSteps: 0 } });
+      expect(started.data.message).toMatch(/continues in the background/);
+      const runId = started.data.runId as string;
+
+      const second = await session.call('jetic_simulate_workflow', { workflow: 'slow', baseUrl: slowUrl });
+      expect(second.isError).toBe(true);
+      expect(second.text).toContain(`Simulation ${runId} is still running`);
+
+      let status = 'running';
+      for (let i = 0; i < 50 && status === 'running'; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        status = (await session.call('jetic_get_run', { runId })).data.status;
+      }
+      expect(status).toBe('passed');
+
+      // Once it has finished, the next run waits inline as usual.
+      const next = await session.call('jetic_simulate_workflow', { workflow: 'slow', baseUrl: slowUrl });
+      expect(next.data).toMatchObject({ success: true, status: 'passed' });
+    } finally {
+      await new Promise((r) => slow.close(() => r(undefined)));
+    }
   });
 
   test('SMK-408f progress is pollable and every stored step carries the curl-style payload', async () => {

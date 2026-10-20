@@ -167,9 +167,11 @@ export const JETIC_MCP_INSTRUCTIONS = [
   '',
   'STEP 4g — RUN',
   '  jetic_simulate_workflow { "workflow": "<slug>" }',
-  '  It preflights the target first and fails fast with a clear reason when the app is unreachable.',
-  '  The response is a compact summary + runId. Full step detail: jetic_get_run { "runId": "..." };',
-  '  recent runs: jetic_list_runs. For long journeys pass async:true, then poll jetic_get_run.',
+  '  It preflights the target first and fails fast with a clear reason when the app is unreachable',
+  '  or its database is down (no per-step noise). The response is a compact summary + runId.',
+  '  A run still going after waitMs (default 45s) replies { status: "running", runId } and keeps running:',
+  '  poll jetic_get_run { "runId": "..." } until status is no longer "running". Do NOT re-run it meanwhile.',
+  '  Full step detail: jetic_get_run; recent runs: jetic_list_runs. async:true replies immediately.',
   '',
   '━━ GENERAL RULES ━━',
   'No AI-provider setup is needed: never ask for OpenRouter/OpenAI keys and never use `jetic config ai`.',
@@ -393,7 +395,7 @@ export function createJeticMcpServer(): McpServer {
   register(
     'jetic_simulate_workflow',
     'Simulate workflow',
-    'Executes a full end-to-end multi-step workflow simulation with dynamic memory capture, header injection, and schema validation against the live server.',
+    'Executes a full end-to-end multi-step workflow simulation with dynamic memory capture, header injection, and schema validation against the live server. Preflights the target and aborts with one clear reason when it is unreachable or its database is down. Every run is saved to .jetic/runs/<runId>/; a run outlasting waitMs (default 45s) returns { status: "running", runId } and continues in the background — poll jetic_get_run. One run at a time per project.',
     simulateWorkflowSchema.shape,
     READ_LIVE,
     handleSimulateWorkflow

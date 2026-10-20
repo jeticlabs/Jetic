@@ -8,6 +8,7 @@ import {
   compactSimulationResult,
   deriveRunStatus,
   newRunId,
+  readRunStatus,
   statsFromSteps,
   stepToProgress,
   updateRunStatus,
@@ -124,6 +125,15 @@ export function handleListWorkflows(args: z.infer<typeof listWorkflowsSchema>) {
   };
 }
 
+/** Below the 60s request timeout most MCP clients use, so a long run is handed off instead of timing out. */
+export const DEFAULT_SIMULATE_WAIT_MS = 45_000;
+
+/**
+ * Simulations in flight, by .jetic dir. Runs of one project share .jetic/memory.json, so a
+ * second run is refused while one is still going (possible once a run continues in the background).
+ */
+const activeRuns = new Map<string, string>();
+
 export const simulateWorkflowSchema = z.object({
   projectPath: z.string().optional().describe('Path to project root or .jetic folder'),
   workflow: z.string().optional().describe('Workflow slug, name, or JSON file path to execute. If omitted, defaults to available workflow'),
@@ -140,6 +150,14 @@ export const simulateWorkflowSchema = z.object({
     .optional()
     .default(false)
     .describe('Start the run in the background and return immediately with a runId. Poll it with jetic_get_run or jetic_list_runs.'),
+  waitMs: z
+    .number()
+    .int()
+    .min(0)
+    .max(600000)
+    .optional()
+    .default(DEFAULT_SIMULATE_WAIT_MS)
+    .describe('How long to wait for the run before replying (default 45000, below typical MCP client timeouts). A run still going after this keeps running in the background and the call returns { status: "running", runId } — poll jetic_get_run. Ignored when async is true.'),
   preflight: z
     .enum(['abort', 'warn', 'off'])
     .optional()
@@ -286,6 +304,13 @@ export async function handleSimulateWorkflow(args: z.infer<typeof simulateWorkfl
     steps: plannedSteps,
   };
 
+  const active = activeRuns.get(jeticDir);
+  if (active) {
+    throw new Error(
+      `Simulation ${active} is still running for this project and shares its memory. Poll jetic_get_run { "runId": "${active}" } until it finishes, then retry.`
+    );
+  }
+
   const execute = async () => {
     const result = await simulator.simulateWorkflow(workflowDef, {
       clearMemory: args.clearMemory ?? false,
@@ -314,29 +339,50 @@ export async function handleSimulateWorkflow(args: z.infer<typeof simulateWorkfl
     return { result, reportPath };
   };
 
-  // 5. Async mode: persist a "running" marker, hand the runId back immediately,
-  //    and record the outcome when the background run finishes.
+  // 5. Persist a "running" marker first so the run is observable from the start, then run it.
+  //    Async mode replies at once; otherwise we wait up to waitMs and hand the run off to the
+  //    background if it is still going, so the client's request timeout never cuts it short.
+  writeRunningStatus(jeticDir, runId, runMeta);
+  activeRuns.set(jeticDir, runId);
+  const settled = execute()
+    .catch((err) => {
+      try {
+        writeRunError(jeticDir, runId, err, runMeta);
+      } catch {
+        // Status file is best-effort — the original error is what matters.
+      }
+      throw err;
+    })
+    .finally(() => activeRuns.delete(jeticDir));
+  settled.catch(() => undefined); // a detached run must never raise an unhandled rejection
+
+  const runningResponse = (message: string) => ({
+    status: 'running',
+    runId,
+    workflowName: runMeta.workflowName,
+    environment: { name: effectiveEnv.name, baseUrl: effectiveEnv.baseUrl },
+    progress: readRunStatus(jeticDir, runId)?.stats,
+    message,
+  });
+  const pollHint = `Poll with jetic_get_run { "runId": "${runId}" } or jetic_list_runs.`;
+
   if (args.async) {
-    writeRunningStatus(jeticDir, runId, runMeta);
-    execute()
-      .then(() => undefined)
-      .catch((err) => {
-        try {
-          writeRunError(jeticDir, runId, err, runMeta);
-        } catch {
-          // Status file is best-effort — never surface an unhandled rejection.
-        }
-      });
-    return {
-      status: 'running',
-      runId,
-      workflowName: runMeta.workflowName,
-      environment: { name: effectiveEnv.name, baseUrl: effectiveEnv.baseUrl },
-      message: `Run started in the background against ${effectiveEnv.baseUrl}. Poll with jetic_get_run { "runId": "${runId}" } or jetic_list_runs.`,
-    };
+    return runningResponse(`Run started in the background against ${effectiveEnv.baseUrl}. ${pollHint}`);
   }
 
-  const { result, reportPath } = await execute();
+  const waitMs = args.waitMs ?? DEFAULT_SIMULATE_WAIT_MS;
+  let timer: NodeJS.Timeout | undefined;
+  const outcome = await Promise.race([
+    settled,
+    new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), waitMs);
+    }),
+  ]).finally(() => clearTimeout(timer));
+
+  if (!outcome) {
+    return runningResponse(`Still running after ${waitMs}ms; it continues in the background. ${pollHint}`);
+  }
+  const { result, reportPath } = outcome;
 
   // 6. Compact by default (one line per step); full bodies only on request.
   if (args.includeStepResults) {

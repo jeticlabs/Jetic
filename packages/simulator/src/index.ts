@@ -4,6 +4,6 @@ export { ResponseValidator, ValidationResult, FieldValidation } from './response
 export {
   WorkflowSimulator, WorkflowDef, WorkflowStepDef, WorkflowStepResult, WorkflowSimulationResult,
   SimulateWorkflowOptions, WorkflowSimulatorRuntime, SimulationProgress, PreflightProbe,
-  probeTarget, networkErrorCode, CONNECTION_ERROR_CODES,
+  probeTarget, networkErrorCode, detectInfraFailure, CONNECTION_ERROR_CODES,
 } from './workflow-simulator';
 export * from './conditions';
